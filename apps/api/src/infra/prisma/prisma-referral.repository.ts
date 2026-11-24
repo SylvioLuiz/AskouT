@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { ReferralRecord, ReferralRepository } from '../../core/ports.ts';
+import type { InviteClickRecord, ReferralRecord, ReferralRepository } from '../../core/ports.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaReferralRepository implements ReferralRepository {
@@ -46,5 +46,21 @@ export class PrismaReferralRepository implements ReferralRepository {
        ORDER BY confirmed DESC, total DESC, r."inviterId" ASC
        LIMIT ${limit}`;
     return rows.map((r) => ({ inviterId: r.inviterId, total: Number(r.total), confirmed: Number(r.confirmed) }));
+  }
+
+  async hasInvitee(inviteeId: string): Promise<boolean> {
+    if (!isUuid(inviteeId)) return false;
+    return (await this.prisma.referral.count({ where: { inviteeId } })) > 0;
+  }
+
+  async recordClick(click: InviteClickRecord, purgeBefore: Date): Promise<void> {
+    await this.prisma.inviteClick.deleteMany({ where: { createdAt: { lt: purgeBefore } } });
+    if (!isUuid(click.inviterId)) return;
+    await this.prisma.inviteClick.create({ data: { networkKey: click.networkKey, inviterId: click.inviterId, createdAt: click.createdAt } });
+  }
+
+  async latestClick(networkKey: string, since: Date): Promise<InviteClickRecord | null> {
+    const row = await this.prisma.inviteClick.findFirst({ where: { networkKey, createdAt: { gte: since } }, orderBy: { createdAt: 'desc' } });
+    return row ? { networkKey: row.networkKey, inviterId: row.inviterId, createdAt: row.createdAt } : null;
   }
 }

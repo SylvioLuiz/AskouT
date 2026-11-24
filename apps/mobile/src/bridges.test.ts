@@ -671,6 +671,9 @@ test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Andr
     { id: 2, tag: 'msg:2', data: { 'askout.url': '/conversas/2' } },
     { id: 3, title: 'ana ligou o NOW', body: 'Bora?', data: {} },
     { id: 4, data: { url: '/conversas/9' } },
+    // Chegada ao vivo do amigo: fica, mesmo com a tela do encontro aberta.
+    { id: 5, data: { url: '/now/encontro/7', live: '{"state":"moving"}' } },
+    { id: 6, tag: 'arrival:7:ana', data: { 'askout.url': '/now/encontro/7', 'askout.live': '1' } },
   ];
   let removed: unknown[] = [];
   const push = {
@@ -686,6 +689,7 @@ test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Andr
   assert.deepEqual(removed.map((n) => (n as { id: number }).id), [2]);
   assert.equal(await bridge.clearDelivered({ url: '/now', texts: [{ title: 'ana ligou o NOW', body: 'Bora?' }] }), 1);
   assert.deepEqual(removed.map((n) => (n as { id: number }).id), [3]);
+  assert.equal(await bridge.clearDelivered({ url: '/now/encontro/7', texts: [] }), 0);
 });
 
 test('localização nativa: erros do plugin viram os códigos do navegador', async () => {

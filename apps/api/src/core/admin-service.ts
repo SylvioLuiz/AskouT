@@ -378,6 +378,15 @@ export class AdminService {
     return this.paymentsSwitch.state();
   }
 
+  /** Escolhe quais pacotes de dias ficam à venda (o preço de cada um nas lojas é definido no App Store Connect e no Play Console). */
+  async setBoostDays(actor: Actor, days: unknown, note: unknown): Promise<PaymentsState> {
+    this.assertAdmin(actor);
+    const reason = noteText(note, false);
+    const chosen = await this.paymentsSwitch.setOfferedDays(days, actor.userId);
+    await this.log(actor.userId, 'BOOST_PACKAGES_UPDATED', 'SETTING', 'boost.days', reason ? `${chosen.join(', ')} dias. ${reason}` : `${chosen.join(', ')} dias`);
+    return this.paymentsSwitch.state();
+  }
+
   // ---------- Configurações de evento ("Pode fumar?", "Estacionamento"...) ----------
 
   private get eventExtrasCatalog(): EventExtrasCatalog {

@@ -64,6 +64,13 @@ export class AdminController {
     return this.core.admin.setPayments(actor, b.enabled, b.note);
   }
 
+  /** `{days: number[], note?}`: quais pacotes de dias do impulsionamento ficam à venda. */
+  @Put('payments/packages')
+  setBoostDays(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.setBoostDays(actor, b.days, b.note);
+  }
+
   /** Configurações de evento cadastradas e os ícones disponíveis. */
   @Get('event-extras')
   eventExtras(@CurrentActor() actor: Actor) {

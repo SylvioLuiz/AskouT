@@ -1932,6 +1932,19 @@ model Referral {
   @@index([inviterId, createdAt])
 }
 
+/// Toque no link de convite no celular sem o app, antes de ir para a loja. `networkKey` é o hash da rede de quem tocou
+/// (nunca o IP). Serve para o convite sobreviver à instalação: quem se cadastra na mesma rede logo depois recebe a
+/// sugestão de quem convidou e confirma. Sem chave estrangeira: dura poucos dias e é apagado a cada novo toque.
+model InviteClick {
+  id         String   @id @default(uuid()) @db.Uuid
+  networkKey String
+  inviterId  String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  @@index([networkKey, createdAt])
+  @@index([createdAt])
+}
+
 /// Álbum do encontro: fotos só de quem foi. No NOW `refId` é o id do convite (sem chave estrangeira: o convite some em 24 h);
 /// no evento é `PLACE:<id>` ou `USER:<id>`. Quem foi fica gravado em AlbumMember.
 model Album {

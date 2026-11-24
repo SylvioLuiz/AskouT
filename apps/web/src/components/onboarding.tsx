@@ -3,15 +3,15 @@ import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
-import { takeInvite } from '../lib/invite.ts';
+import { parseInvite, takeInvite } from '../lib/invite.ts';
 import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, placesFromEvents, shouldShowOnboarding } from '../lib/onboarding.ts';
 import { positionWithin } from '../lib/position.ts';
 import { filterByThemes, saveThemes, themeFilter, themesOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
-import type { ExplorePlace } from '../lib/types.ts';
+import type { ExplorePlace, PublicProfile } from '../lib/types.ts';
 import { BoltIcon, HomeIcon, UserIcon } from './icons.tsx';
 import { TastePicker, toggleTaste } from './tastes.tsx';
-import { Button, Loading } from './ui.tsx';
+import { Avatar, Button, Field, Loading } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 const SLIDE_ICONS = [<HomeIcon key="h" />, <UserIcon key="u" />, <BoltIcon key="b" filled />];
@@ -111,6 +111,80 @@ function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>;
   );
 }
 
+/**
+ * Convite que se perdeu na instalação: "Foi @fulano quem te chamou?" quando o servidor achou o toque no link pela mesma
+ * rede; senão, um campo discreto para digitar o @ de quem convidou.
+ */
+function InviteAsk({ suggested, onAccept, onDismiss }: { suggested: PublicProfile | undefined; onAccept: (who: string) => Promise<void>; onDismiss: () => void }) {
+  const [typing, setTyping] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  async function confirm(who: string | undefined) {
+    if (!who) {
+      setProblem(t('Digite o @ de quem te convidou.'));
+      return;
+    }
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await onAccept(who);
+    } catch {
+      setProblem(t('Não achamos @{username}. Confira o nome e tente de novo.', { username: who }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (suggested && !typing) {
+    return (
+      <div className="onb__ask" role="group" aria-label={t('Convite')}>
+        <div className="onb__askwho">
+          <Avatar profile={suggested} size={36} />
+          <p>{t('Foi @{username} quem te chamou para o AskouT?', { username: suggested.username })}</p>
+        </div>
+        <div className="onb__askactions">
+          <Button small loading={busy} onClick={() => confirm(suggested.username)}>{t('Sim, foi')}</Button>
+          <Button
+            small
+            variant="quiet"
+            onClick={() => {
+              onDismiss();
+              setTyping(false);
+            }}
+          >
+            {t('Não')}
+          </Button>
+        </div>
+        {problem ? <p className="field__error" role="alert">{problem}</p> : null}
+      </div>
+    );
+  }
+  if (!typing) {
+    return (
+      <button type="button" className="onb__asklink" onClick={() => setTyping(true)}>
+        {t('Alguém te convidou?')}
+      </button>
+    );
+  }
+  return (
+    <form
+      className="onb__ask"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void confirm(parseInvite(name));
+      }}
+    >
+      <Field label={t('Quem te convidou?')} prefix="@" value={name} onChange={setName} autoComplete="off" maxLength={31} autoFocus error={problem} />
+      <div className="onb__askactions">
+        <Button small type="submit" loading={busy}>{t('Confirmar')}</Button>
+        <Button small variant="quiet" onClick={() => setTyping(false)}>{t('Cancelar')}</Button>
+      </div>
+    </form>
+  );
+}
+
 /** Primeiro login: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por conta, em qualquer aparelho. */
 export function Onboarding() {
   const user = useUser();
@@ -125,18 +199,31 @@ export function Onboarding() {
   const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(new Set());
   const [invited, setInvited] = useState<string | undefined>();
   const [invitedFriend, setInvitedFriend] = useState(false);
-  // Cadastro por link de convite: a API registra quem convidou e já deixa as duas pessoas amigas.
-  // Se o convite não contar (ex.: conta antiga), só segue quem convidou, como antes.
+  // Convite que não veio junto (a pessoa baixou o app pela loja): quem tocou no link pela mesma rede, para confirmar.
+  const [suggested, setSuggested] = useState<PublicProfile | undefined>();
+
+  /** Registra o convite: a API anota quem convidou e já deixa as duas pessoas amigas. Se não contar, só segue quem convidou. */
+  async function accept(who: string): Promise<void> {
+    const { counted } = await api.claimReferral(who);
+    if (!counted) await api.getProfile(who).then((view) => api.follow(view.profile.userId));
+    setInvitedFriend(counted);
+    setInvited(who);
+    setSuggested(undefined);
+  }
+
+  // Cadastro por link de convite (o app abriu pelo link): registra direto. Sem o convite junto, pergunta ao servidor
+  // se alguém da mesma rede tocou num link de convite antes de baixar o app.
   useEffect(() => {
     if (!open) return;
     const who = takeInvite(storage());
-    if (!who || who === user.profile.username) return;
+    if (who && who !== user.profile.username) {
+      accept(who).catch(() => undefined);
+      return;
+    }
     api
-      .claimReferral(who)
-      .then(async ({ counted }) => {
-        if (!counted) await api.getProfile(who).then((view) => api.follow(view.profile.userId));
-        setInvitedFriend(counted);
-        setInvited(who);
+      .pendingReferral()
+      .then(({ inviter }) => {
+        if (inviter && inviter.username !== user.profile.username) setSuggested(inviter);
       })
       .catch(() => undefined);
     // Roda uma vez, ao abrir pela primeira vez.
@@ -160,6 +247,7 @@ export function Onboarding() {
             <h2 id="onb-titulo" className="onb__title">{slide.title}</h2>
             <p className="onb__text">{slide.text}</p>
             {invited && step === 0 ? <p className="onb__invited" role="status">{invitedFriend ? t('Você entrou pelo convite de @{invited} e vocês já são amigos.', { invited }) : t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p> : null}
+            {!invited && step === 0 ? <InviteAsk suggested={suggested} onAccept={accept} onDismiss={() => setSuggested(undefined)} /> : null}
             <div className="onb__dots" aria-hidden="true">
               {ONBOARDING_SLIDES.map((s, i) => (
                 <span key={s.title} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />

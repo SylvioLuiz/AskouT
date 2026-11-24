@@ -702,8 +702,9 @@ export class FlashService {
   }
 
   /**
-   * Quem acompanha voltou ao NOW e a Live Activity da chegada do amigo não está na tela do iPhone (fechou): abre de
-   * novo, em silêncio, com o progresso de agora. Nada acontece se o amigo não mostra a chegada, não tem posição ou já chegou.
+   * Quem acompanha pediu para ver de novo a chegada do amigo (botão no NOW, ou voltou ao NOW com a Live Activity
+   * fechada no iPhone): manda o aviso de novo, em silêncio, com o progresso de agora (Live Activity no iPhone, aviso fixo
+   * no Android, mesmo se tinha ocultado). Nada acontece se o amigo não mostra a chegada, não tem posição ou já chegou.
    */
   async reopenArrival(actorId: string, inviteId: string): Promise<{ reopened: boolean }> {
     const now = this.deps.clock.now();
@@ -728,7 +729,7 @@ export class FlashService {
       body: `Chega em ~${estimate.minutes} min · ${formatArrivalDistance(estimate.distanceM)} até ${dest ? dest.name : 'você'}`,
       url: `/now/encontro/${invite.id}`,
       tag: arrivalTag(invite.id, sharerId),
-      live: { state: 'moving', progress: this.arrivals.current(arrivalTag(invite.id, sharerId), estimate), quiet: true, untilMs: invite.expiresAt.getTime() },
+      live: { state: 'moving', progress: this.arrivals.current(arrivalTag(invite.id, sharerId), estimate), quiet: true, untilMs: invite.expiresAt.getTime(), reopen: true },
       who: { name: who, ...(profile?.avatarUrl ? { image: profile.avatarUrl } : {}) },
       reopen: true,
     });

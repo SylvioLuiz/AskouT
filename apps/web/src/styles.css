@@ -5678,6 +5678,11 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .poster__date--mini { top: 8px; left: 8px; min-width: 44px; padding: 5px 4px 6px; border-radius: 14px; z-index: 2; }
 .poster__date--mini .poster__date-d { margin: 2px 0; font-size: 1.25rem; }
 .poster__date--mini .poster__date-w, .poster__date--mini .poster__date-m { font-size: 0.625rem; }
+.onb__ask { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--brand-soft); text-align: left; }
+.onb__askwho { display: flex; align-items: center; gap: 10px; }
+.onb__askwho p { margin: 0; color: var(--ink); font-size: 0.9375rem; font-weight: 600; }
+.onb__askactions { display: flex; gap: 8px; }
+.onb__asklink { align-self: center; padding: 6px 8px; border: 0; background: none; color: var(--brand); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .onb__invited { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--brand-soft); color: var(--ink); font-size: 0.9375rem; font-weight: 600; }
 .vhero__friends { display: flex; align-items: center; gap: 8px; margin: 0; color: #fff; font-size: 0.875rem; font-weight: 600; text-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
 .vhero__faces { display: inline-flex; }

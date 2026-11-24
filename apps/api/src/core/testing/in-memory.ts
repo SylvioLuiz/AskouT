@@ -6,6 +6,7 @@ import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   ReferralRecord,
+  InviteClickRecord,
   ReferralRepository,
   AlbumRepository,
   VenueStoryRepository,
@@ -257,6 +258,21 @@ export class InMemoryUserRepository implements UserRepository {
 
 export class InMemoryReferralRepository implements ReferralRepository {
   readonly rows = new Map<string, ReferralRecord>();
+  clicks: InviteClickRecord[] = [];
+
+  async hasInvitee(inviteeId: string): Promise<boolean> {
+    return this.rows.has(inviteeId);
+  }
+
+  async recordClick(click: InviteClickRecord, purgeBefore: Date): Promise<void> {
+    this.clicks = this.clicks.filter((c) => c.createdAt >= purgeBefore);
+    this.clicks.push({ ...click });
+  }
+
+  async latestClick(networkKey: string, since: Date): Promise<InviteClickRecord | null> {
+    const found = this.clicks.filter((c) => c.networkKey === networkKey && c.createdAt >= since).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return found ? { ...found } : null;
+  }
   private readonly users: InMemoryUserRepository;
 
   constructor(users: InMemoryUserRepository) {
