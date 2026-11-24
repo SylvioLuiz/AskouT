@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { rejectsWith } from './testing/helpers.ts';
+import { postsOnly, rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
 const H = 3_600_000;
@@ -140,7 +140,7 @@ test('posts do bar: só o dono publica, aparecem na página e no feed de quem se
   await w.core.venues.follow(ana, 'v1');
   const feed = await w.core.posts.feed(ana);
   assert.equal(feed.items.length, 1);
-  assert.equal(feed.items[0]!.venue?.name, 'Bar do Zé');
+  assert.equal(postsOnly(feed.items)[0]!.venue?.name, 'Bar do Zé');
   assert.equal((await w.core.posts.feed(bia)).items.length, 0);
   assert.equal((await w.core.posts.feed(dono)).items.length, 1, 'quem administra o local vê os posts dele no próprio Início');
   // não aparece no perfil pessoal do dono
