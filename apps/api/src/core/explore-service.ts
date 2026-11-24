@@ -498,7 +498,14 @@ export class ExploreService {
     const premium = (input.google === true || input.google === 'true' || input.google === '1') && text.length >= GOOGLE_SEARCH_MIN_CHARS;
     const canSearchGoogle = source.premiumSearch === true && !premium && text.length >= GOOGLE_SEARCH_MIN_CHARS;
     if (!source.search) return { places: placeItems, placesAvailable: false, canSearchGoogle: false };
-    const ext = await source.search(text, center, 10, { premium });
+    let ext = await source.search(text, center, 10, { premium });
+    // Sem nada no AskouT nem no OpenStreetMap, a pessoa cairia num beco sem saída (um bar pequeno quase nunca está no OSM):
+    // o Google entra sozinho. Continua barrado pelo teto diário e pela memória de 10 minutos; com resultados, segue só no botão.
+    let autoGoogle = false;
+    if (!premium && source.premiumSearch === true && text.length >= GOOGLE_SEARCH_MIN_CHARS && placeItems.length === 0 && ext.places.length === 0) {
+      ext = await source.search(text, center, 10, { premium: true });
+      autoGoogle = ext.places.length > 0;
+    }
     const seen = new Set(placeItems.map((p) => fold(p.name)));
     const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
     for (const p of ext.places) {
@@ -524,7 +531,7 @@ export class ExploreService {
         venue: null,
       });
     }
-    return { places: placeItems, placesAvailable: ext.available, canSearchGoogle };
+    return { places: placeItems, placesAvailable: ext.available, canSearchGoogle: canSearchGoogle && !autoGoogle };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */

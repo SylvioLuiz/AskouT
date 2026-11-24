@@ -70,3 +70,26 @@ test('a busca por nome só gasta o Google quando a pessoa pede, com 3 letras ou 
   assert.equal(w.placeSource.premiumCalls, 1);
   assert.equal(short.canSearchGoogle, false);
 });
+
+test('sem resultado no AskouT nem no OSM, a busca recorre ao Google sozinha', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  const BUXIXO = { externalId: 'ChIJBuxixo', source: 'GOOGLE' as const, name: 'Buxixo Bar', category: 'bar', lat: -23.5225, lng: -46.1883, address: 'Mogi das Cruzes - SP' };
+  w.placeSource.premiumOnly = [BUXIXO];
+  w.placeSource.premiumSearch = true;
+  const r = await w.core.explore.searchPlaces(ana!, { q: 'buxixo' });
+  assert.deepEqual(r.places.map((p) => p.key), ['google:ChIJBuxixo']);
+  assert.equal(r.canSearchGoogle, false);
+});
+
+test('com resultados gratuitos, o Google continua só no botão', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  w.placeSource.searchable = [{ externalId: 'osm1', source: 'OSM' as const, name: 'Buxixo Pizzaria', category: 'restaurant', lat: -23.5, lng: -46.1 }];
+  w.placeSource.premiumOnly = [{ externalId: 'ChIJBuxixo', source: 'GOOGLE' as const, name: 'Buxixo Bar', category: 'bar', lat: -23.5225, lng: -46.1883 }];
+  w.placeSource.premiumSearch = true;
+  const r = await w.core.explore.searchPlaces(ana!, { q: 'buxixo' });
+  assert.deepEqual(r.places.map((p) => p.key), ['osm:osm1']);
+  assert.equal(r.canSearchGoogle, true);
+  assert.equal(w.placeSource.premiumCalls, 0);
+});

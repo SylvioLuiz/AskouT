@@ -2160,13 +2160,16 @@ export class FakePlaceSource implements PlaceSource {
   /** Finge ter uma fonte paga (Google) para a busca: o app mostra o botão "buscar mais no Google". */
   premiumSearch = false;
   premiumCalls = 0;
+  /** Lugares que só a busca paga (Google) acha; a gratuita (OSM) não os vê. */
+  premiumOnly: ExternalPlace[] = [];
 
   async search(text: string, _center?: unknown, _limit?: number, opts?: { premium?: boolean }): Promise<{ available: boolean; places: ExternalPlace[] }> {
     this.searchCalls += 1;
     if (opts?.premium) this.premiumCalls += 1;
     if (!this.available) return { available: false, places: [] };
     const needle = text.toLowerCase();
-    return { available: true, places: this.searchable.filter((p) => `${p.name} ${p.address ?? ''}`.toLowerCase().includes(needle)).map((p) => ({ ...p })) };
+    const pool = opts?.premium ? [...this.searchable, ...this.premiumOnly] : this.searchable;
+    return { available: true, places: pool.filter((p) => `${p.name} ${p.address ?? ''}`.toLowerCase().includes(needle)).map((p) => ({ ...p })) };
   }
 
   async lookup(externalId: string): Promise<ExternalPlace | undefined> {
