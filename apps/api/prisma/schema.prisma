@@ -1409,7 +1409,10 @@ model DatePoll {
   conversationId     String    @db.Uuid
   organizerId        String    @db.Uuid
   title              String
+  /// BEST_DATE (vota os dias; hora fixa), BEST_TIME (dia já definido: vota os horários de `candidateTimes`) ou BEST_DATE_TIME (vota os dias e os horários).
   schedulingMode     String    @default("BEST_DATE")
+  /// Horários (HH:MM) votados em BEST_TIME e BEST_DATE_TIME; vazio no BEST_DATE.
+  candidateTimes     String[]  @default([])
   rangeStart         String    @db.VarChar(10)
   rangeEnd           String    @db.VarChar(10)
   durationMinutes    Int
@@ -1459,7 +1462,7 @@ model DatePollParticipant {
   @@index([userId])
 }
 
-/// Um voto por pessoa, votação e dia (a chave primária garante). Dia sem linha = sem resposta.
+/// Um voto por pessoa, votação e opção (a chave primária garante): o dia (AAAA-MM-DD) ou, nas votações com horário, o horário (HH:MM). Sem linha = sem resposta.
 model DatePollVote {
   pollId        String   @db.Uuid
   userId        String   @db.Uuid

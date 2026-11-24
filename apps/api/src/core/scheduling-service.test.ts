@@ -474,3 +474,91 @@ test('grupo do evento: quem é adicionado entra na votação e recebe convite; n
     assert.equal(cards.length, 1);
   }
 });
+
+async function setupMode(mode: 'BEST_TIME' | 'BEST_DATE_TIME') {
+  const base = await setup();
+  const { w, ana, group } = base;
+  const range = mode === 'BEST_TIME' ? { rangeStart: '2026-10-24', rangeEnd: '2026-10-24' } : { rangeStart: '2026-10-23', rangeEnd: '2026-10-25' };
+  const poll = await w.core.scheduling.create(ana, group.id, { title: 'Pizza', ...range, mode, candidateTimes: ['21:00', '19:00', '19:00'], durationMinutes: 120 });
+  return { ...base, poll };
+}
+
+test('só horário: um dia só, de 2 a 12 horários, sem dias para votar', async () => {
+  const { w, ana, group } = await setup();
+  const base = { title: 'Pizza', rangeStart: '2026-10-24', rangeEnd: '2026-10-24', mode: 'BEST_TIME', candidateTimes: ['19:00', '21:00'] };
+  await rejectsWith(w.core.scheduling.create(ana, group.id, { ...base, rangeEnd: '2026-10-25' }), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.create(ana, group.id, { ...base, candidateTimes: ['19:00'] }), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.create(ana, group.id, { ...base, candidateTimes: ['19:00', '25:00'] }), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.create(ana, group.id, { ...base, mode: 'X' }), 'VALIDATION');
+  const { w: w2, poll, bia } = await setupMode('BEST_TIME');
+  assert.equal(poll.mode, 'BEST_TIME');
+  assert.deepEqual(poll.candidateTimes, ['19:00', '21:00']);
+  assert.deepEqual(poll.days, []);
+  assert.deepEqual(poll.times.map((t) => t.date), ['19:00', '21:00']);
+  await rejectsWith(w2.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['2026-10-24'] }), 'VALIDATION');
+  await rejectsWith(w2.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['20:00'] }), 'VALIDATION');
+  const v = await w2.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['21:00'] });
+  assert.equal(v.myVotes['21:00'], 'YES');
+});
+
+test('só horário: a proposta usa o dia da votação e o horário escolhido; confirmar o melhor pega o horário mais votado', async () => {
+  const { w, ana, bia, caio, dani, poll } = await setupMode('BEST_TIME');
+  for (const id of [ana, bia, caio]) await w.core.scheduling.vote(id, poll.id, { status: 'YES', dates: ['21:00'] });
+  await w.core.scheduling.vote(dani, poll.id, { status: 'NO', dates: ['21:00'] });
+  await w.core.scheduling.vote(dani, poll.id, { status: 'YES', dates: ['19:00'] });
+  const view = await w.core.scheduling.get(ana, poll.id);
+  assert.equal(view.timeRanking[0]?.date, '21:00');
+  assert.equal(view.enoughData, true);
+  const summary = (await w.core.scheduling.listMine(ana)).items.find((p) => p.id === poll.id)!;
+  assert.deepEqual([summary.best?.date, summary.best?.time], ['2026-10-24', '21:00']);
+  for (const id of [ana, bia, caio, dani]) await w.core.scheduling.finish(id, poll.id, true);
+  const done = await w.core.scheduling.confirmBest(ana, poll.id);
+  assert.equal(done.status, 'FINALIZED');
+  assert.equal(done.final?.date, '2026-10-24');
+  // 21:00 em São Paulo (UTC-3), duas horas de duração.
+  assert.equal(done.final?.startsAt, '2026-10-25T00:00:00.000Z');
+  assert.equal(done.final?.endsAt, '2026-10-25T02:00:00.000Z');
+  const meetup = (await w.core.meetups.listMine(ana)).find((m) => m.id === done.final!.meetupId)!;
+  assert.equal(meetup.confirmedCount, 3);
+});
+
+test('só horário: propor um horário (também mandado no lugar do dia) e confirmar', async () => {
+  const { w, ana, bia, caio, poll } = await setupMode('BEST_TIME');
+  await rejectsWith(w.core.scheduling.propose(ana, poll.id, undefined, '20:00'), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.propose(ana, poll.id, '2026-10-25', '19:00'), 'VALIDATION');
+  const v = await w.core.scheduling.propose(ana, poll.id, '19:00');
+  assert.equal(v.proposal?.date, '2026-10-24');
+  assert.equal(v.proposal?.startsAt, '2026-10-24T22:00:00.000Z');
+  await w.core.scheduling.respond(bia, poll.id, 'CONFIRMED');
+  const fin = await w.core.scheduling.respond(caio, poll.id, 'CONFIRMED');
+  assert.equal(fin.status, 'FINALIZED');
+});
+
+test('data e horário: vota dias e horários; vai quem pode no dia e no horário', async () => {
+  const { w, ana, bia, caio, dani, poll } = await setupMode('BEST_DATE_TIME');
+  assert.equal(poll.days.length, 3);
+  assert.equal(poll.times.length, 2);
+  for (const id of [ana, bia, caio, dani]) await w.core.scheduling.vote(id, poll.id, { status: 'YES', dates: ['2026-10-24'] });
+  for (const id of [ana, bia]) await w.core.scheduling.vote(id, poll.id, { status: 'YES', dates: ['19:00', '21:00'] });
+  await w.core.scheduling.vote(caio, poll.id, { status: 'MAYBE', dates: ['21:00'] });
+  await w.core.scheduling.vote(dani, poll.id, { status: 'NO', dates: ['21:00'] });
+  await w.core.scheduling.vote(dani, poll.id, { status: 'YES', dates: ['19:00'] });
+  await w.core.scheduling.vote(caio, poll.id, { status: 'NO', dates: ['19:00'] });
+  const view = await w.core.scheduling.get(ana, poll.id);
+  assert.equal(view.myVotes['2026-10-24'], 'YES');
+  assert.equal(view.myVotes['21:00'], 'YES');
+  await rejectsWith(w.core.scheduling.propose(ana, poll.id, '2026-10-24'), 'VALIDATION');
+  for (const id of [ana, bia, caio, dani]) await w.core.scheduling.finish(id, poll.id, true);
+  const done = await w.core.scheduling.confirmBest(ana, poll.id, '2026-10-24', '21:00');
+  assert.equal(done.final?.startsAt, '2026-10-25T00:00:00.000Z');
+  const meetup = (await w.core.meetups.listMine(ana)).find((m) => m.id === done.final!.meetupId)!;
+  // Ana e Bia (posso nos dois) e Caio (talvez às 21h); Dani não pode às 21h.
+  assert.equal(meetup.confirmedCount, 3);
+});
+
+test('votação só de data não aceita horário', async () => {
+  const { w, bia, poll } = await setup();
+  assert.equal(poll.mode, 'BEST_DATE');
+  assert.deepEqual(poll.times, []);
+  await rejectsWith(w.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['19:00'] }), 'VALIDATION');
+});

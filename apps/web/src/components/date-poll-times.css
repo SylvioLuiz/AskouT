@@ -1,0 +1,26 @@
+/* Votação com horário: escolha dos horários na criação e lista de horários na votação. */
+.pollpolicy--even { grid-template-columns: 1fr 1fr; }
+.polltimes__add { display: flex; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.polltimes__add > :first-child { flex: 1 1 auto; min-width: 0; }
+
+.dptimes { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.dptimes__row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px; border: 1.5px solid var(--control-border); border-radius: 14px; background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.dptimes__row:focus-visible { outline: 3px solid var(--brand-text); outline-offset: 2px; }
+.dptimes__row.is-selected { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.dptimes__time { flex: none; min-width: 3.5em; font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dptimes__info { flex: 1 1 auto; min-width: 0; color: var(--muted); font-size: 0.875rem; }
+.dptimes__mark { flex: none; min-width: 2.5em; font-weight: 600; text-align: right; }
+.dptimes__row--YES, .dptimes__row--LGREEN { background: #d7f0de; }
+.dptimes__row--MAYBE, .dptimes__row--LORANGE { background: #ffe7c2; }
+.dptimes__row--NO, .dptimes__row--LRED { background: #ffd9d6; }
+.dptimes__row--YES .dptimes__info, .dptimes__row--MAYBE .dptimes__info, .dptimes__row--NO .dptimes__info,
+.dptimes__row--LGREEN .dptimes__info, .dptimes__row--LORANGE .dptimes__info, .dptimes__row--LRED .dptimes__info { color: inherit; }
+:root[data-theme='dark'] .dptimes__row--YES, :root[data-theme='dark'] .dptimes__row--LGREEN { background: #1d4a2c; }
+:root[data-theme='dark'] .dptimes__row--MAYBE, :root[data-theme='dark'] .dptimes__row--LORANGE { background: #5a3d0c; }
+:root[data-theme='dark'] .dptimes__row--NO, :root[data-theme='dark'] .dptimes__row--LRED { background: #5a1f1b; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .dptimes__row--YES, :root:not([data-theme='light']) .dptimes__row--LGREEN { background: #1d4a2c; }
+  :root:not([data-theme='light']) .dptimes__row--MAYBE, :root:not([data-theme='light']) .dptimes__row--LORANGE { background: #5a3d0c; }
+  :root:not([data-theme='light']) .dptimes__row--NO, :root:not([data-theme='light']) .dptimes__row--LRED { background: #5a1f1b; }
+}
+.dpoll__propose { display: grid; gap: 8px; }

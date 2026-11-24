@@ -9,6 +9,8 @@ type PollRow = {
   conversationId: string;
   organizerId: string;
   title: string;
+  schedulingMode: string;
+  candidateTimes: string[];
   rangeStart: string;
   rangeEnd: string;
   durationMinutes: number;
@@ -50,7 +52,8 @@ function toPoll(r: PollRow): PollRecord {
     conversationId: r.conversationId,
     organizerId: r.organizerId,
     title: r.title,
-    schedulingMode: 'BEST_DATE',
+    schedulingMode: r.schedulingMode === 'BEST_TIME' || r.schedulingMode === 'BEST_DATE_TIME' ? r.schedulingMode : 'BEST_DATE',
+    candidateTimes: r.candidateTimes,
     rangeStart: r.rangeStart,
     rangeEnd: r.rangeEnd,
     durationMinutes: r.durationMinutes,
@@ -105,6 +108,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
         organizerId: poll.organizerId,
         title: poll.title,
         schedulingMode: poll.schedulingMode,
+        candidateTimes: poll.candidateTimes ?? [],
         rangeStart: poll.rangeStart,
         rangeEnd: poll.rangeEnd,
         durationMinutes: poll.durationMinutes,

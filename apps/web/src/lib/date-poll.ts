@@ -6,6 +6,8 @@ export type Level = 'GREEN' | 'ORANGE' | 'RED' | 'GRAY';
 export type Policy = 'UNANIMITY' | 'MAJORITY' | 'MANUAL';
 export type PollStatus = 'VOTING' | 'CONFIRMING' | 'FINALIZED' | 'CANCELLED';
 export type ConfirmationAnswer = 'CONFIRMED' | 'ADJUST' | 'DECLINED';
+/** O que se vota: os dias (hora fixa), só os horários de um dia já definido, ou os dias e os horários. */
+export type PollMode = 'BEST_DATE' | 'BEST_TIME' | 'BEST_DATE_TIME';
 
 export interface DateStats {
   date: string;
@@ -41,6 +43,9 @@ export interface PollView {
   conversationName: string | null;
   isGroup: boolean;
   title: string;
+  mode: PollMode;
+  /** Horários em votação (vazio em BEST_DATE). */
+  candidateTimes: string[];
   status: PollStatus;
   organizer: PublicProfile;
   isOrganizer: boolean;
@@ -57,9 +62,13 @@ export interface PollView {
   thresholds: { green: number; orange: number; minCoverage: number };
   participants: { profile: PublicProfile; finished: boolean; confirmation: ConfirmationAnswer | null }[];
   days: DateStats[];
+  /** Os horários, com os mesmos números (`date` é o horário HH:MM). */
+  times: DateStats[];
+  /** Votos por dia (AAAA-MM-DD) e por horário (HH:MM). */
   myVotes: Record<string, VoteStatus>;
   iFinished: boolean;
   ranking: DateStats[];
+  timeRanking: DateStats[];
   enoughData: boolean;
   proposal: (ProposalView & { tally: { confirmed: number; adjust: number; declined: number; pending: number; total: number }; myConfirmation: ConfirmationAnswer | null }) | null;
   history: ProposalView[];
@@ -71,6 +80,7 @@ export interface PollSummary {
   id: string;
   conversationId: string;
   title: string;
+  mode?: PollMode;
   status: PollStatus;
   rangeStart: string;
   rangeEnd: string;
@@ -81,7 +91,7 @@ export interface PollSummary {
   votedCount: number;
   finalEndsAt: string | null;
   finishedCount: number;
-  best: { date: string; compatibility: number | null; coverage: number } | null;
+  best: { date: string; time?: string | null; compatibility: number | null; coverage: number } | null;
   proposedDate: string | null;
   votingDeadline: string | null;
   meetupId: string | null;
@@ -99,6 +109,9 @@ export interface PollInput {
   preferredTimeStart?: string;
   votingDeadline?: string;
   confirmationPolicy: Policy;
+  mode?: PollMode;
+  /** Com horário (BEST_TIME e BEST_DATE_TIME): de 2 a 12 horários HH:MM. */
+  candidateTimes?: string[];
   /** Evento seu ainda sem data: a votação decide a data dele. */
   eventPostId?: string;
 }
@@ -284,4 +297,27 @@ const WEEKDAYS_SHORT = [t('Dom'), t('Seg'), t('Ter'), t('Qua'), t('Qui'), t('Sex
 /** "2026-10-24" -> "Sáb, 24 out" (rótulo curto do pódio). */
 export function podiumDay(day: string): string {
   return `${WEEKDAYS_SHORT[weekdayOf(day)]}, ${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]!.slice(0, 3)}`;
+}
+
+/** Horários sugeridos ao ligar a votação de horário (os dois primeiros já vêm marcados). */
+export const SUGGESTED_TIMES = ['19:00', '21:00', '12:00', '15:00', '18:00', '20:00'];
+export const POLL_MAX_TIMES = 12;
+
+/** Modo da votação a partir do que está ligado na criação. Nada ligado: `undefined`. */
+export function modeFor(votesDate: boolean, votesTime: boolean): PollMode | undefined {
+  if (votesDate && votesTime) return 'BEST_DATE_TIME';
+  if (votesDate) return 'BEST_DATE';
+  if (votesTime) return 'BEST_TIME';
+  return undefined;
+}
+
+/** Horário HH:MM de um instante no fuso. */
+export function timeOf(iso: string, timeZone = 'America/Sao_Paulo'): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
+}
+
+/** Acrescenta um horário (HH:MM) à lista, sem repetir e em ordem. */
+export function addTime(list: readonly string[], time: string): string[] {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || list.includes(time)) return [...list];
+  return [...list, time].sort();
 }

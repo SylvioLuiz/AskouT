@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
+import './date-poll-times.css';
 import { Button, EmptyState, Field, Notice, PageHead } from './ui.tsx';
 import { ChevronLeftIcon, ChevronRightIcon, MoonIcon, PlusIcon, SunIcon, SunriseIcon } from './icons.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
 import type { ExploreEvent } from '../lib/types.ts';
-import { SLOT_TIME, chipDay, dayInZone, eventDays, longDay, monthTitle, monthWeeks, shiftMonth } from '../lib/date-poll.ts';
+import { POLL_MAX_TIMES, SLOT_TIME, SUGGESTED_TIMES, addTime, chipDay, dayInZone, eventDays, longDay, modeFor, monthTitle, monthWeeks, shiftMonth } from '../lib/date-poll.ts';
 import type { DaySlot, Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
@@ -40,6 +41,11 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [slot, setSlot] = useState<DaySlot | undefined>();
+  // As duas votações já vêm ligadas: a data e o horário. Dá para desligar uma (nunca as duas).
+  const [votesDate, setVotesDate] = useState(true);
+  const [votesTime, setVotesTime] = useState(true);
+  const [times, setTimes] = useState<string[]>(() => SUGGESTED_TIMES.slice(0, 2));
+  const [newTime, setNewTime] = useState('');
   const [deadline, setDeadline] = useState('');
   const [policy, setPolicy] = useState<Policy>('MAJORITY');
   const [event, setEvent] = useState<ExploreEvent | undefined>();
@@ -57,8 +63,10 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
     form.preventDefault();
     setProblem(undefined);
     if (title.trim() === '') return setProblem(t('Dê um nome ao encontro.'));
-    if (start === '' || end === '') return setProblem(t('Escolha o período de datas.'));
-    if (eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem(t('Com um evento, só dá para votar nos dias dele.'));
+    if (start === '' || end === '') return setProblem(votesDate ? t('Escolha o período de datas.') : t('Escolha o dia.'));
+    if (!votesDate && start !== end) return setProblem(t('Votando só o horário, escolha um dia só.'));
+    if (votesDate && eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem(t('Com um evento, só dá para votar nos dias dele.'));
+    if (votesTime && (times.length < 2 || times.length > POLL_MAX_TIMES)) return setProblem(t('Escolha de 2 a {max} horários.', { max: POLL_MAX_TIMES }));
     if (deadlineMax && deadline > deadlineMax) return setProblem(t('O prazo para votar não pode ser depois do início do evento.'));
     setBusy(true);
     try {
@@ -67,7 +75,9 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
         title: title.trim(),
         rangeStart: start,
         rangeEnd: end,
-        ...(slot ? { preferredTimeStart: SLOT_TIME[slot] } : {}),
+        mode: modeFor(votesDate, votesTime),
+        ...(votesTime ? { candidateTimes: times } : {}),
+        ...(!votesTime && slot ? { preferredTimeStart: SLOT_TIME[slot] } : {}),
         ...(deadline ? { votingDeadline: new Date(deadline).toISOString() } : {}),
         confirmationPolicy: policy,
         ...(undatedEventId ? { eventPostId: undatedEventId } : {}),
@@ -108,9 +118,42 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
 
         <section className="pollcard">
           <div className="pollcard__body">
-            <p className="pollcard__label">{t('Período de datas')}</p>
-            <button type="button" className="pollrange" disabled={eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? (end !== start ? t('Período do evento: {from} a {to}', { from: longDay(start), to: longDay(end) }) : t('Período do evento: {from}', { from: longDay(start) })) : start && end ? t('Período: {from} a {to}. Alterar', { from: longDay(start), to: longDay(end) }) : t('Escolher o período de datas')}>
-              {start && end ? (
+            <p className="pollcard__label">{t('O que votar?')}</p>
+          </div>
+          <div className="pollpolicy pollpolicy--even" role="group" aria-label={t('O que votar')}>
+            <button
+              type="button"
+              className="pollpolicy__opt"
+              aria-pressed={votesDate}
+              onClick={() => {
+                if (votesDate && !votesTime) return;
+                if (votesDate) {
+                  // Só o horário: o dia é um só (o primeiro do período ou do evento).
+                  setEnd(start);
+                }
+                setVotesDate(!votesDate);
+              }}
+            >
+              {votesDate ? '✓ ' : ''}
+              {t('Data')}
+            </button>
+            <button type="button" className="pollpolicy__opt" aria-pressed={votesTime} onClick={() => { if (votesTime && !votesDate) return; setVotesTime(!votesTime); }}>
+              {votesTime ? '✓ ' : ''}
+              {t('Horário')}
+            </button>
+          </div>
+          <p className="pollcard__hint pollcard__hint--wide">
+            {votesDate && votesTime ? t('O grupo vota nos dias e nos horários. Toque em um para tirar.') : votesDate ? t('O grupo vota só nos dias.') : t('O dia já está definido: o grupo vota só no horário.')}
+          </p>
+        </section>
+
+        <section className="pollcard">
+          <div className="pollcard__body">
+            <p className="pollcard__label">{votesDate ? t('Período de datas') : t('Dia')}</p>
+            <button type="button" className="pollrange" disabled={votesDate && eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? (end !== start ? t('Período do evento: {from} a {to}', { from: longDay(start), to: longDay(end) }) : t('Período do evento: {from}', { from: longDay(start) })) : start && end ? t('Período: {from} a {to}. Alterar', { from: longDay(start), to: longDay(end) }) : t('Escolher o período de datas')}>
+              {start && end && !votesDate ? (
+                <span className="pollrange__value">{chipDay(start)}</span>
+              ) : start && end ? (
                 <span className="pollrange__value">
                   {chipDay(start)}
                   {end !== start ? (
@@ -123,7 +166,7 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
                   ) : null}
                 </span>
               ) : (
-                <span className="pollrange__empty">{t('Escolha as datas')}</span>
+                <span className="pollrange__empty">{votesDate ? t('Escolha as datas') : t('Escolha o dia')}</span>
               )}
             </button>
             {event && eventRange ? (
@@ -137,21 +180,51 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
           </div>
         </section>
 
-        <section className="pollcard">
-          <div className="pollcard__body">
-            <p className="pollcard__label">
-              {t('Melhor horário')} <span className="pollcard__opt">{t('(opcional)')}</span>
-            </p>
-          </div>
-          <div className="pollslots" role="group" aria-label={t('Melhor horário')}>
-            {SLOTS.map((o) => (
-              <button key={o.id} type="button" className={`pollslot pollslot--${o.tone}`} aria-pressed={slot === o.id} onClick={() => setSlot(slot === o.id ? undefined : o.id)}>
-                {o.icon}
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </section>
+        {votesTime ? (
+          <section className="pollcard">
+            <div className="pollcard__body">
+              <p className="pollcard__label">{t('Horários para votar')}</p>
+              <div className="chips" role="group" aria-label={t('Horários para votar')}>
+                {[...new Set([...SUGGESTED_TIMES, ...times])].sort().map((time) => (
+                  <button key={time} type="button" className="chip" aria-pressed={times.includes(time)} onClick={() => setTimes(times.includes(time) ? times.filter((x) => x !== time) : addTime(times, time))}>
+                    {time}
+                  </button>
+                ))}
+              </div>
+              <div className="polltimes__add">
+                <Field label={t('Outro horário')} type="time" value={newTime} onChange={setNewTime} />
+                <Button
+                  small
+                  variant="secondary"
+                  disabled={newTime === '' || times.length >= POLL_MAX_TIMES}
+                  onClick={() => {
+                    setTimes(addTime(times, newTime.slice(0, 5)));
+                    setNewTime('');
+                  }}
+                >
+                  {t('Adicionar')}
+                </Button>
+              </div>
+              <p className="pollcard__hint">{t('{n} escolhidos · de 2 a {max} horários.', { n: times.length, max: POLL_MAX_TIMES })}</p>
+            </div>
+          </section>
+        ) : (
+          <section className="pollcard">
+            <div className="pollcard__body">
+              <p className="pollcard__label">
+                {t('Melhor horário')} <span className="pollcard__opt">{t('(opcional)')}</span>
+              </p>
+            </div>
+            <div className="pollslots" role="group" aria-label={t('Melhor horário')}>
+              {SLOTS.map((o) => (
+                <button key={o.id} type="button" className={`pollslot pollslot--${o.tone}`} aria-pressed={slot === o.id} onClick={() => setSlot(slot === o.id ? undefined : o.id)}>
+                  {o.icon}
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="pollcard">
           <div className="pollcard__body">
@@ -185,11 +258,13 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
       </form>
 
       {calendar ? (
-        <Sheet title={t('Período de datas')} onClose={() => setCalendar(false)}>
+        <Sheet title={votesDate ? t('Período de datas') : t('Dia')} onClose={() => setCalendar(false)}>
           <RangeCalendar
             start={start}
             end={end}
-            min={today}
+            min={!votesDate && eventRange ? eventRange.start : today}
+            max={!votesDate && eventRange ? eventRange.end : undefined}
+            single={!votesDate}
             onPick={(a, b) => {
               setStart(a);
               setEnd(b);
@@ -207,7 +282,7 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
               if (picked.startsAt) {
                 const range = eventDays(picked.startsAt, picked.endsAt, today);
                 setStart(range.start);
-                setEnd(range.end);
+                setEnd(votesDate ? range.end : range.start);
                 if (deadline > isoToLocalInput(picked.startsAt)) setDeadline('');
               }
               setPicking(false);
@@ -221,7 +296,7 @@ export function DatePollCreateScreen({ conversationId, eventPostId }: { conversa
 }
 
 /** Toque no primeiro dia e depois no último (o mesmo dia duas vezes vale um dia só). */
-export function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max?: string; onPick: (start: string, end: string) => void }) {
+export function RangeCalendar({ start, end, min, max, single, onPick }: { start: string; end: string; min: string; max?: string; single?: boolean; onPick: (start: string, end: string) => void }) {
   const base = start || min;
   const [view, setView] = useState({ year: Number(base.slice(0, 4)), month: Number(base.slice(5, 7)) });
   const [anchor, setAnchor] = useState<string | undefined>();
@@ -233,6 +308,8 @@ export function RangeCalendar({ start, end, min, max, onPick }: { start: string;
   const to = anchor ?? end;
 
   function tap(day: string) {
+    // Um dia só: o primeiro toque já escolhe.
+    if (single) return onPick(day, day);
     if (!anchor) {
       setAnchor(day);
       return;
@@ -270,7 +347,7 @@ export function RangeCalendar({ start, end, min, max, onPick }: { start: string;
         })}
       </div>
       <p className="pollcal__hint" role="status">
-        {anchor ? t('Agora toque no último dia.') : t('Toque no primeiro e no último dia.')}
+        {single ? t('Toque no dia.') : anchor ? t('Agora toque no último dia.') : t('Toque no primeiro e no último dia.')}
       </p>
     </div>
   );

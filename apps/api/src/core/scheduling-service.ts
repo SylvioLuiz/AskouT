@@ -2,7 +2,7 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { computeDateStats, dateRange, daysBetween, decideConfirmation, hasEnoughData, isDay, isTimeZone, rankDates, tallyConfirmations, todayIn, VOTE_STATUSES, zonedTimeToUtc } from './scheduling.ts';
 import type { ConfirmationPolicy, ConfirmationStatus, ConfirmationTally, DateStats, Thresholds, VoteStatus } from './scheduling.ts';
-import type { MeetupRecord, MessageRecord, PollProposalRecord, PollRecord, PollStatus, PublicProfile } from './types.ts';
+import type { MeetupRecord, MessageRecord, PollProposalRecord, PollRecord, PollStatus, PollVoteRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
 /** Nome do grupo da votação de um evento (o mesmo limite dos grupos). */
@@ -13,6 +13,10 @@ export const POLL_TITLE_MAX = 120;
 export const POLL_MAX_DAYS = 60;
 export const POLL_DEFAULT_TIME_ZONE = 'America/Sao_Paulo';
 export const POLL_DEFAULT_START = '19:00';
+/** Horários que cabem numa votação com horário. */
+export const POLL_MAX_TIMES = 12;
+export type PollMode = PollRecord['schedulingMode'];
+const MODES: readonly PollMode[] = ['BEST_DATE', 'BEST_TIME', 'BEST_DATE_TIME'];
 
 const CONTROL_RE = /[\u0000-\u001f\u007f]/;
 const POLICIES: readonly ConfirmationPolicy[] = ['UNANIMITY', 'MAJORITY', 'MANUAL'];
@@ -28,6 +32,10 @@ export interface PollInput {
   votingDeadline?: unknown;
   confirmationPolicy?: unknown;
   thresholds?: unknown;
+  /** BEST_DATE (padrão): vota os dias. BEST_TIME: o dia já está definido (início = fim) e vota os horários. BEST_DATE_TIME: vota os dias e os horários. */
+  mode?: unknown;
+  /** Com horário (BEST_TIME e BEST_DATE_TIME): de 2 a 12 horários (HH:MM). */
+  candidateTimes?: unknown;
   /** Evento seu ainda sem data: a votação decide a data dele (ao fechar, o evento ganha o dia escolhido). */
   eventPostId?: unknown;
 }
@@ -53,6 +61,10 @@ export interface PollView {
   conversationName: string | null;
   isGroup: boolean;
   title: string;
+  /** O que se vota: os dias (BEST_DATE), os horários de um dia já definido (BEST_TIME) ou os dois (BEST_DATE_TIME). */
+  mode: PollMode;
+  /** Horários em votação (vazio no BEST_DATE). */
+  candidateTimes: string[];
   status: PollStatus;
   organizer: PublicProfile;
   isOrganizer: boolean;
@@ -71,13 +83,17 @@ export interface PollView {
   confirmationPolicy: ConfirmationPolicy;
   thresholds: Thresholds;
   participants: { profile: PublicProfile; finished: boolean; confirmation: ConfirmationStatus | null }[];
-  /** Todos os dias do intervalo, com os números do mapa de calor. */
+  /** Todos os dias do intervalo, com os números do mapa de calor (vazio no BEST_TIME). */
   days: DateStats[];
-  /** Seus votos por dia. Dia sem voto = sem resposta. */
+  /** Os horários em votação, com os mesmos números (`date` é o horário HH:MM; vazio no BEST_DATE). */
+  times: DateStats[];
+  /** Seus votos por dia (AAAA-MM-DD) e por horário (HH:MM). Sem voto = sem resposta. */
   myVotes: Record<string, VoteStatus>;
   iFinished: boolean;
   /** Melhores datas, da melhor para a pior. */
   ranking: DateStats[];
+  /** Melhores horários, do melhor para o pior. */
+  timeRanking: DateStats[];
   enoughData: boolean;
   /** Proposta em confirmação. */
   proposal: (PollProposalView & { tally: ConfirmationTally; myConfirmation: ConfirmationStatus | null }) | null;
@@ -91,6 +107,7 @@ export interface PollSummary {
   id: string;
   conversationId: string;
   title: string;
+  mode: PollMode;
   status: PollStatus;
   rangeStart: string;
   rangeEnd: string;
@@ -107,7 +124,7 @@ export interface PollSummary {
   /** Quantas pessoas marcaram "concluí minha votação". */
   finishedCount: number;
   /** Melhor data até agora (nula sem votos suficientes). */
-  best: { date: string; compatibility: number | null; coverage: number } | null;
+  best: { date: string; time: string | null; compatibility: number | null; coverage: number } | null;
   /** Data proposta, enquanto espera confirmação. */
   proposedDate: string | null;
   votingDeadline: string | null;
@@ -154,6 +171,63 @@ function present(p: PollProposalRecord): PollProposalView {
 
 const dayFmt = (day: string): string => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
 
+/** Vota os dias? (Não na votação só de horário, em que o dia já está definido.) */
+const votesDays = (poll: PollRecord): boolean => poll.schedulingMode !== 'BEST_TIME';
+/** Vota os horários? */
+const votesTimes = (poll: PollRecord): boolean => poll.schedulingMode !== 'BEST_DATE';
+
+const dayKeys = (poll: PollRecord): string[] => (votesDays(poll) ? dateRange(poll.rangeStart, poll.rangeEnd) : []);
+const timeKeys = (poll: PollRecord): string[] => (votesTimes(poll) ? [...(poll.candidateTimes ?? [])] : []);
+
+/** HH:MM de um instante no fuso. */
+function timeInZone(at: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(at);
+}
+
+/** "24/11" ou, com horário votado, "24/11 às 20:00". */
+function whenFmt(poll: PollRecord, day: string, startsAt: Date): string {
+  return votesTimes(poll) ? `${dayFmt(day)} às ${timeInZone(startsAt, poll.timezone)}` : dayFmt(day);
+}
+
+/** "Data", "Horário" ou "Data e horário": o que a votação decide. */
+function decidedWord(poll: PollRecord): string {
+  return poll.schedulingMode === 'BEST_TIME' ? 'Horário' : poll.schedulingMode === 'BEST_DATE_TIME' ? 'Data e horário' : 'Data';
+}
+
+/** Horários: HH:MM, sem repetir, de 2 a POLL_MAX_TIMES, em ordem. */
+function parseTimes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) throw validationError('Escolha os horários', { candidateTimes: `De 2 a ${POLL_MAX_TIMES} horários` });
+  const times = [...new Set(raw)];
+  if (times.some((t) => typeof t !== 'string' || !TIME_RE.test(t))) throw validationError('Horário inválido', { candidateTimes: 'Use HH:MM' });
+  if (times.length < 2 || times.length > POLL_MAX_TIMES) throw validationError('Escolha os horários', { candidateTimes: `De 2 a ${POLL_MAX_TIMES} horários` });
+  return (times as string[]).sort();
+}
+
+const VOTE_RANK: Record<VoteStatus, number> = { NO: 0, MAYBE: 1, YES: 2 };
+
+/**
+ * Números de uma combinação dia + horário: cada pessoa conta com a pior resposta entre o dia e o horário
+ * (o que a votação não vota fica de fora); quem não respondeu a um dos dois fica "sem resposta".
+ */
+function comboStats(poll: PollRecord, votes: readonly PollVoteRecord[], ids: readonly string[], th: Thresholds, day: string, time: string): DateStats {
+  const keys = [votesDays(poll) ? day : null, votesTimes(poll) ? time : null].filter((k): k is string => k !== null);
+  const byUser = new Map<string, Map<string, VoteStatus>>();
+  for (const v of votes) {
+    if (!keys.includes(v.date)) continue;
+    let m = byUser.get(v.userId);
+    if (!m) byUser.set(v.userId, (m = new Map()));
+    m.set(v.date, v.status);
+  }
+  const combined: { userId: string; date: string; status: VoteStatus }[] = [];
+  for (const [userId, m] of byUser) {
+    const answers = keys.map((k) => m.get(k));
+    if (answers.some((a) => a === undefined)) continue;
+    const worst = (answers as VoteStatus[]).reduce((a, b) => (VOTE_RANK[b] < VOTE_RANK[a] ? b : a));
+    combined.push({ userId, date: day, status: worst });
+  }
+  return computeDateStats([day], combined, ids, th)[0]!;
+}
+
 /** "Encontrar a melhor data": votação de disponibilidade, ranking, confirmação e fechamento da data. */
 export class SchedulingService {
   private readonly deps: CoreDeps;
@@ -198,11 +272,21 @@ export class SchedulingService {
     if (input.rangeEnd < input.rangeStart) throw validationError('Período inválido', { rangeEnd: 'A data final vem depois da inicial' });
     if (daysBetween(input.rangeStart, input.rangeEnd) + 1 > POLL_MAX_DAYS) throw validationError('Período longo demais', { rangeEnd: `No máximo ${POLL_MAX_DAYS} dias` });
 
+    const mode = input.mode === undefined || input.mode === null || input.mode === '' ? 'BEST_DATE' : input.mode;
+    if (typeof mode !== 'string' || !MODES.includes(mode as PollMode)) throw validationError('Tipo de votação inválido', { mode: 'Use BEST_DATE, BEST_TIME ou BEST_DATE_TIME' });
+    let candidateTimes: string[] = [];
+    if (mode !== 'BEST_DATE') candidateTimes = parseTimes(input.candidateTimes);
+    if (mode === 'BEST_TIME') {
+      if (input.rangeEnd !== input.rangeStart) throw validationError('Escolha um dia só', { rangeEnd: 'Votando só o horário, o dia já está definido' });
+      const day = input.rangeStart;
+      if (candidateTimes.some((t) => zonedTimeToUtc(day, t, timezone) <= now)) throw validationError('Esse horário já passou', { candidateTimes: 'Escolha horários futuros' });
+    }
+
     const duration = input.durationMinutes === undefined || input.durationMinutes === null ? 180 : input.durationMinutes;
     if (typeof duration !== 'number' || !Number.isInteger(duration) || duration < 15 || duration > 1440) throw validationError('Duração inválida', { durationMinutes: 'De 15 minutos a 24 horas' });
 
     let preferred: string | null = null;
-    if (input.preferredTimeStart !== undefined && input.preferredTimeStart !== null && input.preferredTimeStart !== '') {
+    if (mode === 'BEST_DATE' && input.preferredTimeStart !== undefined && input.preferredTimeStart !== null && input.preferredTimeStart !== '') {
       if (typeof input.preferredTimeStart !== 'string' || !TIME_RE.test(input.preferredTimeStart)) throw validationError('Horário inválido', { preferredTimeStart: 'Use HH:MM' });
       preferred = input.preferredTimeStart;
     }
@@ -224,7 +308,8 @@ export class SchedulingService {
       conversationId: conversation.id,
       organizerId: actorId,
       title,
-      schedulingMode: 'BEST_DATE',
+      schedulingMode: mode as PollMode,
+      candidateTimes,
       rangeStart: input.rangeStart,
       rangeEnd: input.rangeEnd,
       durationMinutes: duration,
@@ -247,8 +332,16 @@ export class SchedulingService {
     }
 
     const name = await this.nameOf(actorId);
-    await this.postSystem(conversation.id, actorId, `${name} abriu uma votação de datas: ${title}`, now);
-    await this.notifyAll(actorId, others, poll, `${name} quer achar a melhor data`, `${title}: marque os dias em que você pode.`);
+    if (mode === 'BEST_TIME') {
+      await this.postSystem(conversation.id, actorId, `${name} abriu uma votação de horário: ${title} (${dayFmt(poll.rangeStart)})`, now);
+      await this.notifyAll(actorId, others, poll, `${name} quer achar o melhor horário`, `${title} (${dayFmt(poll.rangeStart)}): marque os horários em que você pode.`);
+    } else if (mode === 'BEST_DATE_TIME') {
+      await this.postSystem(conversation.id, actorId, `${name} abriu uma votação de data e horário: ${title}`, now);
+      await this.notifyAll(actorId, others, poll, `${name} quer achar a melhor data e horário`, `${title}: marque os dias e os horários em que você pode.`);
+    } else {
+      await this.postSystem(conversation.id, actorId, `${name} abriu uma votação de datas: ${title}`, now);
+      await this.notifyAll(actorId, others, poll, `${name} quer achar a melhor data`, `${title}: marque os dias em que você pode.`);
+    }
     return this.view(actorId, poll);
   }
 
@@ -288,10 +381,14 @@ export class SchedulingService {
       if (rangeEnd < today) throw validationError('A data final já passou', { rangeEnd: 'Escolha hoje ou um dia futuro' });
       if (rangeEnd < rangeStart) throw validationError('Período inválido', { rangeEnd: 'A data final vem depois da inicial' });
       if (daysBetween(rangeStart, rangeEnd) + 1 > POLL_MAX_DAYS) throw validationError('Período longo demais', { rangeEnd: `No máximo ${POLL_MAX_DAYS} dias` });
+      if (!votesDays(poll)) {
+        if (rangeEnd !== rangeStart) throw validationError('Escolha um dia só', { rangeEnd: 'Votando só o horário, o dia já está definido' });
+        if (rangeStart !== poll.rangeStart && (poll.candidateTimes ?? []).some((t) => zonedTimeToUtc(rangeStart, t, poll.timezone) <= now)) throw validationError('Esse horário já passou', { rangeStart: 'Escolha um dia em que os horários ainda não passaram' });
+      }
       if (rangeStart !== poll.rangeStart || rangeEnd !== poll.rangeEnd) {
         patch.rangeStart = rangeStart;
         patch.rangeEnd = rangeEnd;
-        changes.push('as datas');
+        changes.push(votesDays(poll) ? 'as datas' : 'o dia');
       }
     }
 
@@ -310,7 +407,8 @@ export class SchedulingService {
 
     // Dias novos no período: quem já tinha concluído precisa poder votar neles.
     const oldDays = new Set(dateRange(poll.rangeStart, poll.rangeEnd));
-    const addedDays = patch.rangeStart !== undefined && dateRange(updated.rangeStart, updated.rangeEnd).some((d) => !oldDays.has(d));
+    // Votando só o horário, mudar o dia muda tudo: todos revisam os votos.
+    const addedDays = patch.rangeStart !== undefined && (!votesDays(poll) || dateRange(updated.rangeStart, updated.rangeEnd).some((d) => !oldDays.has(d)));
     const participants = await scheduling.listParticipants(poll.id);
     if (addedDays) {
       for (const p of participants) if (p.finishedAt !== null) await scheduling.setFinished(poll.id, p.userId, null);
@@ -318,7 +416,7 @@ export class SchedulingService {
 
     const name = await this.nameOf(actorId);
     const what = changes.length === 1 ? changes[0]! : `${changes.slice(0, -1).join(', ')} e ${changes[changes.length - 1]!}`;
-    await this.postSystem(poll.conversationId, actorId, `${name} mudou ${what} da votação "${updated.title}"${addedDays ? '. Há dias novos para votar.' : ''}`, now);
+    await this.postSystem(poll.conversationId, actorId, `${name} mudou ${what} da votação "${updated.title}"${addedDays ? (votesDays(poll) ? '. Há dias novos para votar.' : `. Agora é em ${dayFmt(updated.rangeStart)}: confira seus horários.`) : ''}`, now);
     if (patch.rangeStart !== undefined || patch.title !== undefined) {
       await this.notifyAll(actorId, participants.map((p) => p.userId).filter((id) => id !== actorId), updated, 'Votação atualizada', `${name} mudou ${what} de "${updated.title}". Confira seus votos.`);
     }
@@ -355,10 +453,15 @@ export class SchedulingService {
     this.requireVotingOpen(poll);
     const status = input.status === 'CLEAR' ? null : input.status;
     if (status !== null && !VOTE_STATUSES.includes(status as VoteStatus)) throw validationError('Resposta inválida', { status: 'Use YES, MAYBE, NO ou CLEAR' });
-    if (!Array.isArray(input.dates) || input.dates.length === 0 || input.dates.length > POLL_MAX_DAYS) throw validationError('Escolha os dias', { dates: `Envie de 1 a ${POLL_MAX_DAYS} dias` });
+    const max = POLL_MAX_DAYS + POLL_MAX_TIMES;
+    if (!Array.isArray(input.dates) || input.dates.length === 0 || input.dates.length > max) throw validationError('Escolha os dias ou horários', { dates: `Envie de 1 a ${max} opções` });
     const today = todayIn(poll.timezone, clock.now());
     const dates = [...new Set(input.dates)];
+    const times = new Set(timeKeys(poll));
     for (const d of dates) {
+      if (typeof d === 'string' && times.has(d)) continue;
+      if (typeof d === 'string' && TIME_RE.test(d)) throw validationError('Horário fora da votação', { dates: votesTimes(poll) ? `Só ${[...times].join(', ')}` : 'Esta votação não vota horário' });
+      if (!votesDays(poll)) throw validationError('Escolha os horários', { dates: `Só ${[...times].join(', ')}` });
       if (!isDay(d)) throw validationError('Dia inválido', { dates: 'Use o formato AAAA-MM-DD' });
       if (d < poll.rangeStart || d > poll.rangeEnd) throw validationError('Dia fora do período', { dates: `Só de ${dayFmt(poll.rangeStart)} a ${dayFmt(poll.rangeEnd)}` });
       if (d < today) throw validationError('Esse dia já passou', { dates: 'Escolha dias de hoje em diante' });
@@ -378,24 +481,19 @@ export class SchedulingService {
   // ---------- Propor e confirmar ----------
 
   /** Só quem organiza: manda uma data candidata para confirmação. */
-  async propose(actorId: string, pollId: unknown, date: unknown): Promise<PollView> {
+  async propose(actorId: string, pollId: unknown, date: unknown, time?: unknown): Promise<PollView> {
     const { scheduling, clock, ids } = this.deps;
     const poll = await this.accessible(actorId, pollId);
     if (poll.organizerId !== actorId) throw forbidden('Só quem criou a votação escolhe a data');
     if (poll.status !== 'VOTING') throw conflict(poll.status === 'CONFIRMING' ? 'Já existe uma data em confirmação' : 'Esta votação já terminou');
-    if (!isDay(date) || date < poll.rangeStart || date > poll.rangeEnd) throw validationError('Dia fora do período', { date: `Só de ${dayFmt(poll.rangeStart)} a ${dayFmt(poll.rangeEnd)}` });
-
     const now = clock.now();
-    const startsAt = zonedTimeToUtc(date, poll.preferredTimeStart ?? POLL_DEFAULT_START, poll.timezone);
-    if (startsAt <= now) throw validationError('Esse dia já passou', { date: 'Escolha uma data futura' });
-    const endsAt = new Date(startsAt.getTime() + poll.durationMinutes * 60_000);
-
     const participants = await scheduling.listParticipants(poll.id);
-    const stats = computeDateStats([date], await scheduling.listVotes(poll.id), participants.map((p) => p.userId), this.thresholds(poll))[0]!;
+    const { day, startsAt, stats } = this.pick(poll, await scheduling.listVotes(poll.id), participants.map((p) => p.userId), date, time, false);
+    const endsAt = new Date(startsAt.getTime() + poll.durationMinutes * 60_000);
     const proposal: PollProposalRecord = {
       id: ids.next(),
       pollId: poll.id,
-      candidateDate: date,
+      candidateDate: day,
       candidateStartAt: startsAt,
       candidateEndAt: endsAt,
       compatibilityScore: stats.compatibility,
@@ -412,8 +510,9 @@ export class SchedulingService {
     await scheduling.setConfirmation(proposal.id, poll.id, actorId, 'CONFIRMED', now);
 
     const name = await this.nameOf(actorId);
-    await this.postSystem(poll.conversationId, actorId, `${name} propôs ${dayFmt(date)} para "${poll.title}". Confirme sua presença.`, now);
-    await this.notifyAll(actorId, participants.map((p) => p.userId).filter((id) => id !== actorId), poll, `Confirme a data: ${dayFmt(date)}`, `${name} escolheu ${dayFmt(date)} para "${poll.title}".`);
+    const when = whenFmt(poll, day, startsAt);
+    await this.postSystem(poll.conversationId, actorId, `${name} propôs ${when} para "${poll.title}". Confirme sua presença.`, now);
+    await this.notifyAll(actorId, participants.map((p) => p.userId).filter((id) => id !== actorId), poll, `Confirme: ${when}`, `${name} escolheu ${when} para "${poll.title}".`);
     return this.view(actorId, { ...poll, status: 'CONFIRMING' });
   }
 
@@ -460,7 +559,7 @@ export class SchedulingService {
    * Cria o encontro já com quem votou "posso" e "talvez" naquele dia, todos confirmados (mais quem organiza), sem etapa de confirmação.
    * Quem votou "não posso" ou não respondeu fica de fora. Sem `date`, usa a primeira do ranking.
    */
-  async confirmBest(actorId: string, pollId: unknown, date?: unknown): Promise<PollView> {
+  async confirmBest(actorId: string, pollId: unknown, date?: unknown, time?: unknown): Promise<PollView> {
     const { scheduling, meetups, conversations, blocks, clock, ids } = this.deps;
     const poll = await this.accessible(actorId, pollId);
     if (poll.organizerId !== actorId) throw forbidden('Só quem criou a votação confirma a data');
@@ -469,19 +568,17 @@ export class SchedulingService {
     if (!this.isClosed(poll) && !participants.every((p) => p.finishedAt !== null)) throw conflict('Ainda faltam pessoas concluírem a votação');
 
     const votes = await scheduling.listVotes(poll.id);
-    const days = computeDateStats(dateRange(poll.rangeStart, poll.rangeEnd), votes, participants.map((p) => p.userId), this.thresholds(poll));
-    const ranking = rankDates(days);
-    const chosen = date === undefined || date === null ? ranking[0]?.date : date;
-    if (!isDay(chosen) || chosen < poll.rangeStart || chosen > poll.rangeEnd) throw validationError('Dia fora do período', { date: `Só de ${dayFmt(poll.rangeStart)} a ${dayFmt(poll.rangeEnd)}` });
-    const stats = days.find((d) => d.date === chosen)!;
+    const { day: chosen, time: chosenTime, startsAt, stats } = this.pick(poll, votes, participants.map((p) => p.userId), date, time, true);
 
     const now = clock.now();
-    const startsAt = zonedTimeToUtc(chosen, poll.preferredTimeStart ?? POLL_DEFAULT_START, poll.timezone);
-    if (startsAt <= now) throw validationError('Esse dia já passou', { date: 'Escolha uma data futura' });
     const endsAt = new Date(startsAt.getTime() + poll.durationMinutes * 60_000);
 
     const hidden = new Set(await blocks.listRelatedIds(actorId));
-    const can = new Set(votes.filter((v) => v.date === chosen && (v.status === 'YES' || v.status === 'MAYBE')).map((v) => v.userId));
+    // Pode quem disse "posso" ou "talvez" no dia e no horário escolhidos (o que a votação vota).
+    const ok = (key: string) => new Set(votes.filter((v) => v.date === key && (v.status === 'YES' || v.status === 'MAYBE')).map((v) => v.userId));
+    const okDay = votesDays(poll) ? ok(chosen) : undefined;
+    const okTime = votesTimes(poll) ? ok(chosenTime) : undefined;
+    const can = new Set(participants.map((p) => p.userId).filter((userId) => (okDay?.has(userId) ?? true) && (okTime?.has(userId) ?? true)));
     const going = participants.map((p) => p.userId).filter((userId) => userId === actorId || (can.has(userId) && !hidden.has(userId)));
 
     const proposal: PollProposalRecord = {
@@ -519,8 +616,10 @@ export class SchedulingService {
     await scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id, ...(poll.votingClosedAt ? {} : { votingClosedAt: now }) });
     const card: MessageRecord = { id: ids.next(), conversationId: poll.conversationId, senderId: poll.organizerId, kind: 'MEETUP', body: `Encontro: ${poll.title}`, suggestion: null, response: null, respondedAt: null, meetupId: meetup.id, createdAt: now };
     await conversations.addMessage(card);
-    await this.postSystem(poll.conversationId, poll.organizerId, `Data definida: ${dayFmt(chosen)} para "${poll.title}". ${going.length} ${going.length === 1 ? 'pessoa confirmada' : 'pessoas confirmadas'}.`, now);
-    await this.notifyAll(poll.organizerId, going.filter((id) => id !== poll.organizerId), poll, `Data definida: ${dayFmt(chosen)}`, `Você está confirmado em "${poll.title}". Veja na sua agenda.`);
+    const when = whenFmt(poll, chosen, startsAt);
+    const defined = `${decidedWord(poll)} ${poll.schedulingMode === 'BEST_DATE' ? 'definida' : 'definido'}`;
+    await this.postSystem(poll.conversationId, poll.organizerId, `${defined}: ${when} para "${poll.title}". ${going.length} ${going.length === 1 ? 'pessoa confirmada' : 'pessoas confirmadas'}.`, now);
+    await this.notifyAll(poll.organizerId, going.filter((id) => id !== poll.organizerId), poll, `${defined}: ${when}`, `Você está confirmado em "${poll.title}". Veja na sua agenda.`);
     return this.view(actorId, { ...poll, status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id });
   }
 
@@ -575,6 +674,32 @@ export class SchedulingService {
 
   // ---------- Internos ----------
 
+  /**
+   * Dia e horário de uma proposta: os informados ou, com `fallbackToBest`, os primeiros dos rankings. Votando só a data,
+   * o horário é o fixo da votação; votando só o horário, o dia é o da votação.
+   */
+  private pick(poll: PollRecord, votes: readonly PollVoteRecord[], ids: readonly string[], date: unknown, time: unknown, fallbackToBest: boolean): { day: string; time: string; startsAt: Date; stats: DateStats } {
+    const th = this.thresholds(poll);
+    const empty = (v: unknown) => v === undefined || v === null || v === '';
+    let day: unknown = poll.rangeStart;
+    if (votesDays(poll)) {
+      day = empty(date) && fallbackToBest ? rankDates(computeDateStats(dayKeys(poll), votes, ids, th))[0]?.date : date;
+      if (!isDay(day) || day < poll.rangeStart || day > poll.rangeEnd) throw validationError('Dia fora do período', { date: `Só de ${dayFmt(poll.rangeStart)} a ${dayFmt(poll.rangeEnd)}` });
+    } else if (!empty(date) && date !== poll.rangeStart && !(typeof date === 'string' && TIME_RE.test(date))) {
+      throw validationError('Dia fora da votação', { date: `O dia é ${dayFmt(poll.rangeStart)}` });
+    }
+    let chosenTime: unknown = poll.preferredTimeStart ?? POLL_DEFAULT_START;
+    if (votesTimes(poll)) {
+      // Compatível com quem manda o horário no lugar do dia (votação só de horário).
+      const given = empty(time) && !votesDays(poll) && typeof date === 'string' && TIME_RE.test(date) ? date : time;
+      chosenTime = empty(given) && fallbackToBest ? rankDates(computeDateStats(timeKeys(poll), votes, ids, th))[0]?.date : given;
+      if (typeof chosenTime !== 'string' || !(poll.candidateTimes ?? []).includes(chosenTime)) throw validationError('Horário fora da votação', { time: `Só ${(poll.candidateTimes ?? []).join(', ')}` });
+    }
+    const startsAt = zonedTimeToUtc(day as string, chosenTime as string, poll.timezone);
+    if (startsAt <= this.deps.clock.now()) throw votesTimes(poll) ? validationError('Esse horário já passou', { time: 'Escolha um horário futuro' }) : validationError('Esse dia já passou', { date: 'Escolha uma data futura' });
+    return { day: day as string, time: chosenTime as string, startsAt, stats: comboStats(poll, votes, ids, th, day as string, chosenTime as string) };
+  }
+
   private thresholds(poll: PollRecord): Thresholds {
     return { green: poll.greenMin, orange: poll.orangeMin, minCoverage: poll.minCoverage };
   }
@@ -615,8 +740,9 @@ export class SchedulingService {
       await scheduling.updateProposal(proposal.id, { status: 'REJECTED' });
       await scheduling.updatePoll(poll.id, { status: 'VOTING', votingClosedAt: null });
       const now = clock.now();
-      await this.postSystem(poll.conversationId, responderId, `A data ${dayFmt(proposal.candidateDate)} não passou. A votação voltou a ficar aberta.`, now);
-      await this.deps.notifier.notify({ userId: poll.organizerId, type: 'MEETUP_INVITE', title: `Data ${dayFmt(proposal.candidateDate)} não passou`, body: `"${poll.title}" voltou para a votação.`, url: `/planejar/${poll.id}`, dedupeKey: `poll-rejected:${proposal.id}` });
+      const when = whenFmt(poll, proposal.candidateDate, proposal.candidateStartAt);
+      await this.postSystem(poll.conversationId, responderId, `A proposta ${when} não passou. A votação voltou a ficar aberta.`, now);
+      await this.deps.notifier.notify({ userId: poll.organizerId, type: 'MEETUP_INVITE', title: `${when} não passou`, body: `"${poll.title}" voltou para a votação.`, url: `/planejar/${poll.id}`, dedupeKey: `poll-rejected:${proposal.id}` });
       return { ...poll, status: 'VOTING', votingClosedAt: null };
     }
     return poll;
@@ -653,8 +779,10 @@ export class SchedulingService {
     await scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id });
     const card: MessageRecord = { id: ids.next(), conversationId: poll.conversationId, senderId: poll.organizerId, kind: 'MEETUP', body: `Encontro: ${poll.title}`, suggestion: null, response: null, respondedAt: null, meetupId: meetup.id, createdAt: now };
     await conversations.addMessage(card);
-    await this.postSystem(poll.conversationId, poll.organizerId, `Data definida: ${dayFmt(proposal.candidateDate)} para "${poll.title}"`, now);
-    await this.notifyAll(poll.organizerId, participants.filter((id) => id !== poll.organizerId), poll, `Data definida: ${dayFmt(proposal.candidateDate)}`, `"${poll.title}" está marcado. Veja na sua agenda.`);
+    const when = whenFmt(poll, proposal.candidateDate, proposal.candidateStartAt);
+    const defined = `${decidedWord(poll)} ${poll.schedulingMode === 'BEST_DATE' ? 'definida' : 'definido'}`;
+    await this.postSystem(poll.conversationId, poll.organizerId, `${defined}: ${when} para "${poll.title}"`, now);
+    await this.notifyAll(poll.organizerId, participants.filter((id) => id !== poll.organizerId), poll, `${defined}: ${when}`, `"${poll.title}" está marcado. Veja na sua agenda.`);
     return { ...poll, status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id };
   }
 
@@ -774,9 +902,17 @@ export class SchedulingService {
       const allVotes = await scheduling.listVotes(p.id);
       const votedCount = new Set(allVotes.map((v) => v.userId)).size;
       if (p.status === 'VOTING') {
-        const days = computeDateStats(dateRange(p.rangeStart, p.rangeEnd), allVotes, participants.map((x) => x.userId), this.thresholds(p));
-        const top = rankDates(days)[0];
-        if (top && hasEnoughData([top])) best = { date: top.date, compatibility: top.compatibility, coverage: top.coverage };
+        const ids = participants.map((x) => x.userId);
+        const th = this.thresholds(p);
+        const topDay = votesDays(p) ? rankDates(computeDateStats(dayKeys(p), allVotes, ids, th))[0] : undefined;
+        const topTime = votesTimes(p) ? rankDates(computeDateStats(timeKeys(p), allVotes, ids, th))[0] : undefined;
+        const enough = (!votesDays(p) || (topDay !== undefined && hasEnoughData([topDay]))) && (!votesTimes(p) || (topTime !== undefined && hasEnoughData([topTime])));
+        if (enough) {
+          const day = topDay?.date ?? p.rangeStart;
+          const time = topTime?.date ?? null;
+          const combo = comboStats(p, allVotes, ids, th, day, time ?? '');
+          best = { date: day, time, compatibility: combo.compatibility, coverage: combo.coverage };
+        }
       }
       let proposedDate: string | null = null;
       let needsMyConfirmation = false;
@@ -794,7 +930,7 @@ export class SchedulingService {
       }
       const eventPost = p.eventPostId ? await this.deps.posts.findById(p.eventPostId) : undefined;
       const event = eventPost?.post.eventTitle ? { id: eventPost.post.id, title: eventPost.post.eventTitle, startsAt: eventPost.post.eventStartsAt ? eventPost.post.eventStartsAt.toISOString() : null, endsAt: eventPost.post.eventEndsAt ? eventPost.post.eventEndsAt.toISOString() : null } : null;
-      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null, meetupId: p.meetupId ?? null, event });
+      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, mode: p.schedulingMode, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null, meetupId: p.meetupId ?? null, event });
     }
     return out;
   }
@@ -809,14 +945,17 @@ export class SchedulingService {
 
     const th = this.thresholds(poll);
     const ids = participants.map((p) => p.userId);
-    const days = computeDateStats(dateRange(poll.rangeStart, poll.rangeEnd), votes, ids, th);
+    const days = computeDateStats(dayKeys(poll), votes, ids, th);
+    const times = computeDateStats(timeKeys(poll), votes, ids, th);
     const ranking = rankDates(days);
+    const timeRanking = rankDates(times);
     const open = proposals.find((p) => p.status === 'OPEN');
     const confirmations = open ? await scheduling.listConfirmations(open.id) : [];
     const answers = new Map(confirmations.map((c) => [c.userId, c.status] as const));
     const final = poll.status === 'FINALIZED' ? proposals.find((p) => p.id === poll.finalProposalId) : undefined;
     const myVotes: Record<string, VoteStatus> = {};
-    for (const v of votes) if (v.userId === actorId && v.date >= poll.rangeStart && v.date <= poll.rangeEnd) myVotes[v.date] = v.status;
+    const options = new Set([...days, ...times].map((d) => d.date));
+    for (const v of votes) if (v.userId === actorId && options.has(v.date)) myVotes[v.date] = v.status;
     const me = participants.find((p) => p.userId === actorId);
 
     return {
@@ -825,6 +964,8 @@ export class SchedulingService {
       conversationName: conversation?.type === 'GROUP' ? conversation.name : null,
       isGroup: conversation?.type === 'GROUP',
       title: poll.title,
+      mode: poll.schedulingMode,
+      candidateTimes: timeKeys(poll),
       status: poll.status,
       organizer: toPublicProfile(organizer),
       isOrganizer: poll.organizerId === actorId,
@@ -845,10 +986,12 @@ export class SchedulingService {
         return [{ profile: toPublicProfile(prof), finished: p.finishedAt !== null, confirmation: answers.get(p.userId) ?? null }];
       }),
       days,
+      times,
       myVotes,
       iFinished: me?.finishedAt != null,
       ranking,
-      enoughData: hasEnoughData(ranking),
+      timeRanking,
+      enoughData: (!votesDays(poll) || hasEnoughData(ranking)) && (!votesTimes(poll) || hasEnoughData(timeRanking)),
       proposal: open ? { ...present(open), tally: tallyConfirmations(ids, answers), myConfirmation: answers.get(actorId) ?? null } : null,
       history: proposals.filter((p) => p.status !== 'OPEN').map(present),
       final: final ? { date: final.candidateDate, startsAt: final.candidateStartAt.toISOString(), endsAt: final.candidateEndAt.toISOString(), meetupId: poll.meetupId } : null,

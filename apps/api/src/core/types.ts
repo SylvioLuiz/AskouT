@@ -1234,7 +1234,10 @@ export interface PollRecord {
   conversationId: string;
   organizerId: string;
   title: string;
-  schedulingMode: 'BEST_DATE';
+  /** BEST_DATE: vota os dias (hora fixa). BEST_TIME: o dia já está definido (início = fim) e vota os horários de `candidateTimes`. BEST_DATE_TIME: vota os dias e os horários. */
+  schedulingMode: 'BEST_DATE' | 'BEST_TIME' | 'BEST_DATE_TIME';
+  /** Horários (HH:MM, em ordem) votados em BEST_TIME e BEST_DATE_TIME; vazio (ou ausente) no BEST_DATE. */
+  candidateTimes?: string[];
   /** Dias do calendário (AAAA-MM-DD) no fuso `timezone`. */
   rangeStart: string;
   rangeEnd: string;
