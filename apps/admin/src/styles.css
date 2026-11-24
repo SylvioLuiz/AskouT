@@ -138,6 +138,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card__label { color: var(--muted); }
 .card__value { font-size: 32px; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .card__value--alert { color: var(--danger); }
+/* Números da pessoa (botão Atividade) */
+.stats { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+.stats__signals { list-style: none; margin: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.stats__title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
+.stats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat__label { color: var(--muted); font-size: 12px; }
+.stat__value { font-size: 20px; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat__value--alert { color: var(--danger); }
+.stat__sub { color: var(--muted); font-size: 12px; }
 .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: color-mix(in srgb, var(--ink) 8%, transparent); display: block; }
 .thumbcell { width: 80px; }
 .thumb--story { width: 120px; height: 180px; object-fit: contain; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; flex: none; }

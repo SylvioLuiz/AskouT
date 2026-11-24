@@ -74,7 +74,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
 } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -3457,6 +3457,36 @@ export class InMemoryAdminRepository implements AdminRepository {
       ],
       claims: claims.slice(0, 50).map((c) => ({ id: c.id, venueId: c.venueId, venueName: venueName(c.venueId), status: c.status, createdAt: c.createdAt })),
       groups: [],
+    };
+  }
+
+  /** Versão simples para os testes: conta o que o registro em memória guarda (posts, quem segue, presenças) e zera o resto. */
+  async userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined> {
+    const x = await this.userExtras(userId);
+    if (!x) return undefined;
+    const DAY = 24 * 60 * 60 * 1000;
+    const since30 = now.getTime() - 30 * DAY;
+    const since7 = now.getTime() - 7 * DAY;
+    const posts = [...this.posts.posts.values()].filter((p) => p.authorId === userId);
+    const going = [...this.eventRoom.going.values()].filter((g) => g.userId === userId);
+    const follows = [...(this.follows?.rows.values() ?? [])].filter((f) => f.followerId === userId);
+    const dates = [...posts, ...going, ...follows].map((r) => r.createdAt).filter((d) => d.getTime() >= since30);
+    const lastSeen = [...posts, ...going, ...follows].map((r) => r.createdAt).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const c = x.counts;
+    return {
+      lastSeenAt: lastSeen,
+      accountAgeDays: Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / DAY)),
+      activeDays30: new Set(dates.map((d) => d.toISOString().slice(0, 10))).size,
+      actions7: dates.filter((d) => d.getTime() >= since7).length,
+      actions30: dates.length,
+      social: { friends: c.friends, followers: c.followers, following: c.following, followersGained30: 0, likesReceived: 0, commentsReceived: 0 },
+      content: { posts: c.posts, stories: c.stories, feedPosts: c.feedPosts, comments: c.postComments, likes: c.postLikes },
+      events: { created: c.eventsCreated, going: c.eventsGoing, checkins: 0, invitesSent: 0, invitesReceived: 0, datePolls: 0, cloakroomTickets: 0 },
+      now: { sessions: 0, sessions30: 0, lastAt: null, invitesSent: 0, invitesReceived: 0, meetups: 0, hiddenBy: 0 },
+      messages: { conversations: 0, sent: 0, sent30: 0 },
+      moderation: { reportsReceived: c.reportsReceived, reportsOpen: c.reportsReceived, reportsActioned: 0, reportsMade: 0, reportsMadeActioned: 0, blockedBy: 0, blocksMade: 0, suspensions: 0, lastSuspendedAt: null },
+      purchases: { boostsPaid: 0, spentCents: 0, lastPaidAt: null, boostsPending: 0 },
+      referrals: { invited: 0, qualified: 0 },
     };
   }
 

@@ -78,6 +78,27 @@ export interface UserRow {
   loginProviders: ('GOOGLE' | 'APPLE')[];
 }
 
+/** Números de uma pessoa para moderar e gerenciar (datas em ISO). Nada do conteúdo das mensagens. */
+export interface UserStats {
+  /** Última ação ou visualização registrada no app (o app não grava cada login). */
+  lastSeenAt: string | null;
+  accountAgeDays: number;
+  activeDays30: number;
+  actions7: number;
+  actions30: number;
+  social: { friends: number; followers: number; following: number; followersGained30: number; likesReceived: number; commentsReceived: number };
+  content: { posts: number; stories: number; feedPosts: number; comments: number; likes: number };
+  events: { created: number; going: number; checkins: number; invitesSent: number; invitesReceived: number; datePolls: number; cloakroomTickets: number };
+  now: { sessions: number; sessions30: number; lastAt: string | null; invitesSent: number; invitesReceived: number; meetups: number; hiddenBy: number };
+  messages: { conversations: number; sent: number; sent30: number };
+  moderation: {
+    reportsReceived: number; reportsOpen: number; reportsActioned: number; reportsMade: number; reportsMadeActioned: number;
+    blockedBy: number; blocksMade: number; suspensions: number; lastSuspendedAt: string | null;
+  };
+  purchases: { boostsPaid: number; spentCents: number; lastPaidAt: string | null; boostsPending: number };
+  referrals: { invited: number; qualified: number };
+}
+
 /** Um item da atividade de uma pessoa (curtiu, comentou, publicou, foi, seguiu). */
 export interface UserActivityItem {
   id: string;
