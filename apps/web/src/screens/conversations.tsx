@@ -26,6 +26,7 @@ import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
+import { ProfileBubble } from '../components/profile-bubble.tsx';
 import { VenueBubble } from '../components/venue-bubble.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
 import { PlaceMapSheet, SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
@@ -933,6 +934,33 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     };
   }, [hasThread]);
 
+  // Teclado aberto (iPhone): o sistema não encolhe a página, só a parte visível, e empurra a página para cima para
+  // mostrar a caixa de texto; o topo preso (position: fixed) sumia acima da tela. Como no WhatsApp, o topo acompanha
+  // a parte visível (--chat-vv-top) e a caixa de mensagem fica logo acima do teclado (--chat-kb). Sem teclado, os dois são 0.
+  useEffect(() => {
+    const root = chatRef.current;
+    const vv = window.visualViewport;
+    if (!root || !vv) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const top = Math.max(0, vv.offsetTop);
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        root.style.setProperty('--chat-vv-top', `${Math.round(top)}px`);
+        root.style.setProperty('--chat-kb', `${Math.round(kb)}px`);
+      });
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [hasThread]);
+
   if (view.loading && !view.data && !view.error) return <ChatSkeleton />;
   if (view.error && !view.data) {
     if (view.error.code === 'NOT_FOUND') {
@@ -1325,7 +1353,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ) : null}
       {!cell && !m.mine ? <span className="msg__face">{pos === 'last' || pos === 'single' ? face(m.senderId) : null}</span> : null}
       {!cell && !selected && m.mine && hasActions(m) ? moreButton(m) : null}
-      <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
+      <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' || m.sharedProfile ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
         {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
         {m.story && !m.deleted ? <StoryAttachment story={m.story} mine={m.mine} /> : null}
         {m.replyTo && !m.deleted ? (
@@ -1356,6 +1384,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <FileBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'EVENT' && m.event ? (
           <EventBubble event={m.event} />
+        ) : m.sharedProfile ? (
+          <ProfileBubble card={m.sharedProfile} />
         ) : m.gif ? (
           <CommentGifView gif={m.gif} />
         ) : m.kind === 'TEXT' && m.venue ? (

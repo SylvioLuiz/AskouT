@@ -14,6 +14,7 @@ import { messageDelivery, requestRole } from './message-requests.ts';
 import { canManageVenue } from './venue-access.ts';
 import type { MessageDelivery, MessageRequestRole } from './message-requests.ts';
 import { distanceMeters } from './geo.ts';
+import { normalizeUsername } from './validation.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import { SchedulingService } from './scheduling-service.ts';
 import type { MeetupView } from './meetup-view.ts';
@@ -73,6 +74,8 @@ export interface MessageView {
   storyId: string | null;
   /** O story respondido, enquanto ainda está no ar (null quando acabou): a conversa mostra e abre ao tocar. */
   story: MessageStoryView | null;
+  /** Perfil compartilhado: o cartão, já com as regras de quem vê (privado, bloqueio, conta suspensa). Null se não é um perfil. */
+  sharedProfile: MessageProfileView | null;
   /** Apagada por quem enviou: o conteúdo some para todos. */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -277,6 +280,21 @@ export interface SendInput {
   file?: unknown;
   /** Uso interno (resposta/reação de story): anexa o story à mensagem. Nunca vem do corpo da requisição. */
   storyId?: string;
+  /** Compartilha um perfil (pelo @usuário): a conversa mostra o cartão do perfil, não um link. */
+  profileUsername?: unknown;
+}
+
+/**
+ * Cartão de perfil compartilhado, montado para quem vê (nunca guardado pronto):
+ * - `profile` nulo: indisponível para você (conta suspensa ou apagada, ou bloqueio em qualquer sentido). Nada da pessoa aparece.
+ * - perfil privado que você não segue: só nome, @ e foto (o mesmo que a página do perfil mostra), com `canView` falso.
+ */
+export interface MessageProfileView {
+  profile: PublicProfile | null;
+  /** Você pode ver o conteúdo do perfil: é público, é você, ou você segue com pedido aceito. */
+  canView: boolean;
+  /** Se você segue essa pessoa (para o cartão mostrar "Seguir", "Solicitado" ou nada). */
+  following: 'NONE' | 'PENDING' | 'ACCEPTED' | 'SELF';
 }
 
 /** Story anexado a uma resposta: o que a conversa precisa para mostrar a miniatura e abrir o story. */
@@ -305,6 +323,7 @@ interface ViewExtras {
   reactions?: ReactionView[];
   /** Quem já ouviu esta mensagem de voz. */
   playedBy?: readonly string[];
+  sharedProfile?: MessageProfileView | null;
 }
 
 /** Link de evento do AskouT dentro de um texto (`…/eventos/<id>`). */
@@ -364,6 +383,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     gif: gone ? null : gifOf(m),
     storyId: gone ? null : (m.storyId ?? null),
     story: gone ? null : (extras.story ?? null),
+    sharedProfile: gone || !m.profileUserId ? null : (extras.sharedProfile ?? { profile: null, canView: false, following: 'NONE' }),
     deleted: gone,
     replyTo: gone ? null : (extras.replyTo ?? null),
     reactions: gone ? [] : (extras.reactions ?? []),
@@ -835,6 +855,7 @@ export class ConversationService {
           reactions: decor.reactions.get(m.id) ?? [],
           playedBy: decor.plays.get(m.id) ?? [],
           story: m.storyId ? (decor.stories.get(m.storyId) ?? null) : null,
+          sharedProfile: decor.profiles.get(m.id) ?? null,
         }),
       ),
       hasMore,
@@ -851,7 +872,9 @@ export class ConversationService {
     const hasMedia = input.media !== undefined && input.media !== null;
     const hasGif = input.gif !== undefined && input.gif !== null;
     const hasFile = input.file !== undefined && input.file !== null;
-    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif, hasFile].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto, um vídeo ou um arquivo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto, um vídeo ou um arquivo' });
+    const hasProfile = input.profileUsername !== undefined && input.profileUsername !== null;
+    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif, hasFile, hasProfile].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um perfil, um áudio, uma foto, um vídeo ou um arquivo', { body: 'Envie um texto, uma sugestão, um evento, um perfil, um áudio, uma foto, um vídeo ou um arquivo' });
+    const profileUserId = hasProfile ? await this.shareableProfile(actorId, input.profileUsername) : null;
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de local só em conversas 1 a 1', { suggestion: 'Sugestões de local só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
@@ -904,6 +927,9 @@ export class ConversationService {
       suggestion = parseSuggestion(input.suggestion);
       kind = 'SUGGESTION';
       body = `${suggestion.title} — ${suggestion.venueName}`;
+    } else if (profileUserId) {
+      // Texto neutro: a prévia (lista, resposta, aviso) nunca mostra quem é, porque quem vê pode ter bloqueio com a pessoa.
+      body = 'Perfil compartilhado';
     } else {
       body = parseText(input.body);
     }
@@ -916,7 +942,7 @@ export class ConversationService {
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
     const replyToId = await this.parseReply(conversationId, input.replyToId);
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(profileUserId ? { profileUserId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : file ? { mime: file.mime, data: file.data } : undefined));
     const asRequest = delivery === 'REQUEST' && otherId !== null;
     if (asRequest && (conversation.requestToId !== otherId || conversation.requestDeclinedAt)) {
@@ -938,15 +964,58 @@ export class ConversationService {
     // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
-    const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
-    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : file ? 'enviou um arquivo' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
+    const preview = kind === 'TEXT' && !gif && !profileUserId ? messagePreview(body) : undefined;
+    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : file ? 'enviou um arquivo' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : profileUserId ? 'compartilhou um perfil' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
     const linkCard = linked ? ((await buildEventCards(this.deps, [linked])).get(linked) ?? null) : null;
     const linkedVenue = linkedVenueId(message);
     const venueCard = linkedVenue ? ((await buildVenueCards(this.deps, [linkedVenue])).get(linkedVenue) ?? null) : null;
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, venue: venueCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null });
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, venue: venueCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null, sharedProfile: decor.profiles.get(message.id) ?? null });
+  }
+
+  /**
+   * Perfil que dá para compartilhar: existe, não está suspenso e não tem bloqueio com quem compartilha (em nenhum sentido).
+   * Perfil privado pode ser compartilhado: o cartão só mostra o que a página do perfil já mostra a quem não segue.
+   * Qualquer recusa responde "não encontrado", para não revelar bloqueio nem conta suspensa.
+   */
+  private async shareableProfile(actorId: string, raw: unknown): Promise<string> {
+    const { users, blocks } = this.deps;
+    if (typeof raw !== 'string' || raw.trim() === '' || raw.length > 64) throw notFound('Perfil não encontrado');
+    const profile = await users.findProfileByUsername(normalizeUsername(raw));
+    const user = profile ? await users.findById(profile.userId) : undefined;
+    if (!profile || !user || user.status === 'SUSPENDED') throw notFound('Perfil não encontrado');
+    if (profile.userId !== actorId && (await blocks.existsEitherWay(actorId, profile.userId))) throw notFound('Perfil não encontrado');
+    return profile.userId;
+  }
+
+  /** Cartões de perfil para quem vê, com as mesmas regras da página do perfil (privado, bloqueio, suspensa). */
+  private async profileCards(actorId: string, items: MessageRecord[]): Promise<Map<string, MessageProfileView>> {
+    const { users, blocks, follows } = this.deps;
+    const out = new Map<string, MessageProfileView>();
+    const shared = items.filter((m) => m.profileUserId && !m.deletedAt);
+    if (shared.length === 0) return out;
+    const targetIds = [...new Set(shared.map((m) => m.profileUserId as string))];
+    const related = new Set(await blocks.listRelatedIds(actorId));
+    const profiles = new Map((await users.findProfilesByIds(targetIds)).map((p) => [p.userId, p] as const));
+    const cards = new Map<string, MessageProfileView>();
+    for (const id of targetIds) {
+      const profile = profiles.get(id);
+      const user = profile ? await users.findById(id) : undefined;
+      if (!profile || !user || user.status === 'SUSPENDED' || (id !== actorId && related.has(id))) {
+        cards.set(id, { profile: null, canView: false, following: 'NONE' });
+        continue;
+      }
+      if (id === actorId) {
+        cards.set(id, { profile: toPublicProfile(profile), canView: true, following: 'SELF' });
+        continue;
+      }
+      const status = (await follows.get(actorId, id))?.status ?? 'NONE';
+      cards.set(id, { profile: toPublicProfile(profile), canView: !profile.isPrivate || status === 'ACCEPTED', following: status });
+    }
+    for (const m of shared) out.set(m.id, cards.get(m.profileUserId as string)!);
+    return out;
   }
 
   /** Bytes de uma foto, vídeo ou documento, só para quem está na conversa. Documento vem com o nome (para baixar). */
@@ -1045,7 +1114,7 @@ export class ConversationService {
   }
 
   /** Respostas (trecho da original) e reações de um grupo de mensagens. */
-  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]>; plays: Map<string, string[]>; stories: Map<string, MessageStoryView> }> {
+  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]>; plays: Map<string, string[]>; stories: Map<string, MessageStoryView>; profiles: Map<string, MessageProfileView> }> {
     const { conversations, users } = this.deps;
     // Stories respondidos que ainda estão no ar (o que acabou não aparece mais na conversa).
     const stories = new Map<string, MessageStoryView>();
@@ -1093,7 +1162,7 @@ export class ConversationService {
         replies.set(m.id, { id: o.id, senderName: names.get(o.senderId) ?? 'Alguém', mine: o.senderId === actorId, kind: o.kind, preview: previewOf(o), deleted: o.deletedAt != null });
       }
     }
-    return { replies, reactions, plays, stories };
+    return { replies, reactions, plays, stories, profiles: await this.profileCards(actorId, items) };
   }
 
   /** Bytes de uma mensagem de voz, só para quem está na conversa. */

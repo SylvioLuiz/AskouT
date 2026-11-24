@@ -337,6 +337,8 @@ export interface MessageRecord {
   gifUrl?: string | null;
   /** Story respondido (ou reagido): a mensagem mostra o story anexado. */
   storyId?: string | null;
+  /** Perfil compartilhado: a mensagem (kind TEXT) mostra o cartão do perfil. */
+  profileUserId?: string | null;
   /** Mensagem que esta responde (na mesma conversa). */
   replyToId?: string | null;
   /** Apagada por quem enviou: some para todos, vira "Mensagem apagada". */

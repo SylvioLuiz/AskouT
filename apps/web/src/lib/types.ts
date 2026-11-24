@@ -599,6 +599,14 @@ export interface ChatMemberRead {
   readAt: string | null;
 }
 
+/** Cartão de perfil compartilhado numa conversa. */
+export interface SharedProfileCard {
+  profile: PublicProfile | null;
+  /** Você pode ver o conteúdo: perfil público, é você, ou você segue com pedido aceito. */
+  canView: boolean;
+  following: 'NONE' | 'PENDING' | 'ACCEPTED' | 'SELF';
+}
+
 /** Cartão de um local compartilhado na conversa. */
 export interface ChatVenueCard {
   id: string;
@@ -628,6 +636,8 @@ export interface ChatMessage {
   storyId?: string | null;
   /** O story respondido, enquanto ainda está no ar (null quando acabou: aí não aparece). */
   story?: MessageStory | null;
+  /** Perfil compartilhado: o cartão já vem com as regras de quem vê. `profile` nulo = indisponível (bloqueio ou conta suspensa). */
+  sharedProfile?: SharedProfileCard | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
   deleted: boolean;
   /** Mensagem a que esta responde. */
