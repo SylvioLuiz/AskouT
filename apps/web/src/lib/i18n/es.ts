@@ -3800,6 +3800,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Evento criado por quem é dono deste perfil": "Evento creado por el dueño de este perfil",
   "Foi a convite: marcação, cartão numa conversa ou evento privado": "Por invitación: etiqueta, tarjeta en un chat o evento privado",
   "Evento aberto, sem convite": "Evento abierto, sin invitación",
+  "Cadastre seu celular": "Registra tu celular",
+  "Assim seus amigos acham você pela agenda do celular. O número não aparece para ninguém.": "Así tus amigos te encuentran por la agenda del celular. El número no se muestra a nadie.",
   "Buscar por nome ou @": "Buscar por nombre o @",
   "Buscar amigo por nome ou @": "Buscar amigo por nombre o @",
   "Nenhum amigo encontrado": "No se encontró ningún amigo",

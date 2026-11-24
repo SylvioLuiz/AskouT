@@ -32,6 +32,10 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Quantas vezes o app já pediu para cadastrar o celular e quando foi a última (vale para todos os aparelhos). */
+  getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }>;
+  /** Registra mais um pedido de cadastro do celular. */
+  markPhonePrompted(userId: string, at: Date): Promise<void>;
   /** Troca os gostos de rolê da pessoa (já validados). */
   setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
