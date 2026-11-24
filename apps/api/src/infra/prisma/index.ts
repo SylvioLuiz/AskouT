@@ -19,6 +19,7 @@ export { PrismaVenueStoryRepository } from './prisma-venue-story.repository.ts';
 export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';
 export { PrismaFeedRepository } from './prisma-feed.repository.ts';
 export { PrismaGuestListRepository } from './prisma-guest-list.repository.ts';
+export { PrismaEventShoppingRepository } from './prisma-event-shopping.repository.ts';
 export { PrismaPasswordResetRepository } from './prisma-password-reset.repository.ts';
 export { PrismaPhoneCodeRepository } from './prisma-phone-code.repository.ts';
 export { PrismaMfaRepository } from './prisma-mfa.repository.ts';

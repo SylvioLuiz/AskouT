@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ApiError } from './api.ts';
+import { ApiError, avatarSrc } from './api.ts';
+import { saveBlocker, splitProblems } from './editor-check.ts';
 import type { Async } from './hooks.ts';
 import { ActionDialog, CHANGED_EVENT, Modal } from './ui.tsx';
 import type { ActionSpec } from './ui.tsx';
@@ -43,8 +44,12 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  * `initial` é o que está salvo agora (refeito a cada carga). `save` recebe só os campos que mudaram e o motivo.
  * `check` confere o rascunho antes de salvar (ex.: fim antes do início) e devolve os problemas por campo.
  */
-export function useRecordEditor<D extends Record<string, unknown>>({ initial, save, check, onSaved, noteRequired = true, startEditing = false }: {
+export function useRecordEditor<D extends Record<string, unknown>>({ initial, save, check, onSaved, noteRequired = true, startEditing = false, labels = {}, alias = {} }: {
   initial: D;
+  /** Nome de cada campo, para o aviso quando algo impede o salvar. */
+  labels?: Partial<Record<keyof D, string>>;
+  /** Campo da API que corresponde a outro campo da tela (ex.: `image` → `imageData`). */
+  alias?: Record<string, keyof D & string>;
   noteRequired?: boolean;
   /** Registro novo: abre direto no modo de editar. */
   startEditing?: boolean;
@@ -75,6 +80,7 @@ export function useRecordEditor<D extends Record<string, unknown>>({ initial, sa
     draft,
     set: (k, v) => {
       setDraft((d) => ({ ...d, [k]: v }));
+      setError(undefined);
       setApiProblems((p) => {
         if (!(k in p)) return p;
         const next = { ...p };
@@ -98,7 +104,13 @@ export function useRecordEditor<D extends Record<string, unknown>>({ initial, sa
       setEditing(false);
     },
     save: async () => {
-      if (busy || changed.length === 0 || Object.keys(problems).length > 0) return;
+      if (busy) return;
+      // Nunca fica mudo: sem mudança ou com problema (às vezes num campo fora da vista), diz o que falta.
+      const blocker = saveBlocker(changed.length, problems as Record<string, string | undefined>, labels as Record<string, string>);
+      if (blocker) {
+        setError(blocker);
+        return;
+      }
       if (noteRequired && note.trim() === '') {
         setNoteMissing(true);
         return;
@@ -114,8 +126,10 @@ export function useRecordEditor<D extends Record<string, unknown>>({ initial, sa
         onSaved?.();
       } catch (e) {
         if (e instanceof ApiError) {
-          setError(e.message);
-          if (e.fields) setApiProblems(e.fields as Partial<Record<keyof D, string>>);
+          // Problema de campo que a tela não mostra (ex.: `image`) vai no aviso, para não travar o salvar sem explicação.
+          const { byField, loose } = splitProblems(e.fields, Object.keys(initial), alias);
+          setError(loose.length > 0 ? `${e.message}: ${loose.join(' · ')}` : e.message);
+          setApiProblems(byField as Partial<Record<keyof D, string>>);
         } else setError('Algo deu errado. Tente de novo.');
       } finally {
         setBusy(false);
@@ -248,7 +262,6 @@ export function RecordView<D extends Record<string, unknown>>({ title, subtitle,
   }
 
   const visibleActions = actions.filter((a) => !a.hidden);
-  const blocked = editor ? Object.keys(editor.problems).length > 0 : false;
 
   return (
     <div className="record">
@@ -336,7 +349,7 @@ export function RecordView<D extends Record<string, unknown>>({ title, subtitle,
             >
               Cancelar
             </button>
-            <button type="button" className="btn btn--primary" onClick={() => void editor.save()} disabled={editor.busy || editor.changed.length === 0 || blocked} aria-busy={editor.busy || undefined}>
+            <button type="button" className="btn btn--primary" onClick={() => void editor.save()} disabled={editor.busy} aria-busy={editor.busy || undefined}>
               {editor.busy ? 'Salvando…' : isNew ? 'Cadastrar' : 'Salvar'}
             </button>
           </>
@@ -524,10 +537,20 @@ export function RecordLink({ kind, id, children, label }: { kind: RecordKind; id
   );
 }
 
-/** Link para a pessoa: @usuário que abre o detalhe dela. */
-export function PersonLink({ id, username, displayName }: { id: string; username: string; displayName?: string }) {
+/** Link para a pessoa: @usuário que abre o detalhe dela. Com `avatarUrl` (mesmo nulo), mostra a foto (ou a inicial) ao lado. */
+export function PersonLink({ id, username, displayName, avatarUrl }: { id: string; username: string; displayName?: string; avatarUrl?: string | null }) {
+  const withPhoto = avatarUrl !== undefined;
   return (
     <RecordLink kind="user" id={id} label={`Abrir @${username}`}>
+      {withPhoto ? (
+        avatarUrl ? (
+          <img className="personlink__avatar" src={avatarSrc(avatarUrl)} alt="" loading="lazy" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="personlink__avatar personlink__avatar--empty" aria-hidden="true">
+            {(displayName || username).trim().charAt(0).toUpperCase()}
+          </span>
+        )
+      ) : null}
       {displayName ? <strong>{displayName}</strong> : null} <span className="handle">@{username}</span>
     </RecordLink>
   );

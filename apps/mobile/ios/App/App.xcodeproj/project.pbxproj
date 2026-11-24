@@ -30,6 +30,10 @@
 		A5C7E4022FF0000100A5C7E4 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E4122FF0000100A5C7E4 /* WidgetData.swift */; };
 		A5C7E4032FF0000100A5C7E4 /* WidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E4132FF0000100A5C7E4 /* WidgetsPlugin.swift */; };
 		A5C7E4052FF0000100A5C7E4 /* AskouTWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A5C7E4152FF0000100A5C7E4 /* AskouTWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A5C7E5102FF0000100A5C7E5 /* askout.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5C7E5002FF0000100A5C7E5 /* askout.wav */; };
+		A5C7E5112FF0000100A5C7E5 /* pop.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5C7E5012FF0000100A5C7E5 /* pop.wav */; };
+		A5C7E5122FF0000100A5C7E5 /* sino.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5C7E5022FF0000100A5C7E5 /* sino.wav */; };
+		A5C7E5132FF0000100A5C7E5 /* brilho.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5C7E5032FF0000100A5C7E5 /* brilho.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +107,10 @@
 		A5C7E4142FF0000100A5C7E4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A5C7E4152FF0000100A5C7E4 /* AskouTWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AskouTWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5C7E4162FF0000100A5C7E4 /* AskouTWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AskouTWidgets.entitlements; sourceTree = "<group>"; };
+		A5C7E5002FF0000100A5C7E5 /* askout.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = askout.wav; sourceTree = "<group>"; };
+		A5C7E5012FF0000100A5C7E5 /* pop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = pop.wav; sourceTree = "<group>"; };
+		A5C7E5022FF0000100A5C7E5 /* sino.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = sino.wav; sourceTree = "<group>"; };
+		A5C7E5032FF0000100A5C7E5 /* brilho.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = brilho.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,6 +187,7 @@
 				6215B9F5308D7399001DB28A /* App.entitlements */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				A5C7E5202FF0000100A5C7E5 /* Sounds */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -212,6 +221,17 @@
 				A5C7E4162FF0000100A5C7E4 /* AskouTWidgets.entitlements */,
 			);
 			path = AskouTWidgets;
+			sourceTree = "<group>";
+		};
+		A5C7E5202FF0000100A5C7E5 /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				A5C7E5002FF0000100A5C7E5 /* askout.wav */,
+				A5C7E5012FF0000100A5C7E5 /* pop.wav */,
+				A5C7E5022FF0000100A5C7E5 /* sino.wav */,
+				A5C7E5032FF0000100A5C7E5 /* brilho.wav */,
+			);
+			path = Sounds;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -355,6 +375,10 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				A5C7E5102FF0000100A5C7E5 /* askout.wav in Resources */,
+				A5C7E5112FF0000100A5C7E5 /* pop.wav in Resources */,
+				A5C7E5122FF0000100A5C7E5 /* sino.wav in Resources */,
+				A5C7E5132FF0000100A5C7E5 /* brilho.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -587,7 +611,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -611,7 +635,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
@@ -636,7 +660,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -662,7 +686,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -687,7 +711,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ArrivalWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -712,7 +736,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ArrivalWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -738,7 +762,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.Widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -764,7 +788,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.8;
+				MARKETING_VERSION = 1.0.9;
 				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.Widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

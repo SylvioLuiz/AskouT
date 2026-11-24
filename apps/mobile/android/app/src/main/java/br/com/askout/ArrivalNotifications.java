@@ -70,6 +70,8 @@ final class ArrivalNotifications {
             // Hora da última atualização: o Android mostra "agora" e vai contando ("1 min"...).
             .setShowWhen(true)
             .setWhen(System.currentTimeMillis());
+        // Som escolhido pela pessoa para a chegada (o servidor manda o canal do som nos dados).
+        NotificationSounds.apply(context, builder, data.get("channel"));
         // Marca de "ao vivo": o app não tira da bandeja ao abrir a tela do encontro (push-bridge.ts, deliveredMatches).
         android.os.Bundle live = new android.os.Bundle();
         live.putString("askout.live", "1");

@@ -563,16 +563,20 @@ export class PostService {
   }
 
   /**
-   * Quem organiza desfaz um convite que ainda não foi aceito (some o convite e a marcação; a pessoa pode ser convidada de novo).
-   * Quem já aceitou não sai por aqui.
+   * Desfaz um convite que ainda não foi aceito: some o convite, a marcação e o aviso no sino de quem foi convidado
+   * (a pessoa pode ser convidada de novo). Cancela quem organiza o evento (qualquer convite) ou quem mandou aquele convite.
+   * Quem já aceitou a marcação ou confirmou "Eu vou" não sai por aqui.
    */
   async cancelInvite(actorId: string, postId: unknown, userId: unknown): Promise<{ cancelled: true }> {
     const { post } = await this.seeable(actorId, postId);
-    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento cancela convites');
     if (typeof userId !== 'string' || userId === '' || userId.length > 64) throw notFound('Convite não encontrado');
+    const invite = (await this.deps.posts.listInvites(post.id)).find((i) => i.userId === userId);
+    if (post.authorId !== actorId && invite?.invitedById !== actorId) throw forbidden('Só quem organiza o evento ou quem mandou o convite pode cancelar');
+    if (!invite) throw notFound('Convite não encontrado');
     const tag = (await this.deps.posts.tagsFor([post.id])).find((t) => t.userId === userId);
-    if (tag?.status === 'ACCEPTED') throw conflict('Essa pessoa já aceitou o convite');
+    if (tag?.status === 'ACCEPTED' || (await this.deps.eventRoom.isGoing({ source: 'USER', id: post.id }, userId))) throw conflict('Essa pessoa já aceitou o convite');
     if (!(await this.deps.posts.removeInvite(post.id, userId))) throw notFound('Convite não encontrado');
+    await this.deps.notifier.withdraw?.(userId, `post-tag:${post.id}`);
     return { cancelled: true };
   }
 

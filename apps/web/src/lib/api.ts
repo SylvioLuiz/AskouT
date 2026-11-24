@@ -67,6 +67,10 @@ import type {
   EventPage,
   EventInvite,
   NotificationMute,
+  NotificationSounds,
+  EventReminderChoice,
+  EventReminderEventChoice,
+  EventReminderOption,
   EventStoryGroup,
   CommentGif,
   RollingNowItem,
@@ -78,6 +82,7 @@ import type {
   GifResults,
   GuestListOwnerView,
   GuestListView,
+  EventShoppingView,
   FeedPage,
   FeedPolicy,
   FeedPost,
@@ -110,6 +115,7 @@ import type {
   Profile,
   ProfilePatch,
   ProfileView,
+  BadgeId,
   ReferralOverview,
   PublicProfile,
   SessionUser,
@@ -163,6 +169,13 @@ function pageQuery(page: PageRequest | undefined): string {
 }
 
 const id = encodeURIComponent;
+
+function connectionsQuery(page: PageRequest | undefined, q: string | undefined): string {
+  const base = pageQuery(page);
+  const term = q?.trim();
+  if (!term) return base;
+  return `${base}${base ? '&' : '?'}q=${encodeURIComponent(term)}`;
+}
 
 /** De qual página é o feed: de um evento ou de um rolê (o trecho da rota na API). */
 export type FeedWhere = 'events' | 'venues';
@@ -282,10 +295,13 @@ export function createApi(deps: ApiDeps) {
     /** Convite sugerido para quem acabou de entrar pelo app sem o convite junto (mesma rede do toque no link). */
     pendingReferral: () => request<{ inviter: PublicProfile | null }>('GET', '/me/referral/pending'),
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
+    setBadgeHidden: (badge: BadgeId, hidden: boolean) => request<{ id: BadgeId; hidden: boolean }>('PUT', `/profiles/me/badges/${id(badge)}`, { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),
     setPhone: (phone: string | null) => request<{ phone: string | null; verified?: boolean }>('PUT', '/profiles/me/phone', { body: { phone } }),
+    phonePrompt: () => request<{ show: boolean }>('GET', '/profiles/me/phone/prompt'),
+    markPhonePrompted: () => request<{ ok: true }>('POST', '/profiles/me/phone/prompt'),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
     shownGoingEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/going${pageQuery(page)}`),
@@ -397,10 +413,11 @@ export function createApi(deps: ApiDeps) {
     follow: (userId: string) =>
       request<{ status: 'PENDING' | 'ACCEPTED'; isFriend: boolean }>('POST', `/users/${id(userId)}/follow`),
     unfollow: (userId: string) => request<{ removed: boolean }>('DELETE', `/users/${id(userId)}/follow`),
-    followers: (userId: string, page?: PageRequest) =>
-      request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${pageQuery(page)}`),
-    following: (userId: string, page?: PageRequest) =>
-      request<ConnectionsPage>('GET', `/users/${id(userId)}/following${pageQuery(page)}`),
+    /** `q` filtra por nome ou @ (no servidor, para achar quem ainda não foi carregado). */
+    followers: (userId: string, page?: PageRequest, q?: string) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${connectionsQuery(page, q)}`),
+    following: (userId: string, page?: PageRequest, q?: string) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/following${connectionsQuery(page, q)}`),
     mutualFriends: (userId: string) => request<{ items: PublicProfile[]; total: number }>('GET', `/users/${id(userId)}/mutual-friends`),
     followRequests: (page?: PageRequest) =>
       request<ConnectionsPage>('GET', `/me/follow-requests${pageQuery(page)}`),
@@ -437,6 +454,11 @@ export function createApi(deps: ApiDeps) {
     flashSetNote: (note: string) => request<FlashStatus>('PUT', '/me/flash/note', { body: { note } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
     flashActive: () => request<{ userIds: string[] }>('GET', '/flash/active'),
+    /** Também avisa o servidor de que estou com o app aberto (chamar só com a tela visível). */
+    presenceOnline: () => request<{ userIds: string[] }>('GET', '/presence/online'),
+    presenceAway: () => request<void>('POST', '/presence/away'),
+    presenceSettings: () => request<{ showOnline: boolean }>('GET', '/presence/settings'),
+    setPresenceSettings: (showOnline: boolean) => request<{ showOnline: boolean }>('PUT', '/presence/settings', { body: { showOnline } }),
     flashVisibility: (userId: string) => request<FlashVisibility>('GET', `/flash/visibility/${id(userId)}`),
     setFlashVisibility: (userId: string, body: Partial<FlashVisibility>) => request<FlashVisibility>('PUT', `/flash/visibility/${id(userId)}`, { body }),
     storyVisibility: (userId: string) => request<StoryVisibility>('GET', `/stories/visibility/${id(userId)}`),
@@ -466,6 +488,14 @@ export function createApi(deps: ApiDeps) {
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
+    notificationSounds: () => request<NotificationSounds>('GET', '/notifications/sounds'),
+    setNotificationSounds: (patch: Partial<NotificationSounds>) => request<NotificationSounds>('PUT', '/notifications/sounds', { body: patch }),
+    eventReminderSettings: () => request<EventReminderChoice>('GET', '/notifications/event-reminders'),
+    /** `null` volta ao padrão. O fuso vai junto para o "É hoje!" sair de manhã na hora da pessoa. */
+    setEventReminderSettings: (reminders: EventReminderOption[] | null, timeZone?: string) => request<EventReminderChoice>('PUT', '/notifications/event-reminders', { body: { reminders, ...(timeZone ? { timeZone } : {}) } }),
+    eventReminders: (eventId: string) => request<EventReminderEventChoice>('GET', `/events/${id(eventId)}/reminders`),
+    /** `null` volta a seguir a escolha geral. */
+    setEventReminders: (eventId: string, reminders: EventReminderOption[] | null) => request<EventReminderEventChoice>('PUT', `/events/${id(eventId)}/reminders`, { body: { reminders } }),
 
     // Explorar
     explore: (params: ExploreParams) => {
@@ -681,6 +711,51 @@ export function createApi(deps: ApiDeps) {
     guestListEntries: (eventId: string) => request<GuestListOwnerView>('GET', `/events/${id(eventId)}/guest-list/entries`),
     checkInGuest: (eventId: string, userId: string, checkedIn: boolean) => request<GuestListOwnerView>('PUT', `/events/${id(eventId)}/guest-list/entries/${id(userId)}/check-in`, { body: { checkedIn } }),
     exportGuestList: (eventId: string) => request<{ filename: string; csv: string }>('GET', `/events/${id(eventId)}/guest-list/export`),
+    /** Lista de compras e divisão de gastos (evento criado por uma pessoa; só quem está no grupo do evento usa). */
+    eventShopping: (eventId: string) => request<EventShoppingView>('GET', `/events/${id(eventId)}/shopping`),
+    configureShopping: (eventId: string, input: { enabled?: boolean; membersCanAdd?: boolean; membersCanCheck?: boolean }) => request<EventShoppingView>('PUT', `/events/${id(eventId)}/shopping`, { body: input }),
+    addShoppingItem: (eventId: string, input: { title: string; quantity?: string | null }) => request<EventShoppingView>('POST', `/events/${id(eventId)}/shopping/items`, { body: input }),
+    updateShoppingItem: (eventId: string, itemId: string, input: { title?: string; quantity?: string | null; bought?: boolean }) => request<EventShoppingView>('PATCH', `/events/${id(eventId)}/shopping/items/${id(itemId)}`, { body: input }),
+    deleteShoppingItem: (eventId: string, itemId: string) => request<EventShoppingView>('DELETE', `/events/${id(eventId)}/shopping/items/${id(itemId)}`),
+    addExpense: (eventId: string, input: { amountCents: number; payerId: string; note?: string | null }) => request<EventShoppingView>('POST', `/events/${id(eventId)}/shopping/expenses`, { body: input }),
+    updateExpense: (eventId: string, expenseId: string, input: { amountCents?: number | null; payerId?: string | null; note?: string | null }) => request<EventShoppingView>('PATCH', `/events/${id(eventId)}/shopping/expenses/${id(expenseId)}`, { body: input }),
+    deleteExpense: (eventId: string, expenseId: string) => request<EventShoppingView>('DELETE', `/events/${id(eventId)}/shopping/expenses/${id(expenseId)}`),
+    setSplitMember: (eventId: string, userId: string, included: boolean) => request<EventShoppingView>('PUT', `/events/${id(eventId)}/shopping/split/${id(userId)}`, { body: { included } }),
+    /** Anexo da divisão (nota fiscal, recibo): o arquivo vai cru no corpo, com o tipo no Content-Type e o nome em `?nome=`. */
+    attachExpense: async (eventId: string, file: Blob, name: string, type: string, note?: string): Promise<EventShoppingView> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      const query = new URLSearchParams({ nome: name, ...(note ? { nota: note } : {}) });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/shopping/expenses/file?${query.toString()}`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as EventShoppingView;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
+      throw error;
+    },
+    /** Baixa o anexo de um gasto (a rota exige o token). */
+    expenseFile: async (eventId: string, expenseId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/shopping/expenses/${id(expenseId)}/file`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),
@@ -720,7 +795,7 @@ export function createApi(deps: ApiDeps) {
     requestOrganization: (body: OrganizationRequestBody) => request<VenueClaim>('POST', '/organizations/requests', { body }),
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
-    openExternalVenue: (input: { key: string; lat: number; lng: number }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
+    openExternalVenue: (input: { key: string; lat: number; lng: number; number?: string }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
     cloakroom: (eventId: string) => request<CloakroomPublic>('GET', `/events/${id(eventId)}/cloakroom`),
     requestCloakroomTicket: (eventId: string, body: { description: string; itemCount: number }) => request<CloakroomTicket>('POST', `/events/${id(eventId)}/cloakroom/tickets`, { body }),
     cancelCloakroomTicket: (ticketId: string) => request<CloakroomTicket>('DELETE', `/cloakroom/tickets/${id(ticketId)}`),
@@ -888,7 +963,7 @@ export function createApi(deps: ApiDeps) {
     /** Manda um aviso de teste para os aparelhos da própria pessoa. */
     pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
-    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean; sounds?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Álbuns dos encontros

@@ -32,6 +32,12 @@ export class ProfilesController {
     return this.core.profiles.setPrivacy(actor.userId, asBody(body).isPrivate);
   }
 
+  /** Esconde (`{hidden: true}`) ou mostra um selo no próprio perfil. */
+  @Put('me/badges/:id')
+  setBadgeHidden(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.badges.setHidden(actor, id, asBody(body).hidden);
+  }
+
   /** `{image: "data:image/jpeg;base64,..."}` (até 60 KB, já reduzida pelo app) ou `{image: null}` para remover. */
   @Put('me/photo')
   setPhoto(@CurrentActor() actor: Actor, @Body() body: unknown) {
@@ -43,6 +49,19 @@ export class ProfilesController {
   @Get('me/phone')
   getPhone(@CurrentActor() actor: Actor) {
     return this.core.profiles.getPhone(actor.userId);
+  }
+
+  /** `{show}`: se o app deve pedir agora para cadastrar o celular (a conta não tem e o limite de pedidos deixa). */
+  @Get('me/phone/prompt')
+  phonePrompt(@CurrentActor() actor: Actor) {
+    return this.core.profiles.phonePrompt(actor.userId);
+  }
+
+  /** O app mostrou o pedido de cadastro do celular. */
+  @Post('me/phone/prompt')
+  @HttpCode(200)
+  markPhonePrompted(@CurrentActor() actor: Actor) {
+    return this.core.profiles.markPhonePrompted(actor.userId);
   }
 
   /** `{phone: "(11) 98765-4321"}` guarda (normalizado para +55...); `{phone: null}` apaga. */

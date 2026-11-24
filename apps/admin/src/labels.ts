@@ -35,6 +35,8 @@ export const ACTION_LABEL: Record<string, string> = {
   CLAIM_REJECTED: 'Recusou pedido de dono',
   VENUE_OWNER_REMOVED: 'Tirou o responsável do local',
   VENUE_EDITED: 'Editou o local',
+  VENUE_CREATED: 'Cadastrou um local',
+  VENUES_IMPORTED: 'Importou locais de planilha',
   PLACE_EVENT_EDITED: 'Editou um evento do local',
   POST_REMOVED: 'Apagou um post',
   PLACE_EVENT_REMOVED: 'Apagou um evento do local',
@@ -60,6 +62,39 @@ export const ACTION_LABEL: Record<string, string> = {
   RECO_EXPERIMENT_ENABLED: 'Ligou o teste A/B do “Para você”',
   RECO_EXPERIMENT_CHANGED: 'Mudou o tamanho do controle do teste A/B',
   RECO_EXPERIMENT_DISABLED: 'Desligou o teste A/B do “Para você”',
+  ADMIN_LOGIN: 'Entrou na gestão',
+  ADMIN_PASSWORD_CHANGED: 'Trocou a própria senha na gestão',
+  CLAIM_DOCUMENT_VIEWED: 'Abriu o documento de um pedido de dono',
+  EVENT_EXTRA_MOVED: 'Mudou a ordem das configurações de evento',
+  TASTE_MOVED: 'Mudou a ordem dos gostos de rolê',
+  HUNTER_SYNC_RUN: 'Buscou eventos no Hunter agora',
+  ACCOUNT_DELETED: 'Apagou a própria conta',
+  ACCOUNT_DATA_EXPORTED: 'Baixou a cópia dos próprios dados',
+  MFA_ENABLED: 'Ligou a verificação em duas etapas',
+  MFA_DISABLED: 'Desligou a verificação em duas etapas',
+  MFA_RECOVERY_REGENERATED: 'Gerou novos códigos de recuperação',
+  BOOST_ORDERED: 'Pediu um impulsionamento',
+  BOOST_CANCELLED: 'Cancelou um impulsionamento não pago',
+  BOOST_PAID: 'Impulsionamento pago',
+  BOOST_PAYMENT_REFUSED: 'Pagamento recusado (valor diferente)',
+  ROLE_CHANGED: 'Papel da conta trocado',
+};
+
+/** Grupos do filtro "O que" da auditoria (na ordem do menu). */
+export const ACTION_GROUPS: { label: string; actions: string[] }[] = [
+  { label: 'Contas', actions: ['USER_SUSPENDED', 'USER_REACTIVATED', 'USER_PROFILE_EDITED', 'USER_BIRTHDATE_CHANGED', 'ROLE_CHANGED', 'ACCOUNT_DELETED', 'ACCOUNT_DATA_EXPORTED', 'MFA_ENABLED', 'MFA_DISABLED', 'MFA_RECOVERY_REGENERATED'] },
+  { label: 'Moderação', actions: ['POST_REMOVED', 'COMMENT_REMOVED', 'STORY_REMOVED', 'FEED_POST_REMOVED', 'FEED_COMMENT_REMOVED', 'PLACE_EVENT_REMOVED', 'REPORT_DISMISSED', 'REPORT_ACTIONED'] },
+  { label: 'Locais e eventos', actions: ['CLAIM_APPROVED', 'CLAIM_REJECTED', 'CLAIM_DOCUMENT_VIEWED', 'VENUE_CREATED', 'VENUES_IMPORTED', 'VENUE_EDITED', 'VENUE_OWNER_REMOVED', 'PLACE_EVENT_EDITED'] },
+  { label: 'Impulsionamento', actions: ['BOOST_ORDERED', 'BOOST_CANCELLED', 'BOOST_PAID', 'BOOST_PAYMENT_REFUSED', 'PAYMENTS_ENABLED', 'PAYMENTS_DISABLED', 'BOOST_PACKAGES_UPDATED'] },
+  { label: 'Configurações', actions: ['EVENT_EXTRA_CREATED', 'EVENT_EXTRA_UPDATED', 'EVENT_EXTRA_MOVED', 'EVENT_EXTRA_REMOVED', 'TASTE_CREATED', 'TASTE_UPDATED', 'TASTE_MOVED', 'TASTE_REMOVED', 'RECO_EXPERIMENT_ENABLED', 'RECO_EXPERIMENT_CHANGED', 'RECO_EXPERIMENT_DISABLED'] },
+  { label: 'Hunter', actions: ['HUNTER_ENABLED', 'HUNTER_DISABLED', 'HUNTER_EVENT_REMOVED', 'HUNTER_EVENTS_REMOVED_ALL', 'HUNTER_SYNC_RUN'] },
+  { label: 'Acesso à gestão', actions: ['ADMIN_LOGIN', 'ADMIN_PASSWORD_CHANGED'] },
+];
+
+export const ACTOR_KIND_LABEL: Record<string, string> = {
+  ADMIN: 'Gestão',
+  USER: 'Pessoa no app',
+  SYSTEM: 'Sistema',
 };
 
 export const TARGET_LABEL: Record<string, string> = {
@@ -78,6 +113,10 @@ export const TARGET_LABEL: Record<string, string> = {
   POST_REPORT: 'Denúncia de post',
   CONVERSATION_REPORT: 'Denúncia de conversa',
   USER_REPORT: 'Denúncia de perfil ou comentário',
+  VENUE_STORY: 'Flash do local',
+  VENUE_STORY_REPORT: 'Denúncia de flash do local',
+  BOOST: 'Impulsionamento',
+  HUNTER: 'Hunter',
 };
 
 export const EVENT_KIND_LABEL: Record<string, string> = {

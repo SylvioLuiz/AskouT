@@ -158,7 +158,7 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
           onConfirm={() => void confirm(() => api.block(profile.userId), t('Você bloqueou @{username}.', { username: profile.username }))}
         />
       ) : (
-        <ul className="sharelist">
+        <ul className="sharelist sharelist--compact">
           {row(t('Compartilhar perfil'), t('Mande em uma conversa ou para fora do app.'), () => setStep('share'))}
           {relationship.followsYou === 'ACCEPTED' && !blocked ? row(t('Remover seguidor'), t('Ela deixa de seguir você. Não avisamos.'), () => setStep('remove')) : null}
           {flashOptions && current ? row(t('Ocultar NOW dela'), current.hideTheirs ? t('Ativo: você não vê quando ela liga o NOW.') : t('Você deixa de ver quando ela liga o NOW.'), () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}

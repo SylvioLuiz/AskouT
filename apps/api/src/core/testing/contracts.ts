@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, EventShoppingRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -42,6 +42,7 @@ export interface RepoHarness {
   venueStories: VenueStoryRepository;
   feed: FeedRepository;
   guestLists: GuestListRepository;
+  eventShopping: EventShoppingRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -1542,6 +1543,22 @@ export function defineRepositoryContract(
         assert.deepEqual([list[0]!.adminUsername, list[0]!.targetId, list[0]!.note, list[2]!.note], ['adm', target, 'ok', 'Spam']);
         assert.equal((await h.admin.listAudit({ limit: 1, offset: 1 })).length, 1, 'a paginação respeita limite e deslocamento');
       });
+
+      it('auditoria: ação do sistema e de quem usa o app, nome do alvo, antes/depois e filtros', async () => {
+        const dono = await newUser('donoaud');
+        const target = randomUUID();
+        await h.admin.addAudit({ id: randomUUID(), adminId: null, actorKind: 'SYSTEM', action: 'BOOST_PAID', targetType: 'BOOST', targetId: target, targetLabel: 'Bar Auditado', changes: [{ field: 'situação', before: 'aguardando pagamento', after: 'pago' }], note: 'R$ 69,90', createdAt: at(1) });
+        await h.admin.addAudit({ id: randomUUID(), adminId: dono, actorKind: 'USER', action: 'BOOST_ORDERED', targetType: 'BOOST', targetId: target, targetLabel: 'Bar Auditado', note: null, createdAt: at(0) });
+        const rows = await h.admin.listAudit({ limit: 10, offset: 0 }, { targetId: target });
+        assert.deepEqual(rows.map((r) => [r.action, r.actorKind, r.adminUsername]), [['BOOST_PAID', 'SYSTEM', 'sistema'], ['BOOST_ORDERED', 'USER', 'donoaud']]);
+        assert.deepEqual(rows[0]!.changes, [{ field: 'situação', before: 'aguardando pagamento', after: 'pago' }]);
+        assert.equal(rows[1]!.changes, null);
+        assert.equal(await h.admin.countAudit({ targetId: target, actorKind: 'SYSTEM' }), 1);
+        assert.equal(await h.admin.countAudit({ targetId: target, text: 'auditado' }), 2, 'busca no nome do alvo');
+        assert.equal(await h.admin.countAudit({ targetId: target, text: 'donoaud' }), 1, 'busca no @ de quem fez');
+        assert.equal(await h.admin.countAudit({ targetId: target, actorId: dono }), 1);
+        assert.equal(await h.admin.countAudit({ targetId: target, from: at(1) }), 1);
+      });
     });
 
     describe('locais com dono e reivindicações', () => {
@@ -2028,6 +2045,15 @@ export function defineRepositoryContract(
         await h.notifications.setMuteSettings(ana, { all: false, chats: true, events: true }, at(9));
         assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: true, events: true });
         assert.deepEqual(await h.notifications.getMuteSettings(bia), { all: false, chats: false, events: false }, 'é de cada pessoa');
+        assert.equal((await h.notifications.getEventReminderSettings([ana, bia])).size, 0, 'lembretes: quem nunca mexeu segue o padrão');
+        await h.notifications.setEventReminderSettings(ana, { reminders: ['1d', '30m'], timeZone: 'America/Manaus' }, at(9));
+        await h.notifications.setEventReminderSettings(bia, { reminders: [], timeZone: null }, at(9));
+        const reminderSettings = await h.notifications.getEventReminderSettings([ana, bia]);
+        assert.deepEqual(reminderSettings.get(ana), { reminders: ['1d', '30m'], timeZone: 'America/Manaus' });
+        assert.deepEqual(reminderSettings.get(bia), { reminders: [], timeZone: null }, 'lista vazia: nenhum lembrete');
+        await h.notifications.setEventReminderSettings(ana, { reminders: null, timeZone: 'America/Manaus' }, at(9));
+        assert.deepEqual((await h.notifications.getEventReminderSettings([ana])).get(ana), { reminders: null, timeZone: 'America/Manaus' }, 'volta ao padrão e guarda o fuso');
+        assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: true, events: true }, 'não mexe no silenciar');
         assert.equal(await h.notifications.markRead(ana, at(10), [ids[0]!, ids[3]!]), 1, 'só marca o que é da pessoa');
         assert.equal(await h.notifications.hasUnread(ana, 'k1'), false, 'lido não segura novos avisos');
         assert.equal(await h.notifications.hasUnread(bia, 'k1'), true);
@@ -2286,9 +2312,27 @@ export function defineRepositoryContract(
         assert.equal(perUser.find((r) => r.userId === bia)?.count, 2);
         assert.deepEqual(await h.eventRoom.countGoingByUser([place]), [{ userId: bia, count: 1 }]);
         assert.deepEqual(await h.eventRoom.countGoingByUser([]), []);
-        assert.equal(await h.eventRoom.markReminded(place, ana, at(1)), true, 'primeiro lembrete marca');
-        assert.equal(await h.eventRoom.markReminded(place, ana, at(2)), false, 'o segundo não repete');
-        assert.equal(await h.eventRoom.markReminded(user, ana, at(1)), true, 'outro evento, outro lembrete');
+        assert.equal(await h.eventRoom.markReminded(place, ana, '30m', at(1)), true, 'primeiro lembrete marca');
+        assert.equal(await h.eventRoom.markReminded(place, ana, '30m', at(2)), false, 'o segundo não repete');
+        assert.equal(await h.eventRoom.markReminded(place, ana, 'manha', at(2)), true, 'outro tipo de lembrete, outra marca');
+        assert.equal(await h.eventRoom.markReminded(user, ana, '30m', at(1)), true, 'outro evento, outro lembrete');
+        // presenças de eventos que começam na janela, com o começo do evento
+        const soon = (await h.eventRoom.listGoingStartingBetween(at(0), at(10), 10)).map((g) => [g.ref.source, g.userId, g.startsAt.getTime()]).sort();
+        assert.deepEqual(soon, [['USER', ana, at(5).getTime()], ['USER', bia, at(5).getTime()]].sort(), 'só o evento de pessoa começa nos primeiros 10 s');
+        const later = await h.eventRoom.listGoingStartingBetween(at(10), at(3 * H), 10);
+        assert.deepEqual(later.map((g) => [g.ref.id, g.userId, g.createdAt.getTime(), g.startsAt.getTime()]), [[e.id, bia, at(5).getTime(), at(2 * H).getTime()]]);
+        // lembretes escolhidos só para um evento
+        assert.equal(await h.eventRoom.getReminderChoice(user, bia), undefined, 'sem escolha: segue a geral');
+        await h.eventRoom.setReminderChoice(user, bia, ['1h', '15m'], at(6));
+        await h.eventRoom.setReminderChoice(user, ana, [], at(6));
+        await h.eventRoom.setReminderChoice(place, bia, ['1d'], at(6));
+        assert.deepEqual(await h.eventRoom.getReminderChoice(user, bia), ['1h', '15m']);
+        assert.deepEqual(await h.eventRoom.getReminderChoice(user, ana), [], 'lista vazia: nenhum lembrete');
+        const choices = (await h.eventRoom.listReminderChoices([user])).map((c) => [c.userId, c.reminders.join()]).sort();
+        assert.deepEqual(choices, [[ana, ''], [bia, '1h,15m']].sort(), 'só os do evento pedido');
+        await h.eventRoom.setReminderChoice(user, bia, null, at(7));
+        assert.equal(await h.eventRoom.getReminderChoice(user, bia), undefined, 'null volta a seguir a geral');
+        assert.deepEqual((await h.eventRoom.listReminderChoices([place])).map((c) => c.reminders), [['1d']]);
         // stories: só os que ainda estão no ar, do mais antigo ao mais novo; a mídia vem à parte
         const storyA = { id: randomUUID(), ref: user, userId: bia, mime: 'image/jpeg', video: false, data: new Uint8Array([1, 2, 3]), createdAt: at(1), expiresAt: at(30) };
         const storyB = { id: randomUUID(), ref: user, userId: ana, mime: 'video/mp4', video: true, data: new Uint8Array([4, 5]), createdAt: at(2), expiresAt: at(3) };
@@ -2461,6 +2505,32 @@ export function defineRepositoryContract(
         await h.guestLists.join({ eventId: e.id, userId: ana, companions: 0, at: at(10) }, null);
         await h.places.deleteEvent(e.venueId, e.id);
         assert.equal(await h.guestLists.get(e.id), undefined);
+      });
+
+      it('lista de compras: liga, itens, gastos com anexo, permissões e cascata ao apagar o evento', async () => {
+        const { ana, bia } = await setup();
+        const postId = randomUUID();
+        await h.posts.create({ id: postId, authorId: ana, caption: null, placeName: 'Casa', placeAddress: null, eventTitle: 'Churras', eventStartsAt: at(5), eventEndsAt: at(9), eventKind: 'OTHER' as const, archivedAt: null, editedAt: null, createdAt: at(1) }, []);
+        assert.equal(await h.eventShopping.get(postId), undefined);
+        assert.equal(await h.eventShopping.upsert({ eventPostId: randomUUID(), membersCanAdd: true, membersCanCheck: true, splitExcludedIds: [], createdAt: at(1) }), false, 'evento inexistente');
+        assert.equal(await h.eventShopping.upsert({ eventPostId: postId, membersCanAdd: false, membersCanCheck: true, splitExcludedIds: [bia], createdAt: at(2) }), true);
+        assert.deepEqual(await h.eventShopping.get(postId), { eventPostId: postId, membersCanAdd: false, membersCanCheck: true, splitExcludedIds: [bia], createdAt: at(2) });
+        const item = { id: randomUUID(), eventPostId: postId, title: 'Carvão', quantity: '2 sacos', createdById: ana, boughtById: null, boughtAt: null, createdAt: at(3) };
+        await h.eventShopping.addItem(item);
+        assert.equal(await h.eventShopping.updateItem(item.id, { boughtById: bia, boughtAt: at(4) }), true);
+        assert.deepEqual(await h.eventShopping.listItems(postId), [{ ...item, boughtById: bia, boughtAt: at(4) }]);
+        const expense = { id: randomUUID(), eventPostId: postId, uploaderId: bia, fileName: 'nota.pdf', mime: 'application/pdf', size: 5, amountCents: null, payerId: null, note: null, createdAt: at(5) };
+        await h.eventShopping.addExpense(expense, new Uint8Array([37, 80, 68, 70, 45]));
+        assert.equal(await h.eventShopping.updateExpense(expense.id, { amountCents: 12345, payerId: bia }), true);
+        assert.deepEqual(await h.eventShopping.findExpense(expense.id), { ...expense, amountCents: 12345, payerId: bia });
+        assert.deepEqual(await h.eventShopping.expenseFile(expense.id), { mime: 'application/pdf', name: 'nota.pdf', data: new Uint8Array([37, 80, 68, 70, 45]) });
+        assert.equal(await h.eventShopping.deleteItem(item.id), true);
+        assert.equal(await h.eventShopping.deleteItem(item.id), false);
+        assert.equal(await h.eventShopping.remove(postId), true, 'desligar apaga itens e gastos');
+        assert.deepEqual([await h.eventShopping.get(postId), await h.eventShopping.listExpenses(postId), await h.eventShopping.findExpense(expense.id)], [undefined, [], undefined]);
+        await h.eventShopping.upsert({ eventPostId: postId, membersCanAdd: true, membersCanCheck: true, splitExcludedIds: [], createdAt: at(6) });
+        assert.equal(await h.posts.delete(postId, ana), true);
+        assert.equal(await h.eventShopping.get(postId), undefined, 'apagar o evento leva a lista junto');
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

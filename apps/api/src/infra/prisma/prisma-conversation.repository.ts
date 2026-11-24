@@ -156,6 +156,24 @@ export class PrismaConversationRepository implements ConversationRepository {
     await this.prisma.userSettings.upsert({ where: { userId }, create: { userId, openDms: on }, update: { openDms: on } });
   }
 
+  async getShowOnline(userId: string): Promise<boolean> {
+    if (!isUuid(userId)) return true;
+    const row = await this.prisma.userSettings.findUnique({ where: { userId }, select: { showOnline: true } });
+    return row?.showOnline !== false;
+  }
+
+  async setShowOnline(userId: string, on: boolean): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.userSettings.upsert({ where: { userId }, create: { userId, showOnline: on }, update: { showOnline: on } });
+  }
+
+  async listHiddenOnline(userIds: readonly string[]): Promise<string[]> {
+    const ids = userIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.userSettings.findMany({ where: { userId: { in: ids }, showOnline: false }, select: { userId: true } });
+    return rows.map((r) => r.userId);
+  }
+
   async participantIds(conversationId: string): Promise<string[] | undefined> {
     if (!isUuid(conversationId)) return undefined;
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });

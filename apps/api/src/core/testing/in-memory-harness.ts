@@ -17,6 +17,7 @@ import {
   InMemoryVenueStoryRepository,
   InMemoryFeedRepository,
   InMemoryGuestListRepository,
+  InMemoryEventShoppingRepository,
   InMemoryPushSubscriptionRepository,
   InMemoryFlashRepository,
   InMemoryBlockRepository,
@@ -37,7 +38,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let users = new InMemoryUserRepository();
   let referrals = new InMemoryReferralRepository(users);
   let blocks = new InMemoryBlockRepository();
-  let follows = new InMemoryFollowRepository(blocks);
+  let follows = new InMemoryFollowRepository(blocks, users);
   let pending = new InMemoryPendingSignupRepository();
   let passwordResets = new InMemoryPasswordResetRepository();
   let boosts = new InMemoryBoostRepository();
@@ -56,11 +57,12 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let scheduling = new InMemorySchedulingRepository();
   let profileEvents = new InMemoryProfileEventRepository();
   let posts = new InMemoryPostRepository();
-  let eventRoom = new InMemoryEventRoomRepository(posts);
+  let eventRoom = new InMemoryEventRoomRepository(posts, places);
   let albums = new InMemoryAlbumRepository();
   let venueStories = new InMemoryVenueStoryRepository();
   let feed = new InMemoryFeedRepository(posts, places);
   let guestLists = new InMemoryGuestListRepository(places);
+  let eventShopping = new InMemoryEventShoppingRepository(posts);
   let admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
   let notifications = new InMemoryNotificationRepository();
   let pushSubscriptions = new InMemoryPushSubscriptionRepository();
@@ -151,6 +153,9 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     get guestLists() {
       return guestLists;
     },
+    get eventShopping() {
+      return eventShopping;
+    },
     get notifications() {
       return notifications;
     },
@@ -165,7 +170,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       users = new InMemoryUserRepository();
       referrals = new InMemoryReferralRepository(users);
       blocks = new InMemoryBlockRepository();
-      follows = new InMemoryFollowRepository(blocks);
+      follows = new InMemoryFollowRepository(blocks, users);
       pending = new InMemoryPendingSignupRepository();
       passwordResets = new InMemoryPasswordResetRepository();
       boosts = new InMemoryBoostRepository();
@@ -184,11 +189,12 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       scheduling = new InMemorySchedulingRepository();
       profileEvents = new InMemoryProfileEventRepository();
       posts = new InMemoryPostRepository();
-      eventRoom = new InMemoryEventRoomRepository(posts);
+      eventRoom = new InMemoryEventRoomRepository(posts, places);
       albums = new InMemoryAlbumRepository();
       venueStories = new InMemoryVenueStoryRepository();
       feed = new InMemoryFeedRepository(posts, places);
       guestLists = new InMemoryGuestListRepository(places);
+      eventShopping = new InMemoryEventShoppingRepository(posts);
       admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
       notifications = new InMemoryNotificationRepository();
       pushSubscriptions = new InMemoryPushSubscriptionRepository();

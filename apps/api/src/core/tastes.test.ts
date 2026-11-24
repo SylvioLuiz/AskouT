@@ -44,7 +44,7 @@ test('a gestão cadastra, edita, ordena e apaga gostos, com validação e audito
   await w.core.admin.deleteTaste(A, pet.id);
   assert.equal((await w.core.tastes.list()).length, 10);
   await rejectsWith(w.core.admin.deleteTaste(A, pet.id), 'NOT_FOUND');
-  assert.deepEqual([...w.admin.audit.values()].map((a) => a.action), ['TASTE_CREATED', 'TASTE_UPDATED', 'TASTE_REMOVED']);
+  assert.deepEqual([...w.admin.audit.values()].map((a) => a.action), ['TASTE_CREATED', 'TASTE_MOVED', 'TASTE_UPDATED', 'TASTE_REMOVED']);
 });
 
 test('tem o gosto de RPG e jogos de mesa, com ícone', async () => {

@@ -346,16 +346,25 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
-    const box = center ? boundingBox(center, radiusM) : undefined;
+    const box = center && radiusM > 0 ? boundingBox(center, radiusM) : undefined;
     // O nome é filtrado no banco (sem acento, maiúscula, pontuação e espaços): antes vinham só os 500 primeiros locais
     // e o filtro era feito depois, então locais além deles (ex.: "What's Bar" em Santos) nunca apareciam.
+    // Com posição, os 500 que passam são os mais perto dela: um nome comum ("Bar do Zé") tem centenas de homônimos
+    // pelo país e o da esquina não pode ficar de fora por acaso.
     const needle = compactName(text);
+    const cosLat = center ? Math.max(Math.cos((center.lat * Math.PI) / 180), 0.2) : 1;
     const ids = needle
       ? (
-          await this.prisma.$queryRaw<{ id: string }[]>`
-            SELECT id FROM "Venue"
-            WHERE regexp_replace(translate(lower(name), 'áàâãäåéèêëíìîïóòôõöúùûüçñý', 'aaaaaaeeeeiiiiooooouuuucny'), '[^a-z0-9]', '', 'g') LIKE ${`%${needle}%`}
-            LIMIT ${PREFILTER_CAP}`
+          center
+            ? await this.prisma.$queryRaw<{ id: string }[]>`
+                SELECT id FROM "Venue"
+                WHERE regexp_replace(translate(lower(name), 'áàâãäåéèêëíìîïóòôõöúùûüçñý', 'aaaaaaeeeeiiiiooooouuuucny'), '[^a-z0-9]', '', 'g') LIKE ${`%${needle}%`}
+                ORDER BY power(lat - ${center.lat}, 2) + power((lng - ${center.lng}) * ${cosLat}, 2)
+                LIMIT ${PREFILTER_CAP}`
+            : await this.prisma.$queryRaw<{ id: string }[]>`
+                SELECT id FROM "Venue"
+                WHERE regexp_replace(translate(lower(name), 'áàâãäåéèêëíìîïóòôõöúùûüçñý', 'aaaaaaeeeeiiiiooooouuuucny'), '[^a-z0-9]', '', 'g') LIKE ${`%${needle}%`}
+                LIMIT ${PREFILTER_CAP}`
         ).map((r) => r.id)
       : undefined;
     if (ids && ids.length === 0) return [];

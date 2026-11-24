@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { EventReminderOption } from '../event-reminders.ts';
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
 import { conflict } from '../errors.ts';
@@ -14,6 +15,7 @@ import type {
   EventRoomRepository,
   FeedRepository,
   GuestListRepository,
+  EventShoppingRepository,
   ConversationRepository,
   MeetupRepository,
   SchedulingRepository,
@@ -66,6 +68,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import { matchesNotificationFilter, type NotificationFilter } from '../notification-categories.ts';
+import { DEFAULT_SOUNDS, type NotificationSoundSettings } from '../notification-sounds.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
@@ -73,7 +76,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditFilter, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminEventPerson, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
 } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -111,6 +114,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   readonly photos = new Map<string, ProfilePhotoRecord>();
+  readonly phonePrompts = new Map<string, { count: number; lastAt: Date | null }>();
 
   async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
     if (photo) this.photos.set(userId, { ...photo, data: new Uint8Array(photo.data) });
@@ -213,6 +217,15 @@ export class InMemoryUserRepository implements UserRepository {
   async markOnboarded(userId: string, at: Date): Promise<void> {
     const u = this.users.get(userId);
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
+  }
+
+  async getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }> {
+    return { ...(this.phonePrompts.get(userId) ?? { count: 0, lastAt: null }) };
+  }
+
+  async markPhonePrompted(userId: string, at: Date): Promise<void> {
+    const now = this.phonePrompts.get(userId) ?? { count: 0, lastAt: null };
+    this.phonePrompts.set(userId, { count: now.count + 1, lastAt: at });
   }
 
   async setTastes(userId: string, tastes: string[]): Promise<void> {
@@ -616,9 +629,12 @@ export class InMemoryFlashRepository implements FlashRepository {
 export class InMemoryFollowRepository implements FollowRepository {
   readonly rows = new Map<string, Follow>();
   private readonly blocks: BlockRepository;
+  private readonly users: InMemoryUserRepository | undefined;
 
-  constructor(blocks: BlockRepository) {
+  /** `users` é opcional: sem ele, a busca por `query` não encontra ninguém. */
+  constructor(blocks: BlockRepository, users?: InMemoryUserRepository) {
     this.blocks = blocks;
+    this.users = users;
   }
 
   private key(followerId: string, followeeId: string): string {
@@ -645,15 +661,15 @@ export class InMemoryFollowRepository implements FollowRepository {
     this.rows.delete(this.key(b, a));
   }
 
-  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
-    return this.matching(userId, direction, status)
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]> {
+    return this.matching(userId, direction, status, query)
       .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime() || x.followerId.localeCompare(y.followerId))
       .slice(page.offset, page.offset + page.limit)
       .map((f) => ({ ...f }));
   }
 
-  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
-    return this.matching(userId, direction, status).length;
+  async count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number> {
+    return this.matching(userId, direction, status, query).length;
   }
 
   async acceptAllPending(followeeId: string): Promise<number> {
@@ -688,10 +704,13 @@ export class InMemoryFollowRepository implements FollowRepository {
     return out;
   }
 
-  private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
-    return [...this.rows.values()].filter(
-      (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
-    );
+  private matching(userId: string, direction: Direction, status: FollowStatus, query?: string): Follow[] {
+    return [...this.rows.values()].filter((f) => {
+      if (f.status !== status || (direction === 'followers' ? f.followeeId !== userId : f.followerId !== userId)) return false;
+      if (!query) return true;
+      const p = this.users?.profiles.get(direction === 'followers' ? f.followerId : f.followeeId);
+      return !!p && (p.username.startsWith(query) || p.displayName.toLowerCase().includes(query));
+    });
   }
 }
 
@@ -1346,6 +1365,21 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async setOpenDms(userId: string, on: boolean): Promise<void> {
     if (on) this.openDms.add(userId);
     else this.openDms.delete(userId);
+  }
+
+  readonly hiddenOnline = new Set<string>();
+
+  async getShowOnline(userId: string): Promise<boolean> {
+    return !this.hiddenOnline.has(userId);
+  }
+
+  async setShowOnline(userId: string, on: boolean): Promise<void> {
+    if (on) this.hiddenOnline.delete(userId);
+    else this.hiddenOnline.add(userId);
+  }
+
+  async listHiddenOnline(userIds: readonly string[]): Promise<string[]> {
+    return userIds.filter((id) => this.hiddenOnline.has(id));
   }
 
   async participantIds(conversationId: string): Promise<string[] | undefined> {
@@ -2277,6 +2311,31 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     this.muted.set(userId, { ...settings });
   }
 
+  readonly sounds = new Map<string, NotificationSoundSettings>();
+
+  async getSoundSettings(userId: string): Promise<NotificationSoundSettings> {
+    return { ...DEFAULT_SOUNDS, ...this.sounds.get(userId) };
+  }
+
+  async setSoundSettings(userId: string, settings: NotificationSoundSettings): Promise<void> {
+    this.sounds.set(userId, { ...settings });
+  }
+
+  readonly eventReminders = new Map<string, import('../ports.ts').EventReminderSettings>();
+
+  async getEventReminderSettings(userIds: string[]): Promise<Map<string, import('../ports.ts').EventReminderSettings>> {
+    const out = new Map<string, import('../ports.ts').EventReminderSettings>();
+    for (const id of userIds) {
+      const saved = this.eventReminders.get(id);
+      if (saved) out.set(id, { reminders: saved.reminders ? [...saved.reminders] : null, timeZone: saved.timeZone });
+    }
+    return out;
+  }
+
+  async setEventReminderSettings(userId: string, settings: import('../ports.ts').EventReminderSettings): Promise<void> {
+    this.eventReminders.set(userId, { reminders: settings.reminders ? [...settings.reminders] : null, timeZone: settings.timeZone });
+  }
+
   async create(record: NotificationRecord): Promise<void> {
     this.rows.push({ ...record });
   }
@@ -2295,6 +2354,18 @@ export class InMemoryNotificationRepository implements NotificationRepository {
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {
     return this.rows.some((n) => n.userId === userId && n.readAt === null && n.dedupeKey === dedupeKey);
+  }
+
+  async deleteByKey(userId: string, dedupeKey: string): Promise<number> {
+    let removed = 0;
+    for (let i = this.rows.length - 1; i >= 0; i--) {
+      const n = this.rows[i]!;
+      if (n.userId === userId && n.dedupeKey === dedupeKey) {
+        this.rows.splice(i, 1);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {
@@ -2630,11 +2701,15 @@ export class InMemoryPostRepository implements PostRepository {
 
 export class InMemoryEventRoomRepository implements EventRoomRepository {
   private readonly postsRepo: InMemoryPostRepository;
+  /** Para saber quando começam os eventos dos locais (o banco faz isso com um join). */
+  private readonly placesRepo: InMemoryPlaceRepository | undefined;
   readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date; onProfile: boolean }>();
   readonly reminded = new Set<string>();
+  readonly reminderChoices = new Map<string, { ref: EventRef; userId: string; reminders: EventReminderOption[] }>();
 
-  constructor(postsRepo: InMemoryPostRepository) {
+  constructor(postsRepo: InMemoryPostRepository, placesRepo?: InMemoryPlaceRepository) {
     this.postsRepo = postsRepo;
+    this.placesRepo = placesRepo;
   }
 
   private static key(ref: EventRef): string {
@@ -2660,11 +2735,41 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return row && this.alive(ref) ? row.onProfile : undefined;
   }
 
-  async markReminded(ref: EventRef, userId: string): Promise<boolean> {
-    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+  async markReminded(ref: EventRef, userId: string, kind: EventReminderOption): Promise<boolean> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}|${kind}`;
     if (this.reminded.has(key)) return false;
     this.reminded.add(key);
     return true;
+  }
+
+  async listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]> {
+    const out: { ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[] = [];
+    for (const g of this.going.values()) {
+      let startsAt: Date | null | undefined;
+      if (g.ref.source === 'PLACE') startsAt = this.placesRepo?.events.get(g.ref.id)?.startsAt;
+      else {
+        const post = this.postsRepo.posts.get(g.ref.id);
+        startsAt = post && post.archivedAt === null ? post.eventStartsAt : null;
+      }
+      if (startsAt && startsAt > from && startsAt <= to) out.push({ ref: { ...g.ref }, userId: g.userId, createdAt: g.createdAt, startsAt });
+    }
+    return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(0, limit);
+  }
+
+  async listReminderChoices(refs: EventRef[]): Promise<{ ref: EventRef; userId: string; reminders: EventReminderOption[] }[]> {
+    const wanted = new Set(refs.map((r) => InMemoryEventRoomRepository.key(r)));
+    return [...this.reminderChoices.values()].filter((c) => wanted.has(InMemoryEventRoomRepository.key(c.ref))).map((c) => ({ ref: { ...c.ref }, userId: c.userId, reminders: [...c.reminders] }));
+  }
+
+  async getReminderChoice(ref: EventRef, userId: string): Promise<EventReminderOption[] | undefined> {
+    const row = this.reminderChoices.get(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+    return row ? [...row.reminders] : undefined;
+  }
+
+  async setReminderChoice(ref: EventRef, userId: string, reminders: EventReminderOption[] | null): Promise<void> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+    if (reminders === null) this.reminderChoices.delete(key);
+    else this.reminderChoices.set(key, { ref: { ...ref }, userId, reminders: [...reminders] });
   }
 
   async removeGoing(ref: EventRef, userId: string): Promise<boolean> {
@@ -3339,7 +3444,11 @@ export class InMemoryAdminRepository implements AdminRepository {
   }
 
   async addAudit(record: AuditRecord) {
-    this.audit.set(record.id, { ...record });
+    this.audit.set(record.id, { ...record, actorKind: record.actorKind ?? 'ADMIN', targetLabel: record.targetLabel ?? null, changes: record.changes ?? null });
+  }
+
+  async countAudit(filter: AuditFilter = {}) {
+    return (await this.listAudit({ limit: Number.MAX_SAFE_INTEGER, offset: 0 }, filter)).length;
   }
 
   async countList(kind: AdminCountKind, filter: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean } = {}): Promise<number> {
@@ -3355,19 +3464,29 @@ export class InMemoryAdminRepository implements AdminRepository {
       case 'CONVERSATION_REPORTS': return (await this.listConversationReports(open, all)).length;
       case 'STORY_REPORTS': return (await this.listStoryReports(open, all)).length;
       case 'USER_REPORTS': return (await this.listUserReports(open, all)).length;
-      case 'AUDIT': return (await this.listAudit(all)).length;
+      case 'AUDIT': return this.countAudit();
     }
   }
 
-  async listAudit(page: Page) {
+  async listAudit(page: Page, filter: AuditFilter = {}) {
+    const name = (id: string | null) => (id ? this.username(id) : 'sistema');
+    const text = filter.text?.toLowerCase();
     const rows = [...this.audit.values()]
+      .filter((r) => (!filter.action || r.action === filter.action)
+        && (!filter.actorKind || (r.actorKind ?? 'ADMIN') === filter.actorKind)
+        && (!filter.targetType || r.targetType === filter.targetType)
+        && (!filter.actorId || r.adminId === filter.actorId)
+        && (!filter.targetId || r.targetId === filter.targetId)
+        && (!filter.from || r.createdAt.getTime() >= filter.from.getTime())
+        && (!filter.to || r.createdAt.getTime() < filter.to.getTime())
+        && (!text || [r.note, r.targetLabel, r.targetId, name(r.adminId)].some((v) => v?.toLowerCase().includes(text))))
       .map((r, i) => ({ r, i }))
       .sort((a, b) => b.r.createdAt.getTime() - a.r.createdAt.getTime() || b.i - a.i)
       .map((x) => x.r);
     sortRows(rows, page, { action: (r) => r.action, targetType: (r) => r.targetType, createdAt: (r) => r.createdAt.getTime() });
     return rows
       .slice(page.offset, page.offset + page.limit)
-      .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
+      .map((r) => ({ ...r, actorKind: r.actorKind ?? 'ADMIN', targetLabel: r.targetLabel ?? null, changes: r.changes ?? null, adminUsername: name(r.adminId) }));
   }
 
   /** O que só a gestão troca e o registro em memória não guarda (quem publica no feed). */
@@ -3376,6 +3495,10 @@ export class InMemoryAdminRepository implements AdminRepository {
   private personRef(id: string, at: Date): AdminPersonRef {
     const p = this.users.profiles.get(id);
     return { id, username: p?.username ?? '(removido)', displayName: p?.displayName ?? '', at };
+  }
+
+  private eventPerson(id: string, at: Date): AdminEventPerson {
+    return { ...this.personRef(id, at), avatarUrl: this.users.profiles.get(id)?.avatarUrl ?? null };
   }
 
   async userExtras(userId: string): Promise<AdminUserExtras | undefined> {
@@ -3432,6 +3555,36 @@ export class InMemoryAdminRepository implements AdminRepository {
     };
   }
 
+  /** Versão simples para os testes: conta o que o registro em memória guarda (posts, quem segue, presenças) e zera o resto. */
+  async userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined> {
+    const x = await this.userExtras(userId);
+    if (!x) return undefined;
+    const DAY = 24 * 60 * 60 * 1000;
+    const since30 = now.getTime() - 30 * DAY;
+    const since7 = now.getTime() - 7 * DAY;
+    const posts = [...this.posts.posts.values()].filter((p) => p.authorId === userId);
+    const going = [...this.eventRoom.going.values()].filter((g) => g.userId === userId);
+    const follows = [...(this.follows?.rows.values() ?? [])].filter((f) => f.followerId === userId);
+    const dates = [...posts, ...going, ...follows].map((r) => r.createdAt).filter((d) => d.getTime() >= since30);
+    const lastSeen = [...posts, ...going, ...follows].map((r) => r.createdAt).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const c = x.counts;
+    return {
+      lastSeenAt: lastSeen,
+      accountAgeDays: Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / DAY)),
+      activeDays30: new Set(dates.map((d) => d.toISOString().slice(0, 10))).size,
+      actions7: dates.filter((d) => d.getTime() >= since7).length,
+      actions30: dates.length,
+      social: { friends: c.friends, followers: c.followers, following: c.following, followersGained30: 0, likesReceived: 0, commentsReceived: 0 },
+      content: { posts: c.posts, stories: c.stories, feedPosts: c.feedPosts, comments: c.postComments, likes: c.postLikes },
+      events: { created: c.eventsCreated, going: c.eventsGoing, checkins: 0, invitesSent: 0, invitesReceived: 0, datePolls: 0, cloakroomTickets: 0 },
+      now: { sessions: 0, sessions30: 0, lastAt: null, invitesSent: 0, invitesReceived: 0, meetups: 0, hiddenBy: 0 },
+      messages: { conversations: 0, sent: 0, sent30: 0 },
+      moderation: { reportsReceived: c.reportsReceived, reportsOpen: c.reportsReceived, reportsActioned: 0, reportsMade: 0, reportsMadeActioned: 0, blockedBy: 0, blocksMade: 0, suspensions: 0, lastSuspendedAt: null },
+      purchases: { boostsPaid: 0, spentCents: 0, lastPaidAt: null, boostsPending: 0 },
+      referrals: { invited: 0, qualified: 0 },
+    };
+  }
+
   async venueExtras(venueId: string): Promise<AdminVenueExtras | undefined> {
     const v = this.places.venues.get(venueId);
     if (!v) return undefined;
@@ -3466,6 +3619,10 @@ export class InMemoryAdminRepository implements AdminRepository {
     const comments = [...this.posts.comments.values()].filter((c) => c.postId === postId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     const author = this.personRef(p.authorId, p.createdAt);
     const venue = (id: string | null | undefined) => (id && this.places.venues.get(id) ? { id, name: this.places.venues.get(id)!.name } : null);
+    const going = [...this.eventRoom.going.values()].filter((g) => g.ref.source === 'USER' && g.ref.id === postId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const goingIds = new Set(going.map((g) => g.userId));
+    const invites = await this.posts.listInvites(postId);
+    const pending = invites.filter((i) => !goingIds.has(i.userId));
     return {
       id: p.id, caption: p.caption, author: { id: author.id, username: author.username, displayName: author.displayName },
       placeName: p.placeName, placeAddress: p.placeAddress, eventTitle: p.eventTitle, eventStartsAt: p.eventStartsAt, eventEndsAt: p.eventEndsAt, eventKind: p.eventKind,
@@ -3473,11 +3630,14 @@ export class InMemoryAdminRepository implements AdminRepository {
       venue: venue(p.venueId), placeVenue: venue(p.placeVenueId), linkedEventId: p.linkedEventId ?? null,
       images: images.map((i) => ({ id: i.id, uploaded: i.mime !== null && i.placePhotoRef === null })),
       tagged: [...this.posts.tags.values()].filter((t) => t.postId === postId).map((t) => this.personRef(t.userId, t.createdAt)),
+      going: going.slice(0, 50).map((g) => this.eventPerson(g.userId, g.createdAt)),
+      invitedPending: pending.slice(0, 50).map((i) => ({ ...this.eventPerson(i.userId, i.createdAt), invitedBy: i.invitedById ? { id: i.invitedById, username: this.username(i.invitedById) } : null })),
+      invitedPendingCount: pending.length,
       counts: {
         likes: [...this.posts.likes.keys()].filter((k) => k.includes(postId)).length, comments: comments.length,
         reports: [...this.posts.reports.values()].filter((r) => r.postId === postId).length,
-        attendees: [...this.eventRoom.going.values()].filter((g) => g.ref.source === 'USER' && g.ref.id === postId).length,
-        invites: 0, stories: 0, feedPosts: 0, reposts: 0,
+        attendees: going.length,
+        invites: invites.length, stories: 0, feedPosts: 0, reposts: 0,
       },
       recentComments: comments.slice(0, 20).map((c) => ({ id: c.id, username: this.username(c.authorId), body: c.body, createdAt: c.createdAt })),
     };
@@ -4003,5 +4163,98 @@ export class InMemoryGuestListRepository implements GuestListRepository {
     if (!e) return false;
     this.entries.set(key, { ...e, checkedInAt: at });
     return true;
+  }
+}
+
+/** Lista de compras e divisão em memória. Quem confere se o evento existe é o repositório de posts. */
+export class InMemoryEventShoppingRepository implements EventShoppingRepository {
+  private readonly posts: InMemoryPostRepository;
+  readonly records = new Map<string, EventShoppingRecord>();
+  readonly items = new Map<string, ShoppingItemRecord>();
+  readonly expenses = new Map<string, EventExpenseRecord>();
+  readonly files = new Map<string, Uint8Array>();
+
+  constructor(posts: InMemoryPostRepository) {
+    this.posts = posts;
+  }
+
+  async get(eventPostId: string): Promise<EventShoppingRecord | undefined> {
+    const r = this.posts.posts.has(eventPostId) ? this.records.get(eventPostId) : undefined;
+    return r ? { ...r, splitExcludedIds: [...r.splitExcludedIds] } : undefined;
+  }
+
+  async upsert(record: EventShoppingRecord): Promise<boolean> {
+    const post = this.posts.posts.get(record.eventPostId);
+    if (!post || post.eventTitle === null) return false;
+    const before = this.records.get(record.eventPostId);
+    this.records.set(record.eventPostId, { ...record, splitExcludedIds: [...record.splitExcludedIds], createdAt: before?.createdAt ?? record.createdAt });
+    return true;
+  }
+
+  async remove(eventPostId: string): Promise<boolean> {
+    for (const [id, i] of this.items) if (i.eventPostId === eventPostId) this.items.delete(id);
+    for (const [id, e] of this.expenses) {
+      if (e.eventPostId !== eventPostId) continue;
+      this.expenses.delete(id);
+      this.files.delete(id);
+    }
+    return this.records.delete(eventPostId);
+  }
+
+  async listItems(eventPostId: string): Promise<ShoppingItemRecord[]> {
+    return [...this.items.values()].filter((i) => i.eventPostId === eventPostId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map((i) => ({ ...i }));
+  }
+
+  async findItem(id: string): Promise<ShoppingItemRecord | undefined> {
+    const i = this.items.get(id);
+    return i ? { ...i } : undefined;
+  }
+
+  async addItem(item: ShoppingItemRecord): Promise<void> {
+    this.items.set(item.id, { ...item });
+  }
+
+  async updateItem(id: string, patch: Partial<Pick<ShoppingItemRecord, 'title' | 'quantity' | 'boughtById' | 'boughtAt'>>): Promise<boolean> {
+    const i = this.items.get(id);
+    if (!i) return false;
+    this.items.set(id, { ...i, ...patch });
+    return true;
+  }
+
+  async deleteItem(id: string): Promise<boolean> {
+    return this.items.delete(id);
+  }
+
+  async listExpenses(eventPostId: string): Promise<EventExpenseRecord[]> {
+    return [...this.expenses.values()].filter((e) => e.eventPostId === eventPostId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map((e) => ({ ...e }));
+  }
+
+  async findExpense(id: string): Promise<EventExpenseRecord | undefined> {
+    const e = this.expenses.get(id);
+    return e ? { ...e } : undefined;
+  }
+
+  async addExpense(expense: EventExpenseRecord, data: Uint8Array | null): Promise<void> {
+    this.expenses.set(expense.id, { ...expense });
+    if (data) this.files.set(expense.id, new Uint8Array(data));
+  }
+
+  async updateExpense(id: string, patch: Partial<Pick<EventExpenseRecord, 'amountCents' | 'payerId' | 'note'>>): Promise<boolean> {
+    const e = this.expenses.get(id);
+    if (!e) return false;
+    this.expenses.set(id, { ...e, ...patch });
+    return true;
+  }
+
+  async deleteExpense(id: string): Promise<boolean> {
+    this.files.delete(id);
+    return this.expenses.delete(id);
+  }
+
+  async expenseFile(id: string): Promise<{ mime: string; name: string; data: Uint8Array } | undefined> {
+    const e = this.expenses.get(id);
+    const data = this.files.get(id);
+    if (!e || !data || e.mime === null || e.fileName === null) return undefined;
+    return { mime: e.mime, name: e.fileName, data: new Uint8Array(data) };
   }
 }

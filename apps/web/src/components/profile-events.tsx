@@ -6,7 +6,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { AttendedEvent, PostedEvent, PostedEventsPage, PostView } from '../lib/types.ts';
-import { GoingTile } from './profile-attended.tsx';
+import { GoingTile, OriginTag } from './profile-attended.tsx';
 import { TileMenu, useTileMenu } from './tile-press.tsx';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
@@ -27,7 +27,10 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
-          {event.sample ? <span className="tag tag--sample">{t('Exemplo de teste')}</span> : null}
+          <span className="ptile__tags">
+            <OriginTag origin={event.origin} />
+            {event.sample ? <span className="tag tag--sample">{t('Exemplo de teste')}</span> : null}
+          </span>
         </span>
       </Link>
       {mine ? (
@@ -41,7 +44,7 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
 }
 
 /** Evento que a pessoa publicou como post: mesmo desenho do evento postado, com a foto do post de capa. */
-function PostTile({ post, mine, onRemove, onHide, busy }: { post: PostView; mine: boolean; onRemove: () => void; onHide: () => void; busy: boolean }) {
+function PostTile({ post, username, mine, onRemove, onHide, busy }: { post: PostView; username: string; mine: boolean; onRemove: () => void; onHide: () => void; busy: boolean }) {
   const [failed, setFailed] = useState(false);
   const [asking, setAsking] = useState(false);
   // Segurar o cartão: deixar só no Participou (some da aba Eventos) ou apagar.
@@ -57,6 +60,10 @@ function PostTile({ post, mine, onRemove, onHide, busy }: { post: PostView; mine
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
+          {/* Evento de outra pessoa em que a dona do perfil aceitou a marcação: foi convidada. */}
+          <span className="ptile__tags">
+            <OriginTag origin={post.author.username === username ? 'CREATED' : 'INVITED'} />
+          </span>
         </span>
       </Link>
       {mine ? (
@@ -200,7 +207,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
 
   // Os eventos publicados como post vêm primeiro (mais novos), depois os eventos postados do Explorar.
   const tiles = [
-    ...eventPosts.map((post) => <PostTile key={`p-${post.id}`} post={post} mine={mine} busy={busyId === post.id} onRemove={() => void removePost(post)} onHide={() => void hidePost(post)} />),
+    ...eventPosts.map((post) => <PostTile key={`p-${post.id}`} post={post} username={username} mine={mine} busy={busyId === post.id} onRemove={() => void removePost(post)} onHide={() => void hidePost(post)} />),
     ...page.items.map((event) => <Tile key={event.id} event={event} mine={mine} busy={busyId === event.id} onRemove={() => void remove(event)} />),
     // Presenças mostradas no perfil, sem repetir o que já está postado. Tirar daqui leva o evento para a aba Participou.
     ...going

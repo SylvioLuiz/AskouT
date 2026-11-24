@@ -361,7 +361,7 @@ test('evento sem data decidida por votação: cria sem data, a votação liga ao
   assert.equal(edited.event?.startsAt, v.final?.startsAt);
 });
 
-test('evento sem data: a votação abre num grupo com todos os convidados e quem é convidado depois entra', async () => {
+test('evento sem data: todo convidado vota; no grupo só entra quem aceitou, e quem é convidado depois entra na votação', async () => {
   const { w, ana, bia, caio, dani } = await setup('MAJORITY');
   const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', dateByPoll: true } });
   const base = { title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id };
@@ -369,25 +369,44 @@ test('evento sem data: a votação abre num grupo com todos os convidados e quem
   // Sem convidados ainda: pede para convidar primeiro.
   await rejectsWith(w.core.scheduling.create(ana, undefined, base), 'VALIDATION');
 
-  // Convidou a bia e o caio (conversas 1 a 1): a votação abre num grupo do evento com os dois.
+  // Convidou a bia e o caio (conversas 1 a 1); só a bia aceitou ("Eu vou"). Os dois votam, só a bia está no grupo.
   const withBia = await w.core.conversations.open(ana, bia);
   const withCaio = await w.core.conversations.open(ana, caio);
   await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
   await w.core.conversations.send(ana, withCaio.id, { eventId: post.id });
+  await w.core.eventPages.go(bia, post.id);
   const poll = await w.core.scheduling.create(ana, undefined, base);
   assert.notEqual(poll.conversationId, withBia.id);
   assert.deepEqual(poll.participants.map((p) => p.profile.username).sort(), ['ana', 'bia', 'caio']);
   const group = await w.conversations.findById(poll.conversationId);
   assert.equal(group?.type, 'GROUP');
   assert.equal(group?.name, 'Aniversário');
+  assert.deepEqual((await w.conversations.participantIds(poll.conversationId))?.sort(), [ana, bia].sort(), 'quem não aceitou não entra no grupo');
 
-  // Convidou a dani depois: entra no grupo e na votação.
+  // O caio vota fora do grupo: abre a votação (pela página do evento ou pelo aviso) e vota.
+  const forCaio = await w.core.scheduling.vote(caio, poll.id, { dates: ['2026-10-20'], status: 'YES' });
+  assert.equal(forCaio.inConversation, false);
+  assert.equal(forCaio.eventPostId, post.id);
+  assert.equal((await w.core.eventPages.get(caio, post.id)).datePollId, poll.id);
+  assert.equal((await w.core.eventPages.get(caio, post.id)).group, null);
+  await rejectsWith(w.core.conversations.messages(caio, poll.conversationId), 'NOT_FOUND');
+  assert.equal((await w.core.scheduling.get(bia, poll.id)).inConversation, true);
+
+  // Aceitou depois: entra no grupo nessa hora. Desmarcou: sai do grupo, mas segue na votação.
+  await w.core.eventPages.go(caio, post.id);
+  assert.ok((await w.conversations.participantIds(poll.conversationId))?.includes(caio));
+  assert.equal((await w.core.eventPages.get(caio, post.id)).group?.conversationId, poll.conversationId);
+  await w.core.eventPages.cancel(caio, post.id);
+  assert.equal((await w.conversations.participantIds(poll.conversationId))?.includes(caio), false);
+  assert.equal((await w.core.scheduling.get(caio, poll.id)).iFinished, false, 'continua votando');
+
+  // Convidou a dani depois: entra na votação, não no grupo.
   const withDani = await w.core.conversations.open(ana, dani);
   await w.core.conversations.send(ana, withDani.id, { eventId: post.id });
   const after = await w.core.scheduling.get(ana, poll.id);
   assert.deepEqual(after.participants.map((p) => p.profile.username).sort(), ['ana', 'bia', 'caio', 'dani']);
-  assert.ok((await w.conversations.participantIds(poll.conversationId))?.includes(dani));
-  const chat = await w.core.conversations.messages(dani, poll.conversationId);
+  assert.equal((await w.conversations.participantIds(poll.conversationId))?.includes(dani), false);
+  const chat = await w.core.conversations.messages(ana, poll.conversationId);
   assert.ok(chat.messages.some((m) => /convidou mais uma pessoa/.test(m.body ?? '')));
 
   // Mandar de novo para quem já está não muda nada; quem repassa (não é quem criou) não põe ninguém na votação.
@@ -428,6 +447,7 @@ test('grupo do evento: sem foto própria mostra a capa do evento; a foto trocada
   const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', dateByPoll: true } });
   const withBia = await w.core.conversations.open(ana, bia);
   await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+  await w.core.eventPages.go(bia, post.id);
   const poll = await w.core.scheduling.create(ana, undefined, { title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
   const cover = `/posts/images/${post.images[0]!.id}`;
 

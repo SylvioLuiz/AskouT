@@ -1,7 +1,8 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { decodeImageDataUrl } from './image.ts';
-import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
-import { normalizeTag } from './explore-match.ts';
+import { DomainError, conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
+import { fold, normalizeTag } from './explore-match.ts';
+import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS, toPublicProfile } from './types.ts';
@@ -167,6 +168,12 @@ const HOUR_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const EXTERNAL_KEY_RE = /^(google|osm):[A-Za-z0-9_./:-]{1,200}$/;
 /** Raio para conferir, na fonte externa, que o local mesmo existe onde o app diz. */
 const EXTERNAL_CHECK_RADIUS_M = 150;
+/** Número de um endereço escolhido como rua ("123", "1500A", "12-B"). */
+const HOUSE_NUMBER_RE = /^(?=.*\d)[0-9A-Za-z/-]{1,10}$/;
+/** Até onde o ponto exato do número pode ficar do ponto da rua achada na busca (rua comprida). */
+const HOUSE_NUMBER_MAX_DRIFT_M = 6000;
+/** Tipo de via no começo do nome, que o Google abrevia ("R.", "Av.") e o OpenStreetMap escreve por extenso. */
+const STREET_TYPE_RE = /^(rua|r|avenida|av|travessa|tv|alameda|al|estrada|est|rodovia|rod|praca|pca|largo|lgo|viela|ladeira|lad)\.?\s+/;
 
 export function venueCoverPath(venueId: string, version: number): string {
   return `/venues/${venueId}/cover?v=${version}`;
@@ -180,11 +187,18 @@ export function venueLogoPath(venueId: string, version: number): string {
 }
 
 /** Troca de uma imagem do perfil (capa ou logo): mantém, remove, usa link https ou guarda um arquivo enviado. */
-function resolveImage(input: { url: unknown; data: unknown }, current: string | null, ownPrefix: string, maxBytes: number, maxLabel: string, ownPath: () => string): { url: string | null; upload?: { mime: string; bytes: Uint8Array } } {
+/** `fields` diz em qual campo cai o erro (capa: imageUrl/imageData; logo: logoUrl/logoData), para a tela marcar o campo certo. */
+function resolveImage(input: { url: unknown; data: unknown }, current: string | null, ownPrefix: string, maxBytes: number, maxLabel: string, ownPath: () => string, fields: { url: string; data: string } = { url: 'imageUrl', data: 'imageData' }): { url: string | null; upload?: { mime: string; bytes: Uint8Array } } {
   const own = current !== null && current.startsWith(ownPrefix) ? current : null;
-  const badUrl = () => validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+  const badUrl = () => validationError('Dados inválidos', { [fields.url]: 'Use um endereço de imagem que comece com https://' });
   if (input.data !== undefined && input.data !== null && input.data !== '') {
-    const img = decodeImageDataUrl(input.data, maxBytes, maxLabel);
+    let img: ReturnType<typeof decodeImageDataUrl>;
+    try {
+      img = decodeImageDataUrl(input.data, maxBytes, maxLabel);
+    } catch (e) {
+      if (e instanceof DomainError && e.details?.image) throw validationError(e.message, { [fields.data]: e.details.image });
+      throw e;
+    }
     return { url: ownPath(), upload: { mime: img.mime, bytes: img.bytes } };
   }
   if (input.url === null || input.url === '') return { url: null };
@@ -734,7 +748,7 @@ export class VenueService {
     const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
     const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => '(foto enviada)');
-    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)');
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)', { url: 'logoUrl', data: 'logoData' });
     const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
     return { name, address, category, description, coverUrl: cover.url, logoUrl: logo.url, instagram };
   }
@@ -757,7 +771,7 @@ export class VenueService {
     const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
     const now = this.deps.clock.now().getTime();
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => venueCoverPath(venue.id, now));
-    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now));
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now), { url: 'logoUrl', data: 'logoData' });
     await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl: cover.url, logoUrl: logo.url, instagram });
     const ownCover = cover.url !== null && cover.url.startsWith(`/venues/${venue.id}/cover`);
     const ownLogo = logo.url !== null && logo.url.startsWith(`/venues/${venue.id}/logo`);
@@ -875,10 +889,15 @@ export class VenueService {
    * Página de um lugar que só existe na fonte externa (Google): confere lá que o lugar existe ali perto e cria o local
    * na primeira vez. Nunca confia no nome vindo do app. Devolve o id para abrir `/bares/:id`.
    */
-  async openExternal(input: { key?: unknown; lat?: unknown; lng?: unknown }): Promise<{ venueId: string }> {
+  async openExternal(input: { key?: unknown; lat?: unknown; lng?: unknown; number?: unknown }): Promise<{ venueId: string }> {
     const key = input.key;
     if (typeof key !== 'string' || !EXTERNAL_KEY_RE.test(key)) throw validationError('Local inválido', { key: 'Identificador de local inválido' });
-    const known = await this.deps.places.findVenueByExternalKey(key);
+    const rawNumber = input.number === undefined || input.number === null ? '' : typeof input.number === 'string' ? input.number.trim().replace(/\s+/g, '') : '#';
+    if (rawNumber !== '' && !HOUSE_NUMBER_RE.test(rawNumber)) throw validationError('Número inválido', { number: 'Use só o número do endereço (ex.: 123)' });
+    const houseNumber = rawNumber.toUpperCase();
+    // Rua com número vira um local próprio ("Rua X, 123"), separado da rua e de outros números dela.
+    const venueKey = houseNumber ? `${key}#${houseNumber}` : key;
+    const known = await this.deps.places.findVenueByExternalKey(venueKey);
     if (known) return { venueId: known.id };
     const { lat, lng } = input;
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw validationError('Local inválido', { lat: 'Posição inválida' });
@@ -887,27 +906,57 @@ export class VenueService {
     // é conferido direto na fonte pelo id.
     const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key) ?? (await this.lookupExternal(key));
     if (!place) throw notFound('Local não encontrado');
+    const point = houseNumber ? ((await this.locateHouseNumber(place, houseNumber)) ?? { lat: place.lat, lng: place.lng }) : { lat: place.lat, lng: place.lng };
     const venue: VenueRecord = {
       id: this.deps.ids.next(),
-      name: place.name.slice(0, VENUE_NAME_MAX),
-      address: place.address ? place.address.slice(0, 200) : null,
+      name: (houseNumber ? `${place.name}, ${houseNumber}` : place.name).slice(0, VENUE_NAME_MAX),
+      address: houseNumber ? withHouseNumber(place, houseNumber) : place.address ? place.address.slice(0, 200) : null,
       category: place.category ? place.category.slice(0, VENUE_CATEGORY_MAX) : null,
-      lat: place.lat,
-      lng: place.lng,
+      lat: point.lat,
+      lng: point.lng,
       isSample: false,
       ownerId: null,
-      externalKey: key,
-      photoRef: place.photoRef ?? null,
-      photoAuthor: place.photoAuthor ?? null,
+      externalKey: venueKey,
+      photoRef: houseNumber ? null : (place.photoRef ?? null),
+      photoAuthor: houseNumber ? null : (place.photoAuthor ?? null),
     };
     try {
       await this.deps.places.createVenue(venue);
     } catch (error) {
-      const again = await this.deps.places.findVenueByExternalKey(key);
+      const again = await this.deps.places.findVenueByExternalKey(venueKey);
       if (again) return { venueId: again.id };
       throw error;
     }
     return { venueId: venue.id };
+  }
+
+  /**
+   * Ponto exato de "rua + número", para o mapa e a rota levarem à porta e não ao meio da rua. Tenta a busca gratuita
+   * (OpenStreetMap) e, se não achar e houver Google, a paga (uma vez, só na criação do local). Sem resposta, `undefined`.
+   */
+  private async locateHouseNumber(street: ExternalPlace, houseNumber: string): Promise<{ lat: number; lng: number } | undefined> {
+    const source = this.deps.placeSource;
+    if (!source.search) return undefined;
+    // A busca gratuita já vem puxada para perto da rua; a paga leva também bairro e cidade.
+    const query = `${street.name}, ${houseNumber}`.slice(0, 120);
+    const area = addressRest(street).join(', ');
+    const wanted = streetKey(street.name);
+    const matches = (p: ExternalPlace): boolean => {
+      if (p.street) return false;
+      if (distanceMeters(street, p) > HOUSE_NUMBER_MAX_DRIFT_M) return false;
+      return [p.name, p.address ?? ''].some((text) => {
+        const [first, second] = text.split(',').map((part) => part.trim());
+        return !!first && !!second && streetKey(first) === wanted && second.split(/[\s-]/)[0]!.toUpperCase() === houseNumber;
+      });
+    };
+    const near = { lat: street.lat, lng: street.lng };
+    const free = await source.search(query, near, 5).catch(() => ({ available: false, places: [] as ExternalPlace[] }));
+    const hit = free.places.find(matches);
+    if (hit) return { lat: hit.lat, lng: hit.lng };
+    if (!source.premiumSearch) return undefined;
+    const paid = await source.search(`${query}${area ? `, ${area}` : ''}`.slice(0, 120), near, 5, { premium: true }).catch(() => ({ available: false, places: [] as ExternalPlace[] }));
+    const paidHit = paid.places.find(matches);
+    return paidHit ? { lat: paidHit.lat, lng: paidHit.lng } : undefined;
   }
 
   private async lookupExternal(key: string): Promise<ExternalPlace | undefined> {
@@ -1076,4 +1125,20 @@ export class VenueService {
     const ticketUrl = parseTicketUrl(input.ticketUrl, current?.ticketUrl ?? null);
     return { title, description, kind, startsAt, endsAt, isFree, tags, ticketUrl, cover };
   }
+}
+
+/** Nome da rua para comparar entre fontes: sem acento, sem o tipo de via ("Rua", "R.", "Av.") e sem pontuação. */
+function streetKey(name: string): string {
+  return fold(name).replace(STREET_TYPE_RE, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Endereço de "rua + número": "Rua X, 123 - Bairro - Cidade". O que a fonte já dava da rua (bairro, cidade) continua. */
+function withHouseNumber(street: ExternalPlace, houseNumber: string): string {
+  return [`${street.name}, ${houseNumber}`, ...addressRest(street)].join(' - ').slice(0, 200);
+}
+
+/** O endereço da rua sem a própria rua (que o Google repete abreviada): bairro, cidade, estado. */
+function addressRest(street: ExternalPlace): string[] {
+  const own = streetKey(street.name);
+  return (street.address ?? '').split(' - ').map((part) => part.trim()).filter((part) => part !== '' && streetKey(part) !== own);
 }

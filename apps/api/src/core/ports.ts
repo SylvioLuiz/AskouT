@@ -1,6 +1,6 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
-import type { GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditFilter, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -32,6 +32,10 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Quantas vezes o app já pediu para cadastrar o celular e quando foi a última (vale para todos os aparelhos). */
+  getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }>;
+  /** Registra mais um pedido de cadastro do celular. */
+  markPhonePrompted(userId: string, at: Date): Promise<void>;
   /** Troca os gostos de rolê da pessoa (já validados). */
   setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
@@ -62,9 +66,12 @@ export interface FollowRepository {
   delete(followerId: string, followeeId: string): Promise<boolean>;
   /** Remove o seguimento nos dois sentidos entre a e b. */
   deleteBetween(a: string, b: string): Promise<void>;
-  /** Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue. */
-  list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]>;
-  count(userId: string, direction: Direction, status: FollowStatus): Promise<number>;
+  /**
+   * Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue.
+   * `query` (já em minúsculas) filtra a outra ponta: @ começando com o termo ou nome contendo o termo.
+   */
+  list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]>;
+  count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number>;
   /** Aceita todas as solicitações pendentes recebidas por followeeId. Retorna quantas. */
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */
@@ -423,6 +430,11 @@ export interface ConversationRepository {
   /** A pessoa (perfil público) escolheu receber mensagens de quem ela não segue direto na caixa de conversas. */
   getOpenDms(userId: string): Promise<boolean>;
   setOpenDms(userId: string, on: boolean): Promise<void>;
+  /** A pessoa mostra a bolinha verde de online (padrão: sim). */
+  getShowOnline(userId: string): Promise<boolean>;
+  setShowOnline(userId: string, on: boolean): Promise<void>;
+  /** Dentre `userIds`, quem escondeu a bolinha de online. */
+  listHiddenOnline(userIds: readonly string[]): Promise<string[]>;
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
@@ -662,7 +674,7 @@ export interface PlaceRepository {
   findEvent(id: string): Promise<{ event: PlaceEventRecord; venue: VenueRecord } | undefined>;
   /** Hashtags de eventos que ainda não acabaram, com a contagem, filtradas pelo começo do texto. */
   listTags(prefix: string, from: Date, to: Date, limit: number): Promise<{ tag: string; count: number }[]>;
-  /** Locais do AskouT pelo nome (qualquer parte). Sem `center`, não filtra por distância. */
+  /** Locais do AskouT pelo nome (qualquer parte), os mais perto primeiro. Sem `center` ou com `radiusM` 0, não filtra por distância. */
   searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number): Promise<{ venue: VenueRecord; distanceM: number | null }[]>;
   findVenue(id: string): Promise<VenueRecord | undefined>;
   listVenuesByOwner(ownerId: string): Promise<VenueRecord[]>;
@@ -909,11 +921,15 @@ export interface AdminRepository {
   findUserReport(id: string): Promise<{ id: string; reportedUserId: string; resolvedAt: Date | null } | undefined>;
   resolveUserReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
   addAudit(record: AuditRecord): Promise<void>;
-  listAudit(page: Page): Promise<AuditRow[]>;
+  /** Mais novo primeiro (ou na ordem pedida), só o que passa no filtro. */
+  listAudit(page: Page, filter?: AuditFilter): Promise<AuditRow[]>;
+  countAudit(filter?: AuditFilter): Promise<number>;
   /** Quantos registros cada lista da gestão tem com o mesmo filtro (para o total embaixo das tabelas). */
   countList(kind: AdminCountKind, filter?: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean }): Promise<number>;
   /** O cadastro inteiro da pessoa e os vínculos (contagens e listas curtas) para o detalhe da gestão. */
   userExtras(userId: string): Promise<AdminUserExtras | undefined>;
+  /** Números da pessoa para a gestão (contagens e datas, sem conteúdo de mensagens). `now` marca as janelas de 7 e 30 dias. */
+  userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined>;
   venueExtras(venueId: string): Promise<AdminVenueExtras | undefined>;
   placeEventExtras(eventId: string): Promise<AdminPlaceEventExtras | undefined>;
   postDetail(postId: string): Promise<AdminPostDetail | undefined>;
@@ -956,6 +972,15 @@ export interface PlaceSource {
   readonly premiumSearch?: boolean;
   /** Um lugar pelo id na fonte, para confirmar que existe. */
   lookup?(externalId: string): Promise<ExternalPlace | undefined>;
+}
+
+/**
+ * Cadastro de local pela gestão a partir do Google, só com o que é grátis: sugestões do Autocomplete (nome e endereço)
+ * e o detalhe "Essentials" (endereço, posição e tipos). Nunca lança.
+ */
+export interface GooglePlacePicker {
+  suggest(text: string, sessionToken: string): Promise<{ available: boolean; items: { placeId: string; name: string; address: string | null }[] }>;
+  essentials(placeId: string, sessionToken?: string): Promise<{ placeId: string; address: string | null; lat: number; lng: number; types: string[] } | undefined>;
 }
 
 /** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */
@@ -1045,11 +1070,25 @@ export interface NotificationRepository {
   unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
+  /** Apaga os avisos da pessoa com essa chave (o motivo deixou de existir, como um convite cancelado). Devolve quantos saíram. */
+  deleteByKey(userId: string, dedupeKey: string): Promise<number>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */
   markRead(userId: string, now: Date, ids?: string[]): Promise<number>;
   /** O que a pessoa silenciou (tudo falso se nunca mexeu). */
   getMuteSettings(userId: string): Promise<NotificationMuteSettings>;
   setMuteSettings(userId: string, settings: NotificationMuteSettings, at: Date): Promise<void>;
+  /** Som de cada grupo de aviso (tudo `padrao` se nunca mexeu). */
+  getSoundSettings(userId: string): Promise<import('./notification-sounds.ts').NotificationSoundSettings>;
+  setSoundSettings(userId: string, settings: import('./notification-sounds.ts').NotificationSoundSettings, at: Date): Promise<void>;
+  /** Lembretes de evento escolhidos e o fuso de cada pessoa. Quem nunca mexeu não vem no mapa (segue o padrão). */
+  getEventReminderSettings(userIds: string[]): Promise<Map<string, EventReminderSettings>>;
+  setEventReminderSettings(userId: string, settings: EventReminderSettings, at: Date): Promise<void>;
+}
+
+/** Escolha geral de lembretes de evento: `reminders` nulo segue o padrão; `timeZone` é o do aparelho (nulo: o padrão). */
+export interface EventReminderSettings {
+  reminders: import('./event-reminders.ts').EventReminderOption[] | null;
+  timeZone: string | null;
 }
 
 export interface PushSubscriptionRepository {
@@ -1078,6 +1117,11 @@ export interface PushMessage {
   live?: PushLive;
   /** Foto (https) de quem o aviso fala: o Android mostra redonda no aviso da chegada. */
   image?: string;
+  /**
+   * Som escolhido pela pessoa para esse tipo de aviso (ver notification-sounds.ts). Sem ele, o som padrão do aparelho.
+   * Só vem diferente de `padrao` para aparelhos que têm os sons (o app avisou ao se inscrever) e para o navegador.
+   */
+  sound?: import('./notification-sounds.ts').NotificationSound;
 }
 
 /**
@@ -1092,6 +1136,8 @@ export interface LiveActivityPush {
   attributes?: { name: string; tag: string; url: string; registration: string };
   /** Toca/acende a tela (a primeira e a chegada); as outras trocam em silêncio. */
   alert?: { title: string; body: string };
+  /** Som do `alert`, escolhido pela pessoa para a chegada. Sem ele, o padrão do iPhone. */
+  sound?: import('./notification-sounds.ts').NotificationSound;
   /** Depois disto a atividade aparece como desatualizada (fim do encontro). */
   staleAtMs: number;
   /** Só no `end`: quando some da tela bloqueada. */
@@ -1145,6 +1191,8 @@ export interface PushSender {
 /** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
 export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
+  /** Tira do sino os avisos com essa chave (o convite foi cancelado). Opcional nos dublês de teste. */
+  withdraw?(userId: string, dedupeKey: string): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
   live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void>;
 }
@@ -1167,8 +1215,16 @@ export interface EventRoomRepository {
   countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]>;
   /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
   listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date; onProfile: boolean }[]>;
-  /** Marca que o lembrete de começo deste evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
-  markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean>;
+  /** Marca que este lembrete (`kind`, ver event-reminders.ts) do evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
+  markReminded(ref: EventRef, userId: string, kind: import('./event-reminders.ts').EventReminderOption, at: Date): Promise<boolean>;
+  /** Presenças em eventos (do local ou de pessoa, sem os apagados) que começam depois de `from` e até `to`, com o começo. */
+  listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]>;
+  /** Lembretes escolhidos só para estes eventos (no lugar da escolha geral de cada pessoa). */
+  listReminderChoices(refs: EventRef[]): Promise<{ ref: EventRef; userId: string; reminders: import('./event-reminders.ts').EventReminderOption[] }[]>;
+  /** A escolha da pessoa para este evento; `undefined` se ela segue a geral. */
+  getReminderChoice(ref: EventRef, userId: string): Promise<import('./event-reminders.ts').EventReminderOption[] | undefined>;
+  /** Guarda a escolha para este evento (lista vazia: nenhum lembrete); `null` volta a seguir a geral. */
+  setReminderChoice(ref: EventRef, userId: string, reminders: import('./event-reminders.ts').EventReminderOption[] | null, at: Date): Promise<void>;
   addStory(story: EventStoryRecord): Promise<void>;
   /** Stories ainda no ar (`expiresAt` depois de `now`) do evento, do mais antigo ao mais novo, sem os bytes. */
   listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]>;
@@ -1364,8 +1420,31 @@ export interface GuestListRepository {
   setCheckedIn(eventId: string, userId: string, at: Date | null): Promise<boolean>;
 }
 
+/** Lista de compras e divisão de gastos dos eventos criados por pessoas. Apagar o evento apaga tudo. */
+export interface EventShoppingRepository {
+  get(eventPostId: string): Promise<EventShoppingRecord | undefined>;
+  /** Liga ou ajusta. false se o evento (post com título de evento) não existe. */
+  upsert(record: EventShoppingRecord): Promise<boolean>;
+  /** Desliga e apaga itens e gastos (com os anexos). */
+  remove(eventPostId: string): Promise<boolean>;
+  /** Na ordem em que foram criados. */
+  listItems(eventPostId: string): Promise<ShoppingItemRecord[]>;
+  findItem(id: string): Promise<ShoppingItemRecord | undefined>;
+  addItem(item: ShoppingItemRecord): Promise<void>;
+  updateItem(id: string, patch: Partial<Pick<ShoppingItemRecord, 'title' | 'quantity' | 'boughtById' | 'boughtAt'>>): Promise<boolean>;
+  deleteItem(id: string): Promise<boolean>;
+  /** Sem os bytes dos anexos, na ordem em que foram lançados. */
+  listExpenses(eventPostId: string): Promise<EventExpenseRecord[]>;
+  findExpense(id: string): Promise<EventExpenseRecord | undefined>;
+  addExpense(expense: EventExpenseRecord, data: Uint8Array | null): Promise<void>;
+  updateExpense(id: string, patch: Partial<Pick<EventExpenseRecord, 'amountCents' | 'payerId' | 'note'>>): Promise<boolean>;
+  deleteExpense(id: string): Promise<boolean>;
+  expenseFile(id: string): Promise<{ mime: string; name: string; data: Uint8Array } | undefined>;
+}
+
 export interface CoreDeps {
   venueStories: VenueStoryRepository;
+  eventShopping: EventShoppingRepository;
   albums: AlbumRepository;
   guestLists: GuestListRepository;
   activity: ActivityRepository;
@@ -1396,6 +1475,8 @@ export interface CoreDeps {
   placeSource: PlaceSource;
   /** Rotas do encontro Flash até o lugar escolhido. Opcional: sem ela o app mostra só a linha reta. */
   routes?: RouteSource;
+  /** Cadastro pela gestão a partir do Google (só com a chave do Google Places). */
+  googlePicker?: GooglePlacePicker;
   /** GIFs nos comentários (Giphy). Opcional: sem a chave GIPHY_API_KEY o recurso fica desligado. */
   gifs?: GifSource;
   pending: PendingSignupRepository;

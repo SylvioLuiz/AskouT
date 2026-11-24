@@ -291,6 +291,14 @@ export class HunterBridge {
     return { enabled };
   }
 
+  /** Busca manual no Hunter pedida pela gestão: fica na auditoria com o resultado. */
+  async auditSync(adminId: string, result: { seen?: number; published?: number; review?: number; rejected?: number; error?: string }): Promise<void> {
+    const note = result.error
+      ? `Falhou: ${result.error}`.slice(0, 400)
+      : `${result.seen ?? 0} visto(s), ${result.published ?? 0} publicado(s), ${result.review ?? 0} em revisão, ${result.rejected ?? 0} recusado(s)`;
+    await this.deps.store.audit(adminId, 'HUNTER_SYNC_RUN', 'sync', note, this.deps.clock.now());
+  }
+
   /** Remove um evento do Hunter (ref) ou todos (ref ausente). Não depende de o Hunter estar ligado. */
   async adminRemove(adminId: string, ref: string | undefined): Promise<{ removed: number }> {
     const refs = ref === undefined ? await this.deps.store.allRefs() : [this.refExists(ref)];

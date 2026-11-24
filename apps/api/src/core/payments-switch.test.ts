@@ -137,6 +137,10 @@ test('a gestão escolhe quais pacotes ficam à venda, e isso vale na hora para p
   await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3 }), 'VALIDATION');
   const ok = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 7 });
   assert.equal(ok.days, 7);
-  const rows = (await w.core.admin.audit(A, {})).items;
+  const rows = (await w.core.admin.audit(A, { actorKind: 'ADMIN' })).items;
   assert.deepEqual([rows[0]?.action, rows[0]?.targetId, rows[0]?.note, rows[0]?.adminId], ['BOOST_PACKAGES_UPDATED', 'boost.days', '1, 7 dias. Teste de pacotes', adm]);
+  assert.deepEqual(rows[0]?.changes?.[0]?.after, '1, 7');
+  // O pedido do dono também fica na auditoria, como ação de quem usa o app.
+  const order = (await w.core.admin.audit(A, { action: 'BOOST_ORDERED' })).items[0];
+  assert.deepEqual([order?.actorKind, order?.adminId, order?.targetId], ['USER', dono, ok.id]);
 });

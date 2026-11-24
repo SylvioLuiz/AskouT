@@ -6,6 +6,7 @@ import { initials, tintIndex } from '../lib/avatar.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { BoltIcon, ChevronLeftIcon } from './icons.tsx';
 import { useFlashOn } from './flash-presence.tsx';
+import { useOnline } from './online-presence.tsx';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -457,6 +458,7 @@ type AvatarProfile = Pick<PublicProfile, 'username' | 'displayName' | 'avatarUrl
 /** Foto (ou iniciais) da pessoa. Com o Flash ligado, ganha um pequeno raio no canto inferior esquerdo, em qualquer tela. */
 export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: number }) {
   const flashOn = useFlashOn(profile.userId);
+  const online = useOnline(profile.userId);
   const style = { width: size, height: size, fontSize: Math.round(size * 0.38) };
   const face = profile.avatarUrl ? (
     <img className="avatar avatar--photo" src={profile.avatarUrl.startsWith('/') ? api.assetUrl(profile.avatarUrl) : profile.avatarUrl} alt="" style={style} referrerPolicy="no-referrer" />
@@ -465,15 +467,26 @@ export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: 
       {initials(profile.username)}
     </span>
   );
-  if (!flashOn) return face;
+  if (!flashOn && !online) return face;
   const badge = Math.max(14, Math.round(size * 0.38));
+  const dot = Math.max(9, Math.round(size * 0.26));
   return (
     <span className="avatarflash" style={{ width: size, height: size }}>
       {face}
-      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title={t('NOW ligado')} aria-hidden="true">
-        <BoltIcon filled />
-      </span>
-      <span className="visually-hidden">{t('NOW ligado')}</span>
+      {flashOn ? (
+        <>
+          <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title={t('NOW ligado')} aria-hidden="true">
+            <BoltIcon filled />
+          </span>
+          <span className="visually-hidden">{t('NOW ligado')}</span>
+        </>
+      ) : null}
+      {online ? (
+        <>
+          <span className="avataronline" style={{ width: dot, height: dot }} title={t('Online')} aria-hidden="true" />
+          <span className="visually-hidden">{t('Online')}</span>
+        </>
+      ) : null}
     </span>
   );
 }

@@ -9,7 +9,7 @@ import { StoryViewer } from '../components/event-story.tsx';
 import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
-import { EventInviteSheet } from '../components/event-invite-picker.tsx';
+import { EventInviteSheet, PendingInvites } from '../components/event-invite-picker.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -34,6 +34,7 @@ import { timeAgo } from '../lib/format.ts';
 import type { EventPage, FeedSettings, PostView } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
 import { GuestListCard } from '../components/guest-list.tsx';
+import { EventShoppingCard } from '../components/event-shopping.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -42,6 +43,7 @@ import { trackTicketClick } from '../components/sponsored-view.tsx';
 import { splitEventTitle } from '../lib/event-title.ts';
 import { LiveTag } from '../components/live-tag.tsx';
 import { GoingChoiceSheet } from '../components/going-choice.tsx';
+import { EventReminderSheet } from '../components/event-reminders.tsx';
 import { EventSkeleton } from '../components/skeletons.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
@@ -196,9 +198,13 @@ export function EventScreen({ eventId }: { eventId: string }) {
       live = false;
     };
   }, [eventId, storyIds, storiesKey]);
+  /** Convites ainda sem resposta (quem organiza vê todos; quem convidou, os seus), para cancelar direto na página. */
+  const invitesFor = !visitor && (fresh ?? loaded.data ?? undefined)?.source === 'USER';
+  const pendingInvites = useAsync(() => (invitesFor ? api.eventInvites(eventId).then((r) => r.invites) : Promise.resolve([])), [eventId, invitesFor]);
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [choosing, setChoosing] = useState(false);
+  const [editingReminders, setEditingReminders] = useState(false);
   // Cancelou a presença estando no grupo do evento: pergunta se sai do grupo também (e da votação da data dele).
   const [askLeaveGroup, setAskLeaveGroup] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -567,6 +573,16 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {choosing ? <GoingChoiceSheet {...(e.startsAt && e.endsAt ? { event: { id: e.id, startsAt: e.startsAt, endsAt: e.endsAt } } : {})} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
+            {/* Quem vai (ou criou) escolhe os lembretes só deste evento; sem mexer, vale a escolha de Configuração > Notificações. */}
+            {!visitor && e.going && !ended && e.startsAt !== null ? (
+              <p className="evgo__hint">
+                {t('Você recebe lembretes antes de começar.')}{' '}
+                <button type="button" className="linkbtn" onClick={() => setEditingReminders(true)}>
+                  {t('Mudar lembretes')}
+                </button>
+              </p>
+            ) : null}
+            {editingReminders ? <EventReminderSheet eventId={e.id} onClose={() => setEditingReminders(false)} /> : null}
             {askLeaveGroup && e.group ? (
               <div className="evinvites__ask" role="group" aria-label={t('Sair também do grupo do evento?')}>
                 <p>{t('Sair também do grupo “{name}”? Você sai da votação da data junto.', { name: e.group.name })}</p>
@@ -652,6 +668,18 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <p className="evwho__empty">{e.isOwner ? t('Ninguém confirmou ainda.') : t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
           ) : null}
           {inviteNote ? <Notice tone="ok">{inviteNote}</Notice> : null}
+          {!visitor && e.source === 'USER' && !ended ? (
+            <PendingInvites
+              invites={pendingInvites.data}
+              eventId={e.id}
+              {...(e.isOwner && e.group ? { groupId: e.group.conversationId } : {})}
+              {...(e.isOwner && e.owner ? { ownerId: e.owner.userId } : {})}
+              onCancelled={() => {
+                setInviteNote(undefined);
+                pendingInvites.reload();
+              }}
+            />
+          ) : null}
 
           {whoOpen ? (
             <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => setWhoOpen(false)}>
@@ -684,12 +712,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 setInvitingFriends(false);
                 setInviteNote(n === 0 ? t('Essas pessoas já estavam convidadas.') : n === 1 ? t('1 pessoa convidada.') : t('{n} pessoas convidadas.', { n }));
                 loaded.reload();
+                pendingInvites.reload();
               }}
               onClose={() => setInvitingFriends(false)}
             />
           ) : null}
 
           {e.source === 'PLACE' && !visitor ? <GuestListCard eventId={e.id} ended={ended} /> : null}
+          {/* Lista de compras e divisão: só em evento de pessoa, para quem está no grupo do evento. */}
+          {e.source === 'USER' && !visitor ? <EventShoppingCard eventId={e.id} ended={ended} /> : null}
 
           {visitor ? null : (
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
@@ -811,7 +842,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
           outside={!e.isPrivate}
           sheetTitle={t('Convidar pessoas')}
           invite
-          onClose={() => setInviting(false)}
+          onClose={() => {
+            setInviting(false);
+            pendingInvites.reload();
+          }}
         />
       ) : null}
       {sharing && e ? (
@@ -823,7 +857,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
           onPostedChange={setPosted}
           profile={e.source === 'PLACE' ? 'toggle' : e.isPrivate ? 'private' : e.isOwner ? 'owner' : 'toggle'}
           outside={!e.isPrivate}
-          onClose={() => setSharing(false)}
+          onClose={() => {
+            setSharing(false);
+            pendingInvites.reload();
+          }}
         />
       ) : null}
       {menu && e ? (

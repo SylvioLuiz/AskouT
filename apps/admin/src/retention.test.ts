@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { experimentVerdict, isThin, pct, pointsDiff, returnVerdict, seconds } from './retention.ts';
+import { experimentVerdict, isThin, pct, pointsDiff, retentionTone, returnVerdict, seconds } from './retention.ts';
 
 const r = (sample: number, returned: number) => ({ sample, returned, rate: sample ? returned / sample : null });
 
@@ -36,4 +36,16 @@ test('frase do teste A/B: palpite, sem efeito e com efeito', () => {
   assert.match(experimentVerdict({ ...d, low: -0.01, significant: false }, false, 30), /inclui zero/);
   assert.match(experimentVerdict(d, false, 30), /aumentou o retorno/);
   assert.match(experimentVerdict({ diff: -0.05, low: -0.09, high: -0.01, significant: true }, false, 30), /diminuiu/);
+});
+
+test('cor da retenção segue as faixas de D1 e D7, neutra com poucos dados', () => {
+  assert.equal(retentionTone('d1', r(100, 40), 30), 'ok');
+  assert.equal(retentionTone('d1', r(100, 39), 30), 'warn');
+  assert.equal(retentionTone('d1', r(100, 25), 30), 'warn');
+  assert.equal(retentionTone('d1', r(100, 24), 30), 'bad');
+  assert.equal(retentionTone('d7', r(100, 20), 30), 'ok');
+  assert.equal(retentionTone('d7', r(100, 10), 30), 'warn');
+  assert.equal(retentionTone('d7', r(100, 9), 30), 'bad');
+  assert.equal(retentionTone('d1', r(10, 9), 30), 'neutral');
+  assert.equal(retentionTone('d7', r(0, 0), 30), 'neutral');
 });

@@ -255,6 +255,7 @@ model User {
   venueStories      VenueStory[]       @relation("VenueStoryAuthor")
   venueStoryReports VenueStoryReport[] @relation("VenueStoryReports")
   venueStoryMutes   VenueStoryMute[]
+  eventReminderChoices EventReminderChoice[]
   venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
@@ -301,6 +302,11 @@ model UserSettings {
   shareAvailability Boolean @default(false)
   /// Perfil público aceita mensagens de quem ele não segue direto na caixa de conversas (sem virar solicitação).
   openDms Boolean @default(false)
+  /// Amigos (e quem conversa com a pessoa) veem a bolinha verde quando ela está com o app aberto. Desligado, ela também não vê a dos outros.
+  showOnline Boolean @default(true)
+  /// Quantas vezes o app pediu para cadastrar o celular (para de pedir depois de algumas) e quando foi a última.
+  phonePromptCount Int       @default(0)
+  phonePromptAt    DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -739,6 +745,15 @@ model NotificationSetting {
   muteAll    Boolean  @default(false)
   muteChats  Boolean  @default(false)
   muteEvents Boolean  @default(false)
+  /// Som do push por grupo (ver apps/api/src/core/notification-sounds.ts): `padrao`, `silencioso` ou um som do app.
+  soundChats   String @default("padrao")
+  soundInvites String @default("padrao")
+  soundArrival String @default("padrao")
+  soundOther   String @default("padrao")
+  /// Lembretes de evento escolhidos (`manha,30m`; vazio = nenhum). Nulo: segue o padrão ("É hoje!" e 30 min antes).
+  eventReminders   String?
+  /// Fuso do aparelho, para o "É hoje!" sair de manhã na hora da pessoa. Nulo: America/Sao_Paulo.
+  reminderTimeZone String?
   updatedAt  DateTime @default(now())
 
   user User @relation("NotificationSettingUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -789,6 +804,8 @@ model PushSubscription {
   createdAt DateTime @default(now())
   /// O app do aparelho mostra o campo "Responder" na notificação (no Android, o push vai só com dados).
   replyable Boolean  @default(false)
+  /// O app do aparelho tem os sons do AskouT (no Android, os canais de cada som). Sem isso, só o som padrão.
+  sounds    Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1058,6 +1075,7 @@ model Post {
   repostedBy PostedUserEvent[]
   datePolls  DatePoll[] @relation("PollEventPost")
   meetings   Meeting[]  @relation("MeetingEventPost")
+  shopping   EventShopping?
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])
@@ -1310,16 +1328,27 @@ model AppSetting {
 }
 
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.
+/// Auditoria: o que a gestão decidiu, ações sensíveis de quem usa o app e do sistema. Só cresce.
 model AdminAudit {
-  id         String   @id @default(uuid()) @db.Uuid
-  adminId    String   @db.Uuid
-  action     String
-  targetType String
-  targetId   String
-  note       String?
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid()) @db.Uuid
+  /// Quem fez. Nulo quando foi o sistema (pagamento confirmado, script).
+  adminId     String?  @db.Uuid
+  /// ADMIN, USER ou SYSTEM.
+  actorKind   String   @default("ADMIN")
+  action      String
+  targetType  String
+  targetId    String
+  /// Nome do alvo no momento (@usuário, local, evento): continua legível se o alvo for apagado.
+  targetLabel String?
+  /// O que mudou, campo a campo: [{ field, before, after }].
+  changes     Json?
+  note        String?
+  createdAt   DateTime @default(now())
 
   @@index([createdAt])
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
 }
 
 /// Capa enviada pelo dono do local (JPEG/PNG/WebP até 256 KB), servida em `/place-events/:id/cover`.
@@ -1531,16 +1560,33 @@ model ExternalIdentity {
   @@index([userId])
 }
 
-/// Lembrete "o evento começa em 30 minutos" já mandado a uma pessoa (uma vez por pessoa e evento). Sem chave estrangeira: guarda só o marcador.
+/// Lembrete de evento já mandado a uma pessoa (uma vez por pessoa, evento e tipo). Sem chave estrangeira: guarda só o marcador.
 model EventReminder {
   id      String   @id @default(uuid()) @db.Uuid
   userId  String   @db.Uuid
   source  String
   eventId String   @db.Uuid
+  /// Qual lembrete (ver apps/api/src/core/event-reminders.ts): `1d`, `manha`, `2h`, `1h`, `30m` ou `15m`.
+  kind    String   @default("30m")
   sentAt  DateTime
 
-  @@unique([userId, source, eventId])
+  @@unique([userId, source, eventId, kind])
   @@index([sentAt])
+}
+
+/// Lembretes que a pessoa escolheu só para um evento (no lugar da escolha geral). Sem chave estrangeira para o evento.
+model EventReminderChoice {
+  userId    String   @db.Uuid
+  source    String
+  eventId   String   @db.Uuid
+  /// Lista separada por vírgula (`manha,30m`); vazio = nenhum lembrete neste evento.
+  reminders String
+  updatedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, source, eventId])
+  @@index([source, eventId])
 }
 
 /// Impulsionamento: anúncio pago por quem administra o local (a página ou um evento dele).
@@ -2101,4 +2147,57 @@ model HunterEventLink {
 
   @@index([createdAt])
   @@index([venueId])
+}
+
+/// Lista de compras e divisão de gastos de um evento criado por uma pessoa (nunca de local). Quem criou o evento liga;
+/// quem está no grupo do evento participa. Apagar o evento apaga tudo.
+model EventShopping {
+  eventPostId      String   @id @db.Uuid
+  /// Quem participa (sem administrar) pode criar e acrescentar itens.
+  membersCanAdd    Boolean  @default(true)
+  /// Quem participa (sem administrar) pode marcar item como comprado.
+  membersCanCheck  Boolean  @default(true)
+  /// Ids de quem fica fora da divisão dos gastos (por padrão todo mundo do grupo entra).
+  splitExcludedIds Json     @default("[]")
+  createdAt        DateTime @default(now())
+
+  eventPost Post                @relation(fields: [eventPostId], references: [id], onDelete: Cascade)
+  items     EventShoppingItem[]
+  expenses  EventExpense[]
+}
+
+/// Item da lista de compras. Pessoas ligadas só pelo id: quem apaga a conta some do nome, o item fica.
+model EventShoppingItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventPostId String    @db.Uuid
+  title       String
+  quantity    String?
+  createdById String    @db.Uuid
+  boughtById  String?   @db.Uuid
+  boughtAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  shopping EventShopping @relation(fields: [eventPostId], references: [eventPostId], onDelete: Cascade)
+
+  @@index([eventPostId, createdAt])
+}
+
+/// Gasto da divisão: anexo (nota fiscal, recibo) enviado por quem participa, ou lançado sem anexo por quem administra.
+/// Quem administra informa o valor (centavos) e quem pagou. Pessoas ligadas só pelo id: a conta do grupo não muda se alguém apagar a conta.
+model EventExpense {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventPostId String   @db.Uuid
+  uploaderId  String   @db.Uuid
+  fileName    String?
+  mime        String?
+  size        Int      @default(0)
+  data        Bytes?
+  amountCents Int?
+  payerId     String?  @db.Uuid
+  note        String?
+  createdAt   DateTime @default(now())
+
+  shopping EventShopping @relation(fields: [eventPostId], references: [eventPostId], onDelete: Cascade)
+
+  @@index([eventPostId, createdAt])
 }

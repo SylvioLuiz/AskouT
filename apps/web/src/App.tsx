@@ -1,11 +1,13 @@
 import { Suspense, useEffect } from 'react';
 import { FlashPresenceProvider } from './components/flash-presence.tsx';
+import { OnlinePresenceProvider } from './components/online-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { TermsGate } from './components/terms-gate.tsx';
 import { CompleteProfileScreen } from './components/complete-profile.tsx';
 import { Onboarding } from './components/onboarding.tsx';
 import { PushAutoAsk } from './components/push-auto-ask.tsx';
+import { PhonePrompt } from './components/phone-prompt.tsx';
 import { PositionAutoAsk } from './components/position-auto-ask.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
 import { VisitorCityGate, VisitorHomeScreen, VisitorShell } from './components/visitor.tsx';
@@ -310,6 +312,7 @@ function AppRoutes() {
 
   return (
     <FlashPresenceProvider>
+      <OnlinePresenceProvider>
       <TermsGate>
         <Shell>
           <Suspense fallback={<ScreenFallback />}>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Suspense>
@@ -317,7 +320,9 @@ function AppRoutes() {
         <Onboarding />
         <PositionAutoAsk />
         <PushAutoAsk />
+        <PhonePrompt />
       </TermsGate>
+      </OnlinePresenceProvider>
     </FlashPresenceProvider>
   );
 }

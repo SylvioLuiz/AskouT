@@ -1,6 +1,7 @@
 import type { LiveActivityPush, PushMessage, PushResult, PushSender } from '../../core/ports.ts';
 import type { PushSubscriptionRecord } from '../../core/types.ts';
 import type { FetchLike, GoogleAccessTokens } from '../google/service-account.ts';
+import { androidChannelFor, CUSTOM_SOUNDS } from '../../core/notification-sounds.ts';
 
 /**
  * Envio de aviso (push) para o app no Android, pelo FCM (API HTTP v1) com conta de serviço do Google.
@@ -51,6 +52,11 @@ export class FcmSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     if (!subscription.endpoint.startsWith(FCM_PREFIX)) return 'FAILED';
     const deviceToken = subscription.endpoint.slice(FCM_PREFIX.length);
+    // Som escolhido: no Android 8+ é o canal que toca (um por som, criados pelo app); `sound` vale para o Android 7.
+    const sound = message.sound ?? 'padrao';
+    const channel = androidChannelFor(sound);
+    // Avisos montados pelo próprio app (mensagem com "Responder", chegada) levam o canal nos dados.
+    const channelData = sound === 'padrao' ? {} : { channel };
     // Com `reply` (só aparelhos que avisaram que sabem), vai só com dados: o próprio app monta o aviso com o campo
     // "Responder" (ReplyMessagingService no Android). Com `notification`, o Android mostraria sozinho, sem o campo.
     const body = message.live
@@ -70,6 +76,7 @@ export class FcmSender implements PushSender {
               tag: message.tag.slice(0, 64),
               ...(message.image ? { image: message.image } : {}),
               ...(message.live.reopen ? { reopen: '1' } : {}),
+              ...channelData,
             },
             android: { priority: 'HIGH', ttl: '60s' },
           },
@@ -78,7 +85,7 @@ export class FcmSender implements PushSender {
       ? JSON.stringify({
           message: {
             token: deviceToken,
-            data: { url: message.url, title: message.title, body: message.body, tag: message.tag.slice(0, 64), reply: message.reply },
+            data: { url: message.url, title: message.title, body: message.body, tag: message.tag.slice(0, 64), reply: message.reply, ...channelData },
             android: { priority: 'HIGH' },
           },
         })
@@ -92,7 +99,13 @@ export class FcmSender implements PushSender {
         // esconde o texto (quando o aparelho está para ocultar conteúdo sensível); desbloqueado, mostra a mensagem.
         android: {
           priority: 'HIGH',
-          notification: { tag: message.tag.slice(0, 64), channel_id: FCM_CHANNEL_ID, notification_priority: 'PRIORITY_HIGH', visibility: 'PRIVATE', default_sound: true },
+          notification: {
+            tag: message.tag.slice(0, 64),
+            channel_id: sound === 'padrao' ? FCM_CHANNEL_ID : channel,
+            notification_priority: 'PRIORITY_HIGH',
+            visibility: 'PRIVATE',
+            ...(sound === 'padrao' ? { default_sound: true } : CUSTOM_SOUNDS.includes(sound) ? { sound } : {}),
+          },
         },
       },
     });

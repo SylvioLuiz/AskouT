@@ -92,6 +92,8 @@ export interface ExplorePlaceItem {
   venue: ExplorePlaceVenue | null;
   /** Local impulsionado (anúncio pago). A tela mostra “Patrocinado”. */
   sponsored?: boolean;
+  /** Só uma rua, sem número (busca por endereço): ao vincular, o app pede o número. */
+  street?: boolean;
 }
 
 export interface ExplorePlaceVenue {
@@ -507,10 +509,9 @@ export class ExploreService {
     if (lat !== undefined && lng !== undefined && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) throw validationError('Posição inválida', { lat: 'Coordenadas fora do intervalo' });
     const center = lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
 
-    const found = await this.deps.places.searchVenues(text, undefined, 0, VENUE_LIMIT);
-    const venues = center
-      ? found.map((v) => ({ ...v, distanceM: distanceMeters(center, v.venue) })).sort((a, b) => a.distanceM - b.distanceM)
-      : found;
+    // Primeiro o banco de locais do AskouT, pelo nome, sem limite de distância mas com os mais perto da pessoa na frente
+    // (o banco escolhe os mais perto antes de cortar no limite). O mapa de fora (OpenStreetMap e, se preciso, o Google) completa.
+    const venues = await this.deps.places.searchVenues(text, center, 0, VENUE_LIMIT);
     const { placeItems } = await this.collectPlaces(actorId, venues, { center: undefined, radiusM: 0, now: this.deps.clock.now(), limit: VENUE_LIMIT });
 
     const source = this.deps.placeSource;
@@ -557,6 +558,7 @@ export class ExploreService {
         photoAuthor: p.photoAuthor ?? null,
         mapsUri: p.mapsUri ?? null,
         venue: null,
+        ...(p.street ? { street: true } : {}),
       });
     }
     return { places: placeItems, placesAvailable: ext.available, canSearchGoogle: canSearchGoogle && !autoGoogle };

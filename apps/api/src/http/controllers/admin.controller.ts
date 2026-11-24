@@ -217,6 +217,12 @@ export class AdminController {
     return this.core.admin.usernameAvailableFor(actor, id, username);
   }
 
+  /** Números da pessoa para a gestão (uso, vínculos, NOW, denúncias, bloqueios, compras), sem conteúdo de mensagens. */
+  @Get('users/:id/stats')
+  userStats(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.userStats(actor, id);
+  }
+
   /** Atividade da pessoa (`kind`: LIKE, COMMENT, POST, FOLLOW, EVENT; `cursor` da página anterior). */
   @Get('users/:id/activity')
   userActivity(@CurrentActor() actor: Actor, @Param('id') id: string, @Query() q: { kind?: unknown; cursor?: unknown }) {
@@ -226,6 +232,43 @@ export class AdminController {
   @Get('venues')
   venues(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.searchVenues(actor, q);
+  }
+
+  /** Cadastra um local (mesmos campos da edição; sem `lat`/`lng`, a posição sai do endereço). */
+  @Post('venues')
+  createVenue(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.admin.createVenue(actor, asBody(body));
+  }
+
+  /** Posição de um endereço (busca gratuita primeiro; Google só se ela não achar). */
+  @Post('venues/geocode')
+  @HttpCode(200)
+  geocodeVenue(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.admin.geocodeAddress(actor, asBody(body).address);
+  }
+
+  /** Sugestões do Google para cadastrar um local (`{text, sessionToken}`; Autocomplete, grátis na sessão). */
+  @Post('venues/google/suggest')
+  @HttpCode(200)
+  googleSuggest(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.googleSuggest(actor, { text: b.text, sessionToken: b.sessionToken });
+  }
+
+  /** Endereço, posição e tipo do lugar escolhido no Google (`{placeId, name?, sessionToken}`; só campos Essentials). */
+  @Post('venues/google/place')
+  @HttpCode(200)
+  googlePlace(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.googlePlace(actor, { placeId: b.placeId, name: b.name, sessionToken: b.sessionToken });
+  }
+
+  /** Importa locais de planilha (`{rows, dryRun, fileName?, note?}`): `dryRun` devolve só a prévia linha a linha. */
+  @Post('venues/import')
+  @HttpCode(200)
+  importVenues(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.importVenues(actor, { rows: b.rows, dryRun: b.dryRun, fileName: b.fileName, note: b.note });
   }
 
   /** Detalhe do evento de local: cadastro, local, responsável e quem confirmou presença. */
@@ -389,7 +432,7 @@ export class AdminController {
   }
 
   @Get('audit')
-  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
+  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown; q?: unknown; action?: unknown; actorKind?: unknown; targetType?: unknown; actorId?: unknown; targetId?: unknown; from?: unknown; to?: unknown }) {
     return this.core.admin.audit(actor, q);
   }
 }

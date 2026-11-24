@@ -147,7 +147,9 @@ export class HunterAdminController {
   @HttpCode(200)
   async syncNow(@CurrentActor() actor: Actor) {
     assertAdmin(actor);
-    return this.sync.run();
+    const result = await this.sync.run();
+    await this.bridge.auditSync(actor.userId, result);
+    return result;
   }
 
   @Post('enabled')

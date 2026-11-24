@@ -46,6 +46,19 @@ export interface ProfileView {
   canViewContent: boolean;
   /** Selo de quem trouxe amigos: quantos, ou null sem selo (não alcançou ou escondeu). Ausente em versões antigas da API. */
   referralBadge?: number | null;
+  /** Selos do perfil. No próprio perfil vêm também os escondidos (`hidden`). Ausente em versões antigas da API. */
+  badges?: ProfileBadge[];
+}
+
+export type BadgeId = 'REFERRAL' | 'ORGANIZER' | 'REGULAR' | 'NOW';
+
+export interface ProfileBadge {
+  id: BadgeId;
+  /** Amigos (REFERRAL), eventos (ORGANIZER e REGULAR) ou pessoas (NOW). */
+  count: number;
+  /** Mínimo para ganhar o selo. */
+  threshold: number;
+  hidden: boolean;
 }
 
 /** Convite com contagem: quem entrou pelo seu link e o progresso do selo. */
@@ -472,15 +485,19 @@ export interface EventCard {
   going?: boolean;
 }
 
+/** De onde o evento veio para a dona do perfil: criou, foi convidada ou é público (entrou por conta própria). */
+export type EventOrigin = 'CREATED' | 'INVITED' | 'PUBLIC';
+
 export interface PostedEvent extends EventCard {
   postedAt: string;
+  origin?: EventOrigin;
 }
 
 /** Evento em que a pessoa confirmou presença (abas Eventos e Participou do perfil). */
 export interface AttendedEvent extends EventCard {
   attendedAt: string;
   /** Evento privado criado por uma pessoa (só aparece para quem tem acesso a ele). */
-  private?: boolean;
+  private?: boolean;  origin?: EventOrigin;
 }
 
 export interface AttendedEventsPage {
@@ -590,6 +607,16 @@ export interface SharedProfileCard {
   following: 'NONE' | 'PENDING' | 'ACCEPTED' | 'SELF';
 }
 
+/** Cartão de um local compartilhado na conversa. */
+export interface ChatVenueCard {
+  id: string;
+  name: string;
+  category: string | null;
+  address: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
@@ -618,6 +645,8 @@ export interface ChatMessage {
   reactions: ChatReaction[];
   /** Evento compartilhado (kind EVENT). */
   event: EventCard | null;
+  /** Local compartilhado: texto com o link da página do local; aparece o cartão que abre a página no app. */
+  venue?: ChatVenueCard | null;
   /** Cartão do encontro (kind MEETUP). */
   meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */
@@ -834,6 +863,30 @@ export interface NotificationMute {
   events: boolean;
 }
 
+/** Som do push: o do aparelho, nenhum, ou um som do AskouT (arquivos em public/sons e dentro do app). */
+export type NotificationSound = 'padrao' | 'askout' | 'pop' | 'sino' | 'brilho' | 'silencioso';
+/** Som de cada grupo de aviso: conversas, convites (encontros e NOW), chegada do amigo e o resto. */
+export interface NotificationSounds {
+  chats: NotificationSound;
+  invites: NotificationSound;
+  arrival: NotificationSound;
+  other: NotificationSound;
+}
+
+/** Lembrete de evento: 1 dia antes, de manhã no dia ("É hoje!"), 2 h, 1 h, 30 min ou 15 min antes. */
+export type EventReminderOption = '1d' | 'manha' | '2h' | '1h' | '30m' | '15m';
+
+/** Escolha de lembretes: a que vale e se é personalizada (false = o padrão, ou num evento a escolha geral). */
+export interface EventReminderChoice {
+  reminders: EventReminderOption[];
+  custom: boolean;
+}
+
+export interface EventReminderEventChoice extends EventReminderChoice {
+  /** A escolha geral da pessoa (o padrão enquanto ela não mexer). */
+  general: EventReminderOption[];
+}
+
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';
@@ -1018,6 +1071,8 @@ export interface ExplorePlace {
   venue: { id: string; logoUrl: string | null; hours: VenueHours | null; followerCount: number; following: boolean; claimed: boolean } | null;
   /** Anúncio pago pelo responsável do local. Sempre mostrar “Patrocinado”. */
   sponsored?: boolean;
+  /** Só uma rua, sem número (busca por endereço): ao vincular, o app pede o número. */
+  street?: boolean;
 }
 
 export interface ExploreResult {
@@ -1653,4 +1708,58 @@ export interface MessageStory {
   expiresAt: string;
   eventId: string;
   author: PublicProfile;
+}
+
+/** Lista de compras e divisão de gastos de um evento criado por uma pessoa (ver EventShoppingService na API). */
+export interface ShoppingItem {
+  id: string;
+  title: string;
+  quantity: string | null;
+  createdBy: PublicProfile | null;
+  boughtBy: PublicProfile | null;
+  boughtAt: string | null;
+  canEdit: boolean;
+}
+
+export interface EventExpense {
+  id: string;
+  uploader: PublicProfile | null;
+  fileName: string | null;
+  mime: string | null;
+  size: number;
+  amountCents: number | null;
+  payer: PublicProfile | null;
+  note: string | null;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+export interface SplitPerson {
+  user: PublicProfile;
+  included: boolean;
+  paidCents: number;
+  shareCents: number;
+  balanceCents: number;
+}
+
+export interface SplitView {
+  totalCents: number;
+  pendingCount: number;
+  people: SplitPerson[];
+  transfers: { from: PublicProfile; to: PublicProfile; amountCents: number }[];
+}
+
+export interface EventShoppingView {
+  supported: boolean;
+  enabled: boolean;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isMember: boolean;
+  hasGroup: boolean;
+  settings: { membersCanAdd: boolean; membersCanCheck: boolean } | null;
+  canAdd: boolean;
+  canCheck: boolean;
+  items: ShoppingItem[];
+  expenses: EventExpense[];
+  split: SplitView | null;
 }

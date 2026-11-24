@@ -105,7 +105,7 @@ export class WebPushSender implements PushSender {
     const { keys, subject, fetchImpl = fetch, nowMs = Date.now, timeoutMs = 8000 } = this.options;
     try {
       // Só o texto curto do aviso vai no push; o app busca o resto ao abrir.
-      const body = encryptPayload(Buffer.from(JSON.stringify({ title: message.title, body: message.body, url: message.url, tag: message.tag })), subscription.p256dh, subscription.auth);
+      const body = encryptPayload(Buffer.from(JSON.stringify({ title: message.title, body: message.body, url: message.url, tag: message.tag, ...(message.sound === 'silencioso' ? { silent: true } : {}) })), subscription.p256dh, subscription.auth);
       const response = await fetchImpl(subscription.endpoint, {
         method: 'POST',
         headers: {

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent, ReactNode } from 'react';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
-import { MuteCard, PushCard, PushTestCard } from '../components/notifications.tsx';
+import { MuteCard, PushCard, PushTestCard, SoundCard } from '../components/notifications.tsx';
+import { EventReminderCard } from '../components/event-reminders.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -21,7 +22,10 @@ import { TastePicker, toggleTaste } from '../components/tastes.tsx';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
+import { ONLINE_CHANGED_EVENT } from '../components/online-presence.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
+import { PeopleSearch } from '../components/people-search.tsx';
+import { matchesPerson } from '../lib/people-search.ts';
 import { ActivityKindIcon, ActivityLog } from '../components/activity-log.tsx';
 import { INTERACTIONS_TABS, interactionsPath, tabFromSlug, type InteractionsTab } from '../lib/activity-log.ts';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
@@ -354,8 +358,12 @@ export function NotificationSettingsScreen() {
       <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
       <PushTestCard />
+      <h2 className="profile__section">{t('Lembretes de eventos')}</h2>
+      <EventReminderCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
+      <h2 className="profile__section">{t('Som dos avisos')}</h2>
+      <SoundCard />
     </>
   );
 }
@@ -563,6 +571,43 @@ function OpenMessagesSetting({ isPrivate }: { isPrivate: boolean }) {
   );
 }
 
+/** Bolinha verde de online: amigos e quem conversa com você veem quando está com o app aberto. Desligada, você também não vê a dos outros. */
+function ShowOnlineSetting() {
+  const settings = useAsync(() => api.presenceSettings(), []);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const on = settings.data?.showOnline !== false;
+
+  async function toggle() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      settings.setData(await api.setPresenceSettings(!on));
+      window.dispatchEvent(new Event(ONLINE_CHANGED_EVENT));
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!settings.data) return null;
+  return (
+    <section className="setting">
+      <div className="setting__text">
+        <h2 className="setting__title" id="online-titulo">
+          {t('Mostrar quando estou online')}
+        </h2>
+        <p className="setting__help">{t('Amigos e pessoas com quem você conversa veem uma bolinha verde na sua foto enquanto você está com o app aberto. Desligado, você também não vê quem está online.')}</p>
+        {problem ? <Notice tone="error">{problem}</Notice> : null}
+      </div>
+      <button type="button" role="switch" aria-checked={on} aria-labelledby="online-titulo" className="switch" onClick={toggle} disabled={busy}>
+        <span className="switch__thumb" />
+      </button>
+    </section>
+  );
+}
+
 export function PrivacyScreen() {
   useTitle(t('Privacidade'));
   const user = useUser();
@@ -611,6 +656,7 @@ export function PrivacyScreen() {
         </button>
       </section>
       <OpenMessagesSetting isPrivate={isPrivate} />
+      <ShowOnlineSetting />
       <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
       <RegionSetting key={personalizeRev} userId={user.profile.userId} />
       <nav className="linklist" aria-label={t('Privacidade')}>
@@ -985,6 +1031,8 @@ export function FriendsScreen() {
   useTitle(t('Amigos'));
   const friends = useAsync(() => api.friends(), []);
   const [inviting, setInviting] = useState(false);
+  const [query, setQuery] = useState('');
+  const shown = friends.data ? friends.data.filter((friend) => matchesPerson(friend, query)) : [];
   return (
     <>
       <PageHead title={t('Amigos')} back="/perfil" subtitle={t('Pessoas que seguem você e que você segue')} action={<Link to="/amigos/contatos">{t('Achar nos contatos')}</Link>} />
@@ -1011,12 +1059,19 @@ export function FriendsScreen() {
       ) : null}
       {friends.data && friends.data.length > 0 ? (
         <>
-          <p className="muted">{pluralize(friends.data.length, 'amigo', 'amigos')}</p>
-          <ul className="list">
-            {friends.data.map((friend) => (
-              <PersonRow key={friend.userId} profile={friend} />
-            ))}
-          </ul>
+          <PeopleSearch value={query} onChange={setQuery} label={t('Buscar amigo por nome ou @')} />
+          {shown.length === 0 ? (
+            <EmptyState title={t('Nenhum amigo encontrado')}>{t('Confira o nome ou o @ digitado.')}</EmptyState>
+          ) : (
+            <>
+              <p className="muted">{shown.length === friends.data.length ? pluralize(friends.data.length, 'amigo', 'amigos') : t('{shown} de {total}', { shown: String(shown.length), total: pluralize(friends.data.length, 'amigo', 'amigos') })}</p>
+              <ul className="list">
+                {shown.map((friend) => (
+                  <PersonRow key={friend.userId} profile={friend} />
+                ))}
+              </ul>
+            </>
+          )}
         </>
       ) : null}
     </>

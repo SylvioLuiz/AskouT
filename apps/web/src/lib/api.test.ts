@@ -82,6 +82,8 @@ describe('cliente da API', () => {
     assert.equal(t.calls[2]?.url, '/api/users/u%201/followers?limit=20&offset=40');
     await t.api.following('u1');
     assert.equal(t.calls[3]?.url, '/api/users/u1/following');
+    await t.api.following('u1', { limit: 30, offset: 0 }, ' @ana ');
+    assert.equal(t.calls[4]?.url, '/api/users/u1/following?limit=30&offset=0&q=%40ana');
   });
 
   it('usa o método certo em cada ação', async () => {

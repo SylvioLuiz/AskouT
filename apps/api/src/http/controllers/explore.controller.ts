@@ -279,6 +279,18 @@ export class ExploreController {
     return this.presentPage(await this.core.eventPages.setGoingOnProfile(actor.userId, id, asBody(body).onProfile));
   }
 
+  /** Lembretes deste evento: `{reminders, custom, general}` (custom false = segue a escolha geral). */
+  @Get('events/:id/reminders')
+  reminders(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.eventPages.reminders(actor.userId, id);
+  }
+
+  /** `{reminders: [...] | null}`: lembretes só deste evento (vazia = nenhum) ou `null` para seguir a escolha geral. */
+  @Put('events/:id/reminders')
+  setReminders(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.eventPages.setReminders(actor.userId, id, asBody(body).reminders);
+  }
+
   @Delete('events/:id/going')
   async cancel(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.presentPage(await this.core.eventPages.cancel(actor.userId, id));

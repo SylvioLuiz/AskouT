@@ -4,6 +4,8 @@ import type { StoryOverlay } from '../../core/story-overlays.ts';
 import type { EventRoomRepository } from '../../core/ports.ts';
 import type { EventAttendanceRecord, EventRef, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, Page, StoryHiddenRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
+import { decodeReminders, encodeReminders } from '../../core/event-reminders.ts';
+import type { EventReminderOption } from '../../core/event-reminders.ts';
 
 export class PrismaEventRoomRepository implements EventRoomRepository {
   private readonly prisma: PrismaClient;
@@ -34,10 +36,48 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return row ? row.onProfile : undefined;
   }
 
-  async markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean> {
+  async markReminded(ref: EventRef, userId: string, kind: EventReminderOption, at: Date): Promise<boolean> {
     if (!isUuid(ref.id) || !isUuid(userId)) return false;
-    const result = await this.prisma.eventReminder.createMany({ data: [{ userId, source: ref.source, eventId: ref.id, sentAt: at }], skipDuplicates: true });
+    const result = await this.prisma.eventReminder.createMany({ data: [{ userId, source: ref.source, eventId: ref.id, kind, sentAt: at }], skipDuplicates: true });
     return result.count > 0;
+  }
+
+  async listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]> {
+    const rows = await this.prisma.eventAttendance.findMany({
+      where: { OR: [{ placeEvent: { startsAt: { gt: from, lte: to } } }, { post: { archivedAt: null, eventStartsAt: { gt: from, lte: to } } }] },
+      select: { userId: true, createdAt: true, placeEventId: true, postId: true, placeEvent: { select: { startsAt: true } }, post: { select: { eventStartsAt: true } } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    return rows.flatMap((r) => {
+      if (r.placeEventId && r.placeEvent) return [{ ref: { source: 'PLACE' as const, id: r.placeEventId }, userId: r.userId, createdAt: r.createdAt, startsAt: r.placeEvent.startsAt }];
+      if (r.postId && r.post?.eventStartsAt) return [{ ref: { source: 'USER' as const, id: r.postId }, userId: r.userId, createdAt: r.createdAt, startsAt: r.post.eventStartsAt }];
+      return [];
+    });
+  }
+
+  async listReminderChoices(refs: EventRef[]): Promise<{ ref: EventRef; userId: string; reminders: EventReminderOption[] }[]> {
+    const valid = refs.filter((r) => isUuid(r.id));
+    if (valid.length === 0) return [];
+    const rows = await this.prisma.eventReminderChoice.findMany({ where: { OR: valid.map((r) => ({ source: r.source, eventId: r.id })) } });
+    return rows.map((r) => ({ ref: { source: r.source === 'PLACE' ? 'PLACE' : 'USER', id: r.eventId }, userId: r.userId, reminders: decodeReminders(r.reminders) }));
+  }
+
+  async getReminderChoice(ref: EventRef, userId: string): Promise<EventReminderOption[] | undefined> {
+    if (!isUuid(ref.id) || !isUuid(userId)) return undefined;
+    const row = await this.prisma.eventReminderChoice.findUnique({ where: { userId_source_eventId: { userId, source: ref.source, eventId: ref.id } } });
+    return row ? decodeReminders(row.reminders) : undefined;
+  }
+
+  async setReminderChoice(ref: EventRef, userId: string, reminders: EventReminderOption[] | null, at: Date): Promise<void> {
+    if (!isUuid(ref.id) || !isUuid(userId)) return;
+    const key = { userId, source: ref.source, eventId: ref.id };
+    if (reminders === null) {
+      await this.prisma.eventReminderChoice.deleteMany({ where: key });
+      return;
+    }
+    const data = { reminders: encodeReminders(reminders), updatedAt: at };
+    await this.prisma.eventReminderChoice.upsert({ where: { userId_source_eventId: key }, create: { ...key, ...data }, update: data });
   }
 
   async removeGoing(ref: EventRef, userId: string): Promise<boolean> {

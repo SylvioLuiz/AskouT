@@ -5,7 +5,7 @@ import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { currentSubscription, disableNativePush, disablePush, enableNativePush, enablePush, nativePushBridge, pushState, readEnvironment, readNativeState, refreshNativeToken } from '../lib/push.ts';
 import type { PushState } from '../lib/push.ts';
-import type { NotificationMute, PushTestResult } from '../lib/types.ts';
+import type { NotificationMute, NotificationSound, NotificationSounds, PushTestResult } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
 const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
@@ -97,7 +97,7 @@ export function PushCard({ hideInstallHint = false }: { hideInstallHint?: boolea
 const MUTE_ROWS: { key: 'all' | 'chats' | 'events'; title: string; help: string }[] = [
   { key: 'all', title: t('Todas'), help: t('Nenhum aviso toca no aparelho. Eles continuam aparecendo no sino.') },
   { key: 'chats', title: t('Conversas'), help: t('Sem push de mensagens e avisos de grupos. Continuam no sino.') },
-  { key: 'events', title: t('Eventos'), help: t('Sem push de convites, mudanças e do lembrete de 30 min antes do evento. Continuam no sino.') },
+  { key: 'events', title: t('Eventos'), help: t('Sem push de convites, mudanças e dos lembretes antes do evento. Continuam no sino.') },
 ];
 
 /** Chaves para silenciar avisos: tudo, só conversas ou só eventos. */
@@ -149,6 +149,90 @@ export function MuteCard() {
   );
 }
 
+const SOUND_OPTIONS: { id: NotificationSound; label: string }[] = [
+  { id: 'padrao', label: t('Padrão do aparelho') },
+  { id: 'askout', label: 'AskouT' },
+  { id: 'pop', label: t('Pop') },
+  { id: 'sino', label: t('Sino') },
+  { id: 'brilho', label: t('Brilho') },
+  { id: 'silencioso', label: t('Sem som') },
+];
+
+const SOUND_ROWS: { key: keyof NotificationSounds; title: string; help: string }[] = [
+  { key: 'chats', title: t('Conversas'), help: t('Mensagens e avisos de grupos.') },
+  { key: 'invites', title: t('Convites'), help: t('Convites para encontros, respostas a eles e o NOW dos amigos.') },
+  { key: 'arrival', title: t('Chegada de amigos'), help: t('Quando um amigo está a caminho ou chegou no encontro do NOW.') },
+  { key: 'other', title: t('Outros avisos'), help: t('Curtidas, comentários, seguidores, lembretes de eventos e o resto.') },
+];
+
+/** Toca a prévia do som (mesmo arquivo que vai dentro do app). O padrão do aparelho e o "sem som" não têm prévia. */
+export function previewSound(sound: NotificationSound): void {
+  if (sound === 'padrao' || sound === 'silencioso' || typeof Audio === 'undefined') return;
+  try {
+    void new Audio(`/sons/${sound}.wav`).play().catch(() => undefined);
+  } catch {
+    /* sem áudio aqui: só salva a escolha */
+  }
+}
+
+/** Som do push para cada tipo de aviso. Cada toque já salva na conta e toca a prévia. */
+export function SoundCard() {
+  const current = useAsync(() => api.notificationSounds(), []);
+  const [override, setOverride] = useState<NotificationSounds | undefined>();
+  const [problem, setProblem] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const value = override ?? current.data;
+
+  async function choose(key: keyof NotificationSounds, sound: NotificationSound) {
+    if (!value || busy) return;
+    previewSound(sound);
+    if (value[key] === sound) return;
+    const next = { ...value, [key]: sound };
+    setOverride(next);
+    setProblem(undefined);
+    setBusy(true);
+    try {
+      setOverride(await api.setNotificationSounds({ [key]: sound }));
+    } catch (failure) {
+      setOverride(value);
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (current.error) return <ErrorState message={current.error.message} onRetry={current.reload} />;
+  if (!value) return <Loading shape="toggles" />;
+  return (
+    <>
+      {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {SOUND_ROWS.map((row) => (
+        <section className="setting" key={row.key}>
+          <div className="setting__text">
+            <h3 className="setting__title" id={`sound-${row.key}`}>
+              {row.title}
+            </h3>
+            <p className="setting__help">{row.help}</p>
+            <div className="chips soundpicker" role="group" aria-labelledby={`sound-${row.key}`}>
+              {SOUND_OPTIONS.map((option) => (
+                <button type="button" key={option.id} className="chip" aria-pressed={value[row.key] === option.id} onClick={() => void choose(row.key, option.id)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      ))}
+      <p className="muted pushcard__hint">{soundHint()}</p>
+    </>
+  );
+}
+
+/** O que cada lugar deixa fazer com o som. */
+function soundHint(): string {
+  if (!nativePushBridge()) return t('No navegador o som é sempre o do aparelho; só o "Sem som" vale aqui. No app do AskouT dá para usar os sons acima.');
+  return t('Os sons novos valem a partir desta versão do app. No Android, se você mudar o som do AskouT nos ajustes do celular, vale o que estiver lá. O modo silencioso e o "Não perturbe" do aparelho continuam valendo.');
+}
 
 /** Texto do resultado do aviso de teste. Exportado para os testes. */
 export function pushTestSummary(r: PushTestResult): { tone: 'ok' | 'error'; text: string } {

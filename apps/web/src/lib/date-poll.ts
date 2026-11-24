@@ -42,6 +42,10 @@ export interface PollView {
   conversationId: string;
   conversationName: string | null;
   isGroup: boolean;
+  /** Você está na conversa da votação. Em votação de evento, quem ainda não aceitou ("Eu vou") vota sem estar no grupo. */
+  inConversation?: boolean;
+  /** Evento sem data cuja data esta votação escolhe. */
+  eventPostId?: string | null;
   title: string;
   mode: PollMode;
   /** Horários em votação (vazio em BEST_DATE). */

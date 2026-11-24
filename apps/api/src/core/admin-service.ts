@@ -4,9 +4,11 @@ import type { ActivityPage } from './activity-service.ts';
 import { bioProblem, displayNameProblem, normalizeBio, normalizeDisplayName, normalizeUsername, usernameProblem } from './validation.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
-import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
+import { DomainError, conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
 import type { AuthResult, AuthService, LoginInput, MfaChallenge, SocialLoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
+import { fold } from './explore-match.ts';
+import { distanceMeters } from './geo.ts';
 import type { VenueEventInput, VenueProfileInput, VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
@@ -15,8 +17,8 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
-import { ADMIN_SORTS, REPORT_RESOLUTIONS } from './types.ts';
+import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditChange, AuditFilter, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus, VenueRecord } from './types.ts';
+import { ADMIN_SORTS, AUDIT_ACTOR_KINDS, AUDIT_TARGET_TYPES, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
 export const ADMIN_PAGE_MAX = 100;
@@ -68,7 +70,7 @@ export interface AdminEventDetail {
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
   /** Primeiras pessoas que confirmaram (até 20), na ordem da confirmação. */
-  going: { id: string; username: string; displayName: string; at: string }[];
+  going: { id: string; username: string; displayName: string; avatarUrl: string | null; at: string }[];
   /** Outras datas do mesmo evento: eventos do mesmo local com o mesmo nome (sem contar este), as mais próximas primeiro. */
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com o mesmo nome, contando este. */
@@ -93,6 +95,67 @@ export interface AdminUserDetail {
 
 /** Edição de local pela gestão: os campos do perfil (como o dono) e os que só a gestão troca. */
 export type AdminVenueEditInput = VenueProfileInput & { lat?: unknown; lng?: unknown; isSample?: unknown; feedPolicy?: unknown; note?: unknown };
+/** Cadastro de local pela gestão: os mesmos campos da edição. Sem `lat`/`lng`, a posição sai do endereço. */
+export type AdminVenueCreateInput = AdminVenueEditInput & { googlePlaceId?: unknown };
+
+/** Tipo do Google (campo `types`, grátis) para o "Tipo" do local, na ordem de preferência. */
+const GOOGLE_TYPE_LABEL: [string, string][] = [
+  ['night_club', 'balada'], ['karaoke', 'karaokê'], ['wine_bar', 'bar de vinhos'], ['pub', 'pub'], ['bar_and_grill', 'bar'], ['bar', 'bar'],
+  ['brewery', 'cervejaria'], ['concert_hall', 'casa de shows'], ['performing_arts_theater', 'teatro'], ['event_venue', 'casa de eventos'],
+  ['dance_hall', 'casa de dança'], ['comedy_club', 'comedy club'], ['pizza_restaurant', 'pizzaria'], ['brazilian_restaurant', 'restaurante'],
+  ['steak_house', 'churrascaria'], ['restaurant', 'restaurante'], ['coffee_shop', 'café'], ['cafe', 'café'], ['bakery', 'padaria'],
+  ['ice_cream_shop', 'sorveteria'], ['stadium', 'estádio'], ['park', 'parque'], ['museum', 'museu'], ['movie_theater', 'cinema'], ['food', 'restaurante'],
+];
+export const categoryFromGoogleTypes = (types: string[]): string | null => GOOGLE_TYPE_LABEL.find(([t]) => types.includes(t))?.[1] ?? null;
+const GOOGLE_PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
+
+/** Uma linha da planilha de importação de locais (como veio; tudo é conferido). */
+export interface AdminVenueImportRow {
+  name?: unknown;
+  address?: unknown;
+  category?: unknown;
+  description?: unknown;
+  instagram?: unknown;
+  imageUrl?: unknown;
+  logoUrl?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+  isSample?: unknown;
+}
+
+/** Como ficou cada linha na prévia (ou na importação). */
+export interface AdminVenueImportLine {
+  /** Linha da planilha (a primeira de dados é a 2, depois do cabeçalho). */
+  line: number;
+  status: 'OK' | 'ERROR' | 'DUPLICATE' | 'CREATED';
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** De onde veio a posição: da planilha, da busca gratuita (OpenStreetMap) ou do Google. */
+  located: 'SHEET' | 'FREE' | 'GOOGLE' | null;
+  /** Problema por coluna. */
+  problems: Record<string, string>;
+  /** Local que já existe (ou linha anterior da planilha) com o mesmo nome ali perto. */
+  duplicateOf: { id: string | null; name: string; line?: number } | null;
+  /** Id do local criado (só na importação). */
+  venueId?: string;
+}
+
+export interface AdminVenueImportResult {
+  dryRun: boolean;
+  lines: AdminVenueImportLine[];
+  counts: { ok: number; errors: number; duplicates: number; created: number };
+}
+
+/** Linhas por importação: cada linha sem posição faz uma busca de endereço. */
+export const VENUE_IMPORT_MAX_ROWS = 200;
+/** Mesmo nome a menos disto é o mesmo local. */
+const VENUE_DUPLICATE_RADIUS_M = 250;
+
+/** Nome comparável: sem acento, maiúscula, pontuação e espaços. */
+const venueNameKey = (name: string) => fold(name).replace(/[^a-z0-9]/g, '');
+
 /** Edição de evento de local pela gestão: os campos de quem administra e os que só a gestão troca. */
 export type AdminEventEditInput = VenueEventInput & { isSample?: unknown; feedPolicy?: unknown; note?: unknown };
 
@@ -118,11 +181,62 @@ function coordOf(value: unknown, current: number, field: 'lat' | 'lng'): number 
   return n;
 }
 
-/** "campo: antes → depois" de cada campo que mudou, para a auditoria. */
-function changesOf(labels: Record<string, string>, before: Record<string, unknown>, after: Record<string, unknown>): string[] {
-  const show = (v: unknown) => (v === null || v === undefined || v === '' ? '(vazio)' : v instanceof Date ? v.toISOString() : Array.isArray(v) ? v.join(', ') || '(vazio)' : String(v).slice(0, 60));
+/** Valor de um campo como a auditoria guarda (texto, até 500 caracteres; nulo quando vazio). */
+function auditValue(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'boolean') return v ? 'sim' : 'não';
+  if (Array.isArray(v)) return v.length ? v.join(', ').slice(0, 500) : null;
+  return String(v).slice(0, 500);
+}
+
+/** Cada campo que mudou, com o valor de antes e o de depois (inteiros, para a auditoria). */
+function diffOf(labels: Record<string, string>, before: Record<string, unknown>, after: Record<string, unknown>): AuditChange[] {
   const same = (a: unknown, b: unknown) => (a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : JSON.stringify(a ?? null) === JSON.stringify(b ?? null));
-  return Object.entries(labels).filter(([k]) => !same(before[k], after[k])).map(([k, label]) => `${label}: ${show(before[k])} → ${show(after[k])}`);
+  return Object.entries(labels).filter(([k]) => !same(before[k], after[k])).map(([k, field]) => ({ field, before: auditValue(before[k]), after: auditValue(after[k]) }));
+}
+
+/** "campo: antes → depois" de cada campo que mudou, para o resumo da auditoria. */
+function changesText(changes: AuditChange[]): string[] {
+  const show = (v: string | null) => (v === null ? '(vazio)' : v.slice(0, 60));
+  return changes.map((c) => `${c.field}: ${show(c.before)} → ${show(c.after)}`);
+}
+
+/** Trecho curto de um texto, para identificar o que foi apagado. */
+function snippet(text: string | null | undefined, max = 80): string | null {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  return Array.from(t).length > max ? `${Array.from(t).slice(0, max - 1).join('')}…` : t;
+}
+
+/** Filtros da auditoria vindos da URL. */
+function auditFilterOf(query: AuditQuery): AuditFilter {
+  const pick = <T extends string>(v: unknown, allowed: readonly T[], field: string): T | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) throw validationError('Filtro inválido', { [field]: 'Valor inválido' });
+    return v as T;
+  };
+  const id = (v: unknown, field: string): string | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || v.length > 64) throw validationError('Filtro inválido', { [field]: 'Valor inválido' });
+    return v;
+  };
+  const day = (v: unknown, field: string, end: boolean): Date | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw validationError('Filtro inválido', { [field]: 'Use AAAA-MM-DD' });
+    const d = new Date(`${v}T00:00:00-03:00`);
+    if (Number.isNaN(d.getTime())) throw validationError('Filtro inválido', { [field]: 'Data inválida' });
+    return end ? new Date(d.getTime() + 24 * 3600 * 1000) : d;
+  };
+  const text = queryText(query.q);
+  const action = id(query.action, 'action') as AuditAction | undefined;
+  const actorKind = pick(query.actorKind, AUDIT_ACTOR_KINDS, 'actorKind');
+  const targetType = pick(query.targetType, AUDIT_TARGET_TYPES, 'targetType');
+  const actorId = id(query.actorId, 'actorId');
+  const targetId = id(query.targetId, 'targetId');
+  const from = day(query.from, 'from', false);
+  const to = day(query.to, 'to', true);
+  return { ...(action ? { action } : {}), ...(actorKind ? { actorKind } : {}), ...(targetType ? { targetType } : {}), ...(actorId ? { actorId } : {}), ...(targetId ? { targetId } : {}), ...(text ? { text } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
 
 /** Linha da lista de eventos de locais, com quantas pessoas confirmaram presença. */
@@ -151,6 +265,8 @@ export function parseSort(query: { sort?: unknown; dir?: unknown }, keys: readon
 }
 
 type ListQuery = { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown };
+type AuditQuery = ListQuery & { q?: unknown; action?: unknown; actorKind?: unknown; targetType?: unknown; actorId?: unknown; targetId?: unknown; from?: unknown; to?: unknown };
+type AuditExtra = { targetLabel?: string | null; changes?: AuditChange[] | null };
 
 function queryText(value: unknown): string {
   if (value === undefined || value === null) return '';
@@ -179,6 +295,10 @@ function noteText(value: unknown, required: boolean): string | null {
 /** Teto de linhas lidas por consulta do painel. Acima disso, o painel avisa que cortou os dados mais antigos. */
 export const RETENTION_MAX_ROWS = 200_000;
 
+const STATUS_LABEL: Record<UserStatus, string> = { ACTIVE: 'ativa', SUSPENDED: 'suspensa', DELETION_REQUESTED: 'exclusão pedida' };
+const EXTRA_FIELDS = { label: 'nome', icon: 'ícone', type: 'tipo' };
+const TASTE_FIELDS = { label: 'nome', icon: 'ícone', hint: 'dica', keywords: 'palavras-chave', kinds: 'tipos de evento' };
+
 export class AdminService {
   private readonly deps: CoreDeps;
   private readonly venues: VenueService;
@@ -202,12 +322,15 @@ export class AdminService {
     const result = await this.auth.login(input, { requireRole: 'ADMIN' });
     if ('mfaRequired' in result) return result;
     if (result.user.role !== 'ADMIN') throw unauthorized();
+    await this.logLogin(result.user.id, 'senha');
     return result;
   }
 
   /** Segunda etapa da entrada no painel (conta com verificação em duas etapas). */
   async verifyMfaLogin(input: { mfaToken: unknown; code: unknown }): Promise<AuthResult> {
-    return this.auth.verifyMfaLogin(input, { requireRole: 'ADMIN' });
+    const result = await this.auth.verifyMfaLogin(input, { requireRole: 'ADMIN' });
+    await this.logLogin(result.user.id, 'senha + verificação em duas etapas');
+    return result;
   }
 
   /**
@@ -218,21 +341,37 @@ export class AdminService {
     const result = await this.auth.socialLogin({ provider: input.provider, idToken: input.idToken }, { requireRole: 'ADMIN' });
     if ('mfaRequired' in result) return result;
     if ('needsProfile' in result || result.user.role !== 'ADMIN') throw unauthorized('Essa conta não tem acesso à gestão');
+    await this.logLogin(result.user.id, input.provider === 'APPLE' ? 'Apple' : String(input.provider));
     return result;
   }
 
   /** Troca a própria senha pelo painel. */
   async changeOwnPassword(actor: Actor, input: { currentPassword: unknown; newPassword: unknown }): Promise<{ token: string }> {
     this.assertAdmin(actor);
-    return this.auth.changePassword(actor.userId, input);
+    const result = await this.auth.changePassword(actor.userId, input);
+    await this.log(actor.userId, 'ADMIN_PASSWORD_CHANGED', 'USER', actor.userId, null, { targetLabel: await this.userLabel(actor.userId) });
+    return result;
+  }
+
+  private async logLogin(userId: string, how: string): Promise<void> {
+    await this.log(userId, 'ADMIN_LOGIN', 'USER', userId, `Entrou na gestão (${how})`, { targetLabel: await this.userLabel(userId) });
+  }
+
+  /** "@usuário" de uma conta, para o nome do alvo na auditoria. */
+  private async userLabel(userId: string): Promise<string | null> {
+    const profile = await this.deps.users.findProfileById(userId);
+    return profile ? `@${profile.username}` : null;
   }
 
   private assertAdmin(actor: Actor): void {
     if (actor.role !== 'ADMIN') throw forbidden('Acesso restrito a administradores');
   }
 
-  private async log(adminId: string, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null): Promise<void> {
-    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId, action, targetType, targetId, note, createdAt: this.deps.clock.now() });
+  private async log(adminId: string, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null, extra: AuditExtra = {}): Promise<void> {
+    await this.deps.admin.addAudit({
+      id: this.deps.ids.next(), adminId, actorKind: 'ADMIN', action, targetType, targetId, note, createdAt: this.deps.clock.now(),
+      targetLabel: extra.targetLabel ?? null, changes: extra.changes && extra.changes.length > 0 ? extra.changes : null,
+    });
   }
 
   private async paged<T>(query: ListQuery, fetch: (page: Page) => Promise<T[]>, count: () => Promise<number>, sortKeys: readonly string[] = []): Promise<AdminPage<T>> {
@@ -285,13 +424,22 @@ export class AdminService {
 
   async claimDocument(actor: Actor, claimId: unknown) {
     this.assertAdmin(actor);
-    return this.venues.claimDocument(actor.userId, claimId);
+    const doc = await this.venues.claimDocument(actor.userId, claimId);
+    // Documento pessoal de quem pediu: cada vez que alguém da gestão abre, fica registrado.
+    if (doc && typeof claimId === 'string') {
+      const claim = await this.deps.claims.findById(claimId);
+      const venue = claim ? await this.deps.places.findVenue(claim.venueId) : undefined;
+      await this.log(actor.userId, 'CLAIM_DOCUMENT_VIEWED', 'CLAIM', claimId, null, { targetLabel: venue?.name ?? null });
+    }
+    return doc;
   }
 
   async reviewClaim(actor: Actor, claimId: unknown, decision: unknown, note: unknown) {
     this.assertAdmin(actor);
     const result = await this.venues.reviewClaim(actor.userId, claimId, decision, note);
-    await this.log(actor.userId, result.status === 'APPROVED' ? 'CLAIM_APPROVED' : 'CLAIM_REJECTED', 'CLAIM', result.id, result.reviewNote);
+    await this.log(actor.userId, result.status === 'APPROVED' ? 'CLAIM_APPROVED' : 'CLAIM_REJECTED', 'CLAIM', result.id, result.reviewNote, {
+      targetLabel: result.venue.name, changes: [{ field: 'situação', before: 'em análise', after: result.status === 'APPROVED' ? 'aprovado' : 'recusado' }],
+    });
     return result;
   }
 
@@ -315,7 +463,9 @@ export class AdminService {
     const reason = noteText(note, status === 'SUSPENDED');
     if (target.status === status) throw conflict(status === 'SUSPENDED' ? 'A conta já está suspensa' : 'A conta já está ativa');
     if (!(await this.deps.admin.setUserStatus(target.id, status))) throw notFound('Usuário não encontrado');
-    await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason);
+    await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason, {
+      targetLabel: await this.userLabel(target.id), changes: [{ field: 'situação', before: STATUS_LABEL[target.status], after: STATUS_LABEL[status] }],
+    });
     return { id: target.id, status };
   }
 
@@ -334,7 +484,9 @@ export class AdminService {
     const before = target.birthDate ?? null;
     if (before === parsed.birthDate) throw conflict('Essa já é a data cadastrada');
     await this.deps.users.updateBirthDate(target.id, parsed.birthDate);
-    await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400));
+    await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400), {
+      targetLabel: await this.userLabel(target.id), changes: [{ field: 'data de nascimento', before, after: parsed.birthDate }],
+    });
     return { id: target.id, birthDate: parsed.birthDate };
   }
 
@@ -401,7 +553,10 @@ export class AdminService {
     if (changes.length === 0) throw conflict('Nada mudou');
     if (next.username !== current.username) await this.deps.users.updateUsername(current.userId, next.username);
     await this.deps.users.updateProfile(next);
-    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, (reason ? `${reason} (${changes.join('; ')})` : changes.join('; ')).slice(0, 400));
+    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, (reason ? `${reason} (${changes.join('; ')})` : changes.join('; ')).slice(0, 400), {
+      targetLabel: `@${current.username}`,
+      changes: diffOf({ displayName: 'nome', username: '@usuário', bio: 'biografia' }, { ...current }, { ...next }),
+    });
     return { id: target.id, username: next.username, displayName: next.displayName, bio: next.bio };
   }
 
@@ -416,6 +571,19 @@ export class AdminService {
     const taken = await this.deps.users.findProfileByUsername(username);
     if (taken && taken.userId !== target.id) return { username, available: false, problem: 'Esse @usuário já está em uso' };
     return { username, available: true };
+  }
+
+  /**
+   * Números da pessoa para moderar e gerenciar: último sinal de uso, frequência, vínculos, eventos, NOW, mensagens
+   * (só quantas), denúncias, bloqueios, suspensões e compras. Nunca o conteúdo das conversas.
+   */
+  async userStats(actor: Actor, userId: unknown): Promise<AdminUserStats> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const stats = await this.deps.admin.userStats(target.id, target.createdAt, this.deps.clock.now());
+    if (!stats) throw notFound('Usuário não encontrado');
+    return stats;
   }
 
   /** O registro de atividade de uma pessoa (curtidas, comentários, posts, eventos, quem seguiu), como ela vê no app. */
@@ -449,7 +617,9 @@ export class AdminService {
     if (enabled && !before.canEnable) throw conflict(before.blocker ?? 'Não é possível ligar o pagamento agora');
     if (before.enabled === enabled) throw conflict(enabled ? 'O pagamento já está ligado' : 'O pagamento já está desligado');
     await this.paymentsSwitch.set(enabled, actor.userId);
-    await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason);
+    await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason, {
+      targetLabel: 'Pagamento do impulsionamento', changes: [{ field: 'ligado', before: auditValue(before.enabled), after: auditValue(enabled) }],
+    });
     return this.paymentsSwitch.state();
   }
 
@@ -457,8 +627,11 @@ export class AdminService {
   async setBoostDays(actor: Actor, days: unknown, note: unknown): Promise<PaymentsState> {
     this.assertAdmin(actor);
     const reason = noteText(note, false);
+    const before = await this.paymentsSwitch.offeredDays();
     const chosen = await this.paymentsSwitch.setOfferedDays(days, actor.userId);
-    await this.log(actor.userId, 'BOOST_PACKAGES_UPDATED', 'SETTING', 'boost.days', reason ? `${chosen.join(', ')} dias. ${reason}` : `${chosen.join(', ')} dias`);
+    await this.log(actor.userId, 'BOOST_PACKAGES_UPDATED', 'SETTING', 'boost.days', reason ? `${chosen.join(', ')} dias. ${reason}` : `${chosen.join(', ')} dias`, {
+      targetLabel: 'Pacotes de impulsionamento', changes: diffOf({ days: 'dias à venda' }, { days: before }, { days: chosen }),
+    });
     return this.paymentsSwitch.state();
   }
 
@@ -476,7 +649,9 @@ export class AdminService {
   async createEventExtra(actor: Actor, input: EventExtraInput): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
     const { option, items } = await this.eventExtrasCatalog.create(input, actor.userId);
-    await this.log(actor.userId, 'EVENT_EXTRA_CREATED', 'SETTING', option.id, `${option.label} (${option.type === 'YES_NO' ? 'sim/não' : 'texto'})`);
+    await this.log(actor.userId, 'EVENT_EXTRA_CREATED', 'SETTING', option.id, `${option.label} (${option.type === 'YES_NO' ? 'sim/não' : 'texto'})`, {
+      targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, {}, { ...option }),
+    });
     return { items };
   }
 
@@ -484,20 +659,27 @@ export class AdminService {
     this.assertAdmin(actor);
     const { before, option, items } = await this.eventExtrasCatalog.update(id, input, actor.userId);
     const note = before.label === option.label ? option.label : `${before.label} → ${option.label}`;
-    await this.log(actor.userId, 'EVENT_EXTRA_UPDATED', 'SETTING', option.id, note.slice(0, 300));
+    await this.log(actor.userId, 'EVENT_EXTRA_UPDATED', 'SETTING', option.id, note.slice(0, 300), { targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, { ...before }, { ...option }) });
     return { items };
   }
 
   async moveEventExtra(actor: Actor, id: unknown, direction: unknown): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
-    const { items } = await this.eventExtrasCatalog.move(id, direction, actor.userId);
+    const before = (await this.eventExtrasCatalog.list()).findIndex((o) => o.id === id);
+    const { option, items } = await this.eventExtrasCatalog.move(id, direction, actor.userId);
+    const after = items.findIndex((o) => o.id === option.id);
+    if (after !== before) {
+      await this.log(actor.userId, 'EVENT_EXTRA_MOVED', 'SETTING', option.id, direction === 'up' ? 'Subiu na lista' : 'Desceu na lista', {
+        targetLabel: option.label, changes: [{ field: 'posição', before: String(before + 1), after: String(after + 1) }],
+      });
+    }
     return { items };
   }
 
   async deleteEventExtra(actor: Actor, id: unknown): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
     const { option, items } = await this.eventExtrasCatalog.remove(id, actor.userId);
-    await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label);
+    await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label, { targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, { ...option }, {}) });
     return { items };
   }
 
@@ -515,7 +697,7 @@ export class AdminService {
   async createTaste(actor: Actor, input: TasteInput): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
     const { taste, items } = await this.tastesCatalog.create(input, actor.userId);
-    await this.log(actor.userId, 'TASTE_CREATED', 'SETTING', taste.id, taste.label);
+    await this.log(actor.userId, 'TASTE_CREATED', 'SETTING', taste.id, taste.label, { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, {}, { ...taste }) });
     return { items };
   }
 
@@ -523,20 +705,27 @@ export class AdminService {
     this.assertAdmin(actor);
     const { before, taste, items } = await this.tastesCatalog.update(id, input, actor.userId);
     const note = before.label === taste.label ? taste.label : `${before.label} → ${taste.label}`;
-    await this.log(actor.userId, 'TASTE_UPDATED', 'SETTING', taste.id, note.slice(0, 300));
+    await this.log(actor.userId, 'TASTE_UPDATED', 'SETTING', taste.id, note.slice(0, 300), { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, { ...before }, { ...taste }) });
     return { items };
   }
 
   async moveTaste(actor: Actor, id: unknown, direction: unknown): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
-    const { items } = await this.tastesCatalog.move(id, direction, actor.userId);
+    const before = (await this.tastesCatalog.list()).findIndex((o) => o.id === id);
+    const { taste, items } = await this.tastesCatalog.move(id, direction, actor.userId);
+    const after = items.findIndex((o) => o.id === taste.id);
+    if (after !== before) {
+      await this.log(actor.userId, 'TASTE_MOVED', 'SETTING', taste.id, direction === 'up' ? 'Subiu na lista' : 'Desceu na lista', {
+        targetLabel: taste.label, changes: [{ field: 'posição', before: String(before + 1), after: String(after + 1) }],
+      });
+    }
     return { items };
   }
 
   async deleteTaste(actor: Actor, id: unknown): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
     const { taste, items } = await this.tastesCatalog.remove(id, actor.userId);
-    await this.log(actor.userId, 'TASTE_REMOVED', 'SETTING', taste.id, taste.label);
+    await this.log(actor.userId, 'TASTE_REMOVED', 'SETTING', taste.id, taste.label, { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, { ...taste }, {}) });
     return { items };
   }
 
@@ -563,7 +752,10 @@ export class AdminService {
     if (before.enabled === enabled && before.controlPercent === percent) throw conflict(enabled ? 'O teste já está ligado com esse tamanho' : 'O teste já está desligado');
     await this.recoExperiment.set(enabled, percent, actor.userId);
     const action = !enabled ? 'RECO_EXPERIMENT_DISABLED' : before.enabled ? 'RECO_EXPERIMENT_CHANGED' : 'RECO_EXPERIMENT_ENABLED';
-    await this.log(actor.userId, action, 'SETTING', 'reco-experiment', `${enabled ? `controle ${percent}%` : 'desligado'}${reason ? `: ${reason}` : ''}`.slice(0, 400));
+    await this.log(actor.userId, action, 'SETTING', 'reco-experiment', `${enabled ? `controle ${percent}%` : 'desligado'}${reason ? `: ${reason}` : ''}`.slice(0, 400), {
+      targetLabel: 'Teste A/B do “Para você”',
+      changes: diffOf({ enabled: 'ligado', controlPercent: 'grupo de controle (%)' }, { enabled: before.enabled, controlPercent: before.controlPercent }, { enabled, controlPercent: percent }),
+    });
     return this.recoExperiment.state();
   }
 
@@ -636,11 +828,12 @@ export class AdminService {
     const profile: VenueProfileInput = { name: input.name, address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, hours: input.hours, instagram: input.instagram };
     const labels = { name: 'nome', address: 'endereço', category: 'tipo', description: 'descrição', coverUrl: 'capa', logoUrl: 'logo', instagram: 'instagram' };
     const preview = this.venues.checkProfileForAdmin(current, profile);
-    const changes = [...changesOf(labels, { ...current }, { ...current, ...preview }), ...changesOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const diff = [...diffOf(labels, { ...current }, { ...current, ...preview }), ...diffOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const changes = changesText(diff);
     if (changes.length === 0) throw conflict('Nada mudou');
     await this.venues.adminUpdateProfile(current.id, profile);
     if (!(await this.deps.admin.updateVenueAdminFields(current.id, adminAfter))) throw notFound('Local não encontrado');
-    await this.log(actor.userId, 'VENUE_EDITED', 'VENUE', current.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    await this.log(actor.userId, 'VENUE_EDITED', 'VENUE', current.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400), { targetLabel: current.name, changes: diff });
     return this.venueDetail(actor, current.id);
   }
 
@@ -652,8 +845,204 @@ export class AdminService {
     if (!venue.ownerId) throw conflict('Este local não tem responsável');
     const reason = noteText(note, true);
     await this.deps.places.setVenueOwner(venue.id, null);
-    await this.log(actor.userId, 'VENUE_OWNER_REMOVED', 'VENUE', venue.id, reason);
+    await this.log(actor.userId, 'VENUE_OWNER_REMOVED', 'VENUE', venue.id, reason, {
+      targetLabel: venue.name, changes: [{ field: 'responsável', before: (await this.userLabel(venue.ownerId)) ?? venue.ownerId, after: null }],
+    });
     return { removed: true };
+  }
+
+  /**
+   * Posição de um endereço: primeiro a busca gratuita (OpenStreetMap); só se ela não achar e houver Google, a paga.
+   * Devolve até 5 opções, a mais provável primeiro.
+   */
+  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[] }> {
+    this.assertAdmin(actor);
+    if (typeof address !== 'string' || address.trim().length < 3) throw validationError('Dados inválidos', { address: 'Escreva o endereço para buscar a posição' });
+    return { items: await this.locate(address.trim().slice(0, 200), 5) };
+  }
+
+  private async locate(address: string, limit: number): Promise<{ name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]> {
+    const source = this.deps.placeSource;
+    if (!source.search) return [];
+    const empty = { available: false, places: [] };
+    const view = (from: 'FREE' | 'GOOGLE') => (p: { name: string; address?: string | null; lat: number; lng: number }) => ({ name: p.name, address: p.address ?? null, lat: p.lat, lng: p.lng, source: from });
+    const free = await source.search(address, undefined, limit).catch(() => empty);
+    if (free.places.length > 0) return free.places.slice(0, limit).map(view('FREE'));
+    if (!source.premiumSearch) return [];
+    const paid = await source.search(address, undefined, limit, { premium: true }).catch(() => empty);
+    return paid.places.slice(0, limit).map(view('GOOGLE'));
+  }
+
+  /**
+   * Busca no Google para cadastrar um local: sugestões do Autocomplete (nome e endereço), sem custo quando a sessão
+   * termina no detalhe. `available: false` quando não há chave do Google ou o teto do dia acabou.
+   */
+  async googleSuggest(actor: Actor, input: { text?: unknown; sessionToken?: unknown }): Promise<{ available: boolean; items: { placeId: string; name: string; address: string | null }[] }> {
+    this.assertAdmin(actor);
+    const picker = this.deps.googlePicker;
+    if (!picker) return { available: false, items: [] };
+    if (typeof input.text !== 'string' || typeof input.sessionToken !== 'string') throw validationError('Dados inválidos', { text: 'Escreva o nome do local' });
+    return picker.suggest(input.text.slice(0, 120), input.sessionToken);
+  }
+
+  /**
+   * O lugar escolhido no Google: endereço, posição e tipo (detalhe "Essentials", grátis dentro da franquia). Avisa se ele
+   * já está no AskouT (vinculado ou com o mesmo nome ali perto). Capa, logo, Instagram e descrição a gestão preenche.
+   */
+  async googlePlace(actor: Actor, input: { placeId?: unknown; name?: unknown; sessionToken?: unknown }): Promise<{ placeId: string; address: string | null; lat: number; lng: number; category: string | null; linked: { id: string; name: string } | null; duplicate: { id: string; name: string } | null }> {
+    this.assertAdmin(actor);
+    const picker = this.deps.googlePicker;
+    if (!picker) throw conflict('A busca no Google não está ligada (falta a chave do Google Places)');
+    if (typeof input.placeId !== 'string' || !GOOGLE_PLACE_ID_RE.test(input.placeId)) throw validationError('Dados inválidos', { placeId: 'Lugar do Google inválido' });
+    const linked = await this.deps.places.findVenueByExternalKey(`google:${input.placeId}`);
+    const place = await picker.essentials(input.placeId, typeof input.sessionToken === 'string' ? input.sessionToken : undefined);
+    if (!place) throw conflict('O Google não respondeu agora (ou o limite do dia acabou). Tente de novo mais tarde ou preencha à mão');
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    const duplicate = !linked && name ? await this.findDuplicateVenue(name, place.lat, place.lng) : undefined;
+    return { placeId: input.placeId, address: place.address, lat: place.lat, lng: place.lng, category: categoryFromGoogleTypes(place.types), linked: linked ? { id: linked.id, name: linked.name } : null, duplicate: duplicate ?? null };
+  }
+
+  /** Local do AskouT com o mesmo nome a menos de 250 m (o mesmo rolê cadastrado de novo). */
+  private async findDuplicateVenue(name: string, lat: number, lng: number): Promise<{ id: string; name: string } | undefined> {
+    const key = venueNameKey(name);
+    if (!key) return undefined;
+    const near = await this.deps.places.searchVenues(name, { lat, lng }, VENUE_DUPLICATE_RADIUS_M, 20);
+    const hit = near.find((r) => venueNameKey(r.venue.name) === key);
+    return hit ? { id: hit.venue.id, name: hit.venue.name } : undefined;
+  }
+
+  /**
+   * Confere um local novo sem gravar: nome, endereço, tipo, descrição, imagens, Instagram, posição (da planilha ou do
+   * endereço) e se já existe um igual ali perto. Erros vão por campo.
+   */
+  private async checkNewVenue(input: AdminVenueCreateInput): Promise<{ record: VenueRecord; profile: VenueProfileInput; isSample: boolean; feedPolicy: FeedPolicy; located: 'SHEET' | 'FREE' | 'GOOGLE'; duplicate?: { id: string; name: string } }> {
+    const id = this.deps.ids.next();
+    const blank: VenueRecord = { id, name: '', address: null, category: null, lat: 0, lng: 0, isSample: false, ownerId: null };
+    const profile: VenueProfileInput = { name: input.name ?? '', address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, instagram: input.instagram };
+    const checked = this.venues.checkProfileForAdmin(blank, profile);
+    const isSample = flagOf(input.isSample, false, 'isSample');
+    const feedPolicy = feedPolicyOf(input.feedPolicy, 'OWNER_ONLY');
+    const given = (v: unknown) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '');
+    let lat: number, lng: number, located: 'SHEET' | 'FREE' | 'GOOGLE';
+    if (given(input.lat) || given(input.lng)) {
+      if (!given(input.lat) || !given(input.lng)) throw validationError('Dados inválidos', { [given(input.lat) ? 'lng' : 'lat']: 'Informe latitude e longitude juntas (ou deixe as duas vazias para buscar pelo endereço)' });
+      const num = (v: unknown) => (typeof v === 'string' ? v.trim().replace(',', '.') : v);
+      lat = coordOf(num(input.lat), 0, 'lat');
+      lng = coordOf(num(input.lng), 0, 'lng');
+      located = 'SHEET';
+    } else {
+      if (!checked.address) throw validationError('Dados inválidos', { address: 'Informe o endereço (ou a latitude e a longitude)' });
+      const [first] = await this.locate(checked.address, 1);
+      if (!first) throw validationError('Dados inválidos', { address: 'Não achamos esse endereço no mapa. Confira ou informe latitude e longitude' });
+      lat = first.lat;
+      lng = first.lng;
+      located = first.source;
+    }
+    const duplicate = await this.findDuplicateVenue(checked.name, lat, lng);
+    const record: VenueRecord = { id, name: checked.name, address: checked.address, category: checked.category, lat, lng, isSample, ownerId: null };
+    return { record, profile, isSample, feedPolicy, located, ...(duplicate ? { duplicate } : {}) };
+  }
+
+  /** Grava um local já conferido: cadastro, descrição/imagens/Instagram e os campos da gestão. */
+  private async saveNewVenue(c: { record: VenueRecord; profile: VenueProfileInput; isSample: boolean; feedPolicy: FeedPolicy }): Promise<void> {
+    await this.deps.places.createVenue(c.record);
+    const { description, imageUrl, imageData, logoUrl, logoData, instagram } = c.profile;
+    const extra: VenueProfileInput = { description, imageUrl, imageData, logoUrl, logoData, instagram };
+    if (Object.values(extra).some((v) => v !== undefined && v !== null && v !== '')) await this.venues.adminUpdateProfile(c.record.id, extra);
+    await this.deps.admin.updateVenueAdminFields(c.record.id, { lat: c.record.lat, lng: c.record.lng, isSample: c.isSample, feedPolicy: c.feedPolicy });
+  }
+
+  /**
+   * Cadastra um local pela gestão, com os mesmos campos da edição. Sem latitude/longitude, a posição sai do endereço
+   * (busca gratuita primeiro). Recusa se já existe um local com o mesmo nome a menos de 250 m. Fica na auditoria.
+   */
+  async createVenue(actor: Actor, input: AdminVenueCreateInput): Promise<AdminVenueDetail> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
+    const reason = noteText(input.note, false);
+    let googleKey: string | undefined;
+    if (input.googlePlaceId !== undefined && input.googlePlaceId !== null && input.googlePlaceId !== '') {
+      if (typeof input.googlePlaceId !== 'string' || !GOOGLE_PLACE_ID_RE.test(input.googlePlaceId)) throw validationError('Dados inválidos', { googlePlaceId: 'Lugar do Google inválido' });
+      googleKey = `google:${input.googlePlaceId}`;
+      const linked = await this.deps.places.findVenueByExternalKey(googleKey);
+      if (linked) throw conflict(`Esse lugar do Google já está no AskouT como “${linked.name}”`);
+    }
+    const c = await this.checkNewVenue(input);
+    if (c.duplicate) throw conflict(`Já existe “${c.duplicate.name}” com esse nome a menos de ${VENUE_DUPLICATE_RADIUS_M} m`);
+    if (googleKey) c.record.externalKey = googleKey;
+    await this.saveNewVenue(c);
+    const where = (googleKey ? 'a partir do Google; ' : '') + (c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)');
+    await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(cadastro manual; ${where})`.slice(0, 400), {
+      targetLabel: c.record.name,
+      changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...c.record }),
+    });
+    return this.venueDetail(actor, c.record.id);
+  }
+
+  /**
+   * Importa locais de uma planilha. Com `dryRun`, só confere e devolve a prévia linha a linha (erros por coluna,
+   * duplicados no AskouT ou repetidos na própria planilha). Sem `dryRun`, grava as linhas sem problema e pula as outras;
+   * cada local criado e o lote ficam na auditoria.
+   */
+  async importVenues(actor: Actor, input: { rows?: unknown; dryRun?: unknown; fileName?: unknown; note?: unknown }): Promise<AdminVenueImportResult> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { rows: 'Envie as linhas da planilha' });
+    const rows = input.rows;
+    if (!Array.isArray(rows) || rows.length === 0) throw validationError('Dados inválidos', { rows: 'A planilha não tem nenhuma linha de local' });
+    if (rows.length > VENUE_IMPORT_MAX_ROWS) throw validationError('Dados inválidos', { rows: `Importe até ${VENUE_IMPORT_MAX_ROWS} locais por vez` });
+    const dryRun = input.dryRun !== false;
+    const fileName = typeof input.fileName === 'string' ? input.fileName.trim().slice(0, 120) : '';
+    const reason = noteText(input.note, false);
+    const lines: AdminVenueImportLine[] = [];
+    const ready: { line: AdminVenueImportLine; checked: Awaited<ReturnType<AdminService['checkNewVenue']>> }[] = [];
+    const seen: { key: string; lat: number; lng: number; line: number; name: string }[] = [];
+    for (const [index, raw] of rows.entries()) {
+      const lineNo = index + 2;
+      const row = (typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {}) as AdminVenueImportRow;
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      const address = typeof row.address === 'string' && row.address.trim() ? row.address.trim() : null;
+      const base: AdminVenueImportLine = { line: lineNo, status: 'OK', name, address, lat: null, lng: null, located: null, problems: {}, duplicateOf: null };
+      try {
+        const sample = typeof row.isSample === 'string' ? ['sim', 's', 'true', '1', 'x'].includes(fold(row.isSample)) : row.isSample;
+        const checked = await this.checkNewVenue({ name: row.name, address: row.address, category: row.category, description: row.description, instagram: row.instagram, imageUrl: row.imageUrl, logoUrl: row.logoUrl, lat: row.lat, lng: row.lng, isSample: sample === undefined || sample === null || sample === '' ? false : sample });
+        const line: AdminVenueImportLine = { ...base, name: checked.record.name, address: checked.record.address, lat: checked.record.lat, lng: checked.record.lng, located: checked.located };
+        const key = venueNameKey(checked.record.name);
+        const twin = seen.find((s) => s.key === key && distanceMeters(s, checked.record) <= VENUE_DUPLICATE_RADIUS_M);
+        if (checked.duplicate) {
+          lines.push({ ...line, status: 'DUPLICATE', duplicateOf: { id: checked.duplicate.id, name: checked.duplicate.name } });
+        } else if (twin) {
+          lines.push({ ...line, status: 'DUPLICATE', duplicateOf: { id: null, name: twin.name, line: twin.line } });
+        } else {
+          seen.push({ key, lat: checked.record.lat, lng: checked.record.lng, line: lineNo, name: checked.record.name });
+          lines.push(line);
+          ready.push({ line, checked });
+        }
+      } catch (error) {
+        if (!(error instanceof DomainError)) throw error;
+        const problems: Record<string, string> = { ...(error.details ?? {}) };
+        if (Object.keys(problems).length === 0) problems['row'] = error.message;
+        lines.push({ ...base, status: 'ERROR', problems });
+      }
+    }
+    if (!dryRun) {
+      for (const r of ready) {
+        await this.saveNewVenue(r.checked);
+        r.line.status = 'CREATED';
+        r.line.venueId = r.checked.record.id;
+        await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', r.checked.record.id, `Importado da planilha${fileName ? ` ${fileName}` : ''} (linha ${r.line.line})`.slice(0, 400), {
+          targetLabel: r.checked.record.name,
+          changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...r.checked.record }),
+        });
+      }
+    }
+    const count = (s: AdminVenueImportLine['status']) => lines.filter((l) => l.status === s).length;
+    const counts = { ok: count('OK'), errors: count('ERROR'), duplicates: count('DUPLICATE'), created: count('CREATED') };
+    if (!dryRun) {
+      if (counts.created === 0) throw conflict('Nenhuma linha pôde ser importada. Corrija a planilha e tente de novo');
+      const summary = `${counts.created} criados, ${counts.duplicates} duplicados e ${counts.errors} com erro pulados`;
+      await this.log(actor.userId, 'VENUES_IMPORTED', 'SETTING', 'venues-import', `${reason ? `${reason} ` : ''}(${fileName ? `${fileName}: ` : ''}${summary})`.slice(0, 400), { targetLabel: fileName || 'Planilha de locais' });
+    }
+    return { dryRun, lines, counts };
   }
 
   async searchPlaceEvents(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminPlaceEventListRow>> {
@@ -704,7 +1093,7 @@ export class AdminService {
       status,
       venue: { id: venue.id, name: venue.name, address: venue.address, owner: venue.ownerId ? { id: venue.ownerId, username: profiles.get(venue.ownerId)?.username ?? '(removido)' } : null },
       goingCount: attendance.length,
-      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
+      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', avatarUrl: profiles.get(a.userId)?.avatarUrl ?? null, at: a.createdAt.toISOString() })),
       sameTitle: others.map((e) => ({ id: e.id, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), upcoming: e.endsAt.getTime() >= now })),
       sameTitleTotal: Math.max(siblings.length, 1),
       extra: (await this.deps.admin.placeEventExtras(event.id)) ?? null,
@@ -729,19 +1118,24 @@ export class AdminService {
     const labels = { title: 'nome', description: 'descrição', kind: 'tipo', startsAt: 'início', endsAt: 'fim', isFree: 'grátis', imageUrl: 'capa', tags: 'hashtags', ticketUrl: 'ingresso' };
     // Confere antes de gravar: "nada mudou" não deve tocar no evento.
     const preview = this.venues.checkEventForAdmin(found.event, fields);
-    const changes = [...changesOf(labels, { ...found.event }, { ...found.event, ...preview }), ...changesOf({ isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const diff = [...diffOf(labels, { ...found.event }, { ...found.event, ...preview }), ...diffOf({ isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const changes = changesText(diff);
     if (changes.length === 0) throw conflict('Nada mudou');
     await this.venues.adminUpdateEvent(found.event.id, fields);
     if (!(await this.deps.admin.updatePlaceEventAdminFields(found.event.id, adminAfter))) throw notFound('Evento não encontrado');
-    await this.log(actor.userId, 'PLACE_EVENT_EDITED', 'PLACE_EVENT', found.event.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    await this.log(actor.userId, 'PLACE_EVENT_EDITED', 'PLACE_EVENT', found.event.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400), { targetLabel: `${found.event.title} · ${found.venue.name}`, changes: diff });
     return this.eventDetail(actor, found.event.id);
   }
 
   async deletePlaceEvent(actor: Actor, eventId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof eventId === 'string' && eventId.length > 0 && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (typeof eventId !== 'string' || eventId.length > 64 || !(await this.deps.admin.deletePlaceEvent(eventId))) throw notFound('Evento não encontrado');
-    await this.log(actor.userId, 'PLACE_EVENT_REMOVED', 'PLACE_EVENT', eventId, reason);
+    await this.log(actor.userId, 'PLACE_EVENT_REMOVED', 'PLACE_EVENT', eventId, reason, {
+      targetLabel: found ? `${found.event.title} · ${found.venue.name}` : null,
+      changes: found ? diffOf({ title: 'nome', startsAt: 'início', venue: 'local' }, { title: found.event.title, startsAt: found.event.startsAt, venue: found.venue.name }, {}) : null,
+    });
     return { deleted: true };
   }
 
@@ -763,8 +1157,9 @@ export class AdminService {
   async deletePost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof postId === 'string' && postId.length > 0 && postId.length <= 64 ? await this.deps.posts.findById(postId) : undefined;
     if (typeof postId !== 'string' || postId.length > 64 || !(await this.deps.admin.deletePost(postId))) throw notFound('Post não encontrado');
-    await this.log(actor.userId, 'POST_REMOVED', 'POST', postId, reason);
+    await this.log(actor.userId, 'POST_REMOVED', 'POST', postId, reason, found ? await this.contentExtra(found.post.authorId, found.post.eventTitle ?? found.post.caption) : {});
     return { deleted: true };
   }
 
@@ -775,7 +1170,7 @@ export class AdminService {
     const comment = typeof commentId === 'string' && commentId.length <= 64 ? await this.deps.posts.findComment(commentId) : undefined;
     if (!comment) throw notFound('Comentário não encontrado');
     await this.deps.posts.deleteComment(comment.id);
-    await this.log(actor.userId, 'COMMENT_REMOVED', 'COMMENT', comment.id, reason);
+    await this.log(actor.userId, 'COMMENT_REMOVED', 'COMMENT', comment.id, reason, await this.contentExtra(comment.authorId, comment.body));
     return { deleted: true };
   }
 
@@ -838,7 +1233,7 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findUserReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.admin.resolveUserReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'USER_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'USER_REPORT', report.id, text, { targetLabel: await this.userLabel(report.reportedUserId) });
     return { resolved: true };
   }
 
@@ -861,7 +1256,7 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findConversationReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.admin.resolveConversationReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'CONVERSATION_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'CONVERSATION_REPORT', report.id, text, { targetLabel: report.reportedUserId ? await this.userLabel(report.reportedUserId) : null });
     return { resolved: true };
   }
 
@@ -934,8 +1329,9 @@ export class AdminService {
   async deleteFeedPost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof postId === 'string' && postId.length > 0 && postId.length <= 64 ? await this.deps.feed.findPost(postId) : undefined;
     if (typeof postId !== 'string' || postId.length > 64 || !(await this.deps.feed.deletePost(postId))) throw notFound('Publicação não encontrada');
-    await this.log(actor.userId, 'FEED_POST_REMOVED', 'FEED_POST', postId, reason);
+    await this.log(actor.userId, 'FEED_POST_REMOVED', 'FEED_POST', postId, reason, found ? await this.contentExtra(found.post.authorId, found.post.body) : {});
     return { deleted: true };
   }
 
@@ -943,8 +1339,9 @@ export class AdminService {
   async deleteFeedComment(actor: Actor, commentId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof commentId === 'string' && commentId.length > 0 && commentId.length <= 64 ? await this.deps.feed.findComment(commentId) : undefined;
     if (typeof commentId !== 'string' || commentId.length > 64 || !(await this.deps.feed.deleteComment(commentId))) throw notFound('Comentário não encontrado');
-    await this.log(actor.userId, 'FEED_COMMENT_REMOVED', 'FEED_COMMENT', commentId, reason);
+    await this.log(actor.userId, 'FEED_COMMENT_REMOVED', 'FEED_COMMENT', commentId, reason, found ? await this.contentExtra(found.authorId, found.body) : {});
     return { deleted: true };
   }
 
@@ -983,14 +1380,23 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.feed.findReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.feed.resolveReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'FEED_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'FEED_REPORT', report.id, text, { targetLabel: await this.userLabel(report.reportedUserId) });
     return { resolved: true };
   }
 
   // ---------- Auditoria ----------
 
-  async audit(actor: Actor, query: ListQuery): Promise<AdminPage<AuditRow>> {
+  /** Filtros: `q` (texto), `action`, `actorKind` (ADMIN/USER/SYSTEM), `targetType`, `actorId`, `targetId`, `from`/`to` (AAAA-MM-DD, horário de Brasília). */
+  async audit(actor: Actor, query: AuditQuery): Promise<AdminPage<AuditRow>> {
     this.assertAdmin(actor);
-    return this.paged(query, (page) => this.deps.admin.listAudit(page), () => this.deps.admin.countList('AUDIT'), ADMIN_SORTS.audit);
+    const filter = auditFilterOf(query);
+    return this.paged(query, (page) => this.deps.admin.listAudit(page, filter), () => this.deps.admin.countAudit(filter), ADMIN_SORTS.audit);
+  }
+
+  /** Autor e trecho do conteúdo apagado: a auditoria continua dizendo o que era depois que some. */
+  private async contentExtra(authorId: string, text: string | null | undefined): Promise<AuditExtra> {
+    const author = (await this.userLabel(authorId)) ?? '(removido)';
+    const excerpt = snippet(text);
+    return { targetLabel: excerpt ? `${author}: “${excerpt}”` : author, changes: diffOf({ author: 'autor', text: 'conteúdo' }, { author, text: snippet(text, 500) }, {}) };
   }
 }

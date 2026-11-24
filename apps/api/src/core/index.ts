@@ -4,6 +4,7 @@ import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
+import { PresenceService } from './presence-service.ts';
 import { StoryReactionService } from './story-reaction-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
@@ -16,6 +17,7 @@ import { VenueStoryService } from './venue-story-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { FeedService } from './feed-service.ts';
 import { GuestListService } from './guest-list-service.ts';
+import { EventShoppingService } from './event-shopping-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { PublicService } from './public-service.ts';
@@ -45,6 +47,7 @@ import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepo
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
 import { ReferralService } from './referral-service.ts';
+import { BadgeService } from './badge-service.ts';
 
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   /** Valor do impulsionamento por dia, em centavos. */
@@ -64,11 +67,12 @@ export function createCore(input: CoreInput) {
   const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
   const referrals = new ReferralService(deps);
-  const profiles = new ProfileService(deps, referrals);
+  const badges = new BadgeService(deps, referrals);
+  const profiles = new ProfileService(deps, referrals, badges);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
-  const eventPages = new EventPageService(deps, profiles);
+  const eventPages = new EventPageService(deps, profiles, input.notifications);
   const conversations = new ConversationService(deps, flash);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
@@ -92,12 +96,14 @@ export function createCore(input: CoreInput) {
     offers: new OfferService(deps),
     auth,
     referrals,
+    badges,
     profiles,
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
     availability: new AvailabilityService(deps),
     flash,
     conversations,
+    presence: new PresenceService(deps),
     storyReactions: new StoryReactionService(deps, eventPages, conversations),
     suggestions: new SuggestionService(deps, flash),
     explore,
@@ -105,7 +111,9 @@ export function createCore(input: CoreInput) {
     eventPages,
     feed: new FeedService(deps, eventPages),
     guestList: new GuestListService(deps, eventPages),
-    eventReminders: new EventReminderService(deps),
+    /** Lista de compras e divisão de gastos dos eventos criados por pessoas. */
+    eventShopping: new EventShoppingService(deps, eventPages),
+    eventReminders: new EventReminderService(deps, input.notifications),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
     calendarSync: new CalendarSyncService(deps),
@@ -207,6 +215,8 @@ export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, sugges
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { GuestListService, GUEST_LIST_COMPANIONS_MAX, GUEST_LIST_LIMIT_MAX } from './guest-list-service.ts';
 export type { GuestListView, GuestListOwnerView, GuestListEntryView, GuestListConfigView } from './guest-list-service.ts';
+export { EventShoppingService, computeSplit, SHOPPING_ITEMS_MAX, EXPENSES_MAX } from './event-shopping-service.ts';
+export type { EventShoppingView, ShoppingItemView, ExpenseView, SplitView } from './event-shopping-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventCoverView } from './event-page-service.ts';
@@ -235,6 +245,8 @@ export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
 export { ReferralService, REFERRAL_BADGE_THRESHOLD } from './referral-service.ts';
+export { BadgeService, BADGE_IDS, ORGANIZER_MIN_GUESTS, REGULAR_MIN_EVENTS, NOW_MIN_PEOPLE } from './badge-service.ts';
+export type { BadgeId, ProfileBadgeView } from './badge-service.ts';
 export type { ReferralOverview, ReferralPersonView, TopInviterView } from './referral-service.ts';
 export { ProfileService } from './profile-service.ts';
 export type { ProfilePatch, ProfileView, RelationState } from './profile-service.ts';
