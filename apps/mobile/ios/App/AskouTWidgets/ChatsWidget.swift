@@ -1,11 +1,9 @@
-import AppIntents
 import SwiftUI
 import UIKit
 import WidgetKit
 
 /// Widget "Conversas", como o do WhatsApp: as últimas conversas com foto (ou iniciais), nome, prévia da última
-/// mensagem, hora e não lidas. A pessoa escolhe se mostra tudo, só grupos ou só conversas individuais (no iOS 17+, ao
-/// editar o widget; no iOS 16, mostra tudo).
+/// mensagem, hora e não lidas. Na galeria há três: Conversas (tudo), Grupos e Conversas individuais.
 ///
 /// Os dados vêm de `GET /me/widgets/chats?show=…` (apps/api/src/core/widget-service.ts, `chats`), com o mesmo token
 /// e as mesmas regras da aba Conversas: sem quem tem bloqueio com você, sem solicitações de mensagem pendentes e com as
@@ -177,64 +175,16 @@ enum ChatsStore {
     }
 }
 
-// MARK: - Configuração (iOS 17+: "Editar widget" › Mostrar)
+// MARK: - Três widgets na galeria: Conversas (tudo), Grupos e Individuais
 
-@available(iOSApplicationExtension 17.0, *)
-enum ChatsShowOption: String, AppEnum {
-    case all, direct, group
+/// Um widget por filtro, que a pessoa escolhe na galeria ao adicionar. Funciona em todos os iOS que o app suporta
+/// (o `if #available` não é aceito dentro do WidgetBundle, então não dá para ter o seletor do iOS 17 e um
+/// substituto no iOS 16 ao mesmo tempo).
+struct ChatsProvider: TimelineProvider {
+    let show: ChatsShow
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Mostrar"
-    static var caseDisplayRepresentations: [ChatsShowOption: DisplayRepresentation] = [
-        .all: "Tudo",
-        .direct: "Só individuais",
-        .group: "Só grupos",
-    ]
-
-    var show: ChatsShow { ChatsShow(rawValue: rawValue) ?? .all }
-}
-
-@available(iOSApplicationExtension 17.0, *)
-struct ChatsWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Conversas"
-    static var description = IntentDescription("Escolha se o widget mostra todas as conversas, só os grupos ou só as individuais.")
-
-    @Parameter(title: "Mostrar", default: .all)
-    var show: ChatsShowOption
-}
-
-@available(iOSApplicationExtension 17.0, *)
-struct ChatsIntentProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> ChatsEntry {
-        ChatsEntry(date: Date(), show: .all, state: .ready(.sample(.all)))
-    }
-
-    func snapshot(for configuration: ChatsWidgetIntent, in context: Context) async -> ChatsEntry {
-        let show = configuration.show.show
-        if context.isPreview { return ChatsEntry(date: Date(), show: show, state: .ready(.sample(show))) }
-        return await ChatsStore.entries(show, rows: ChatsStore.rows(for: context.family)).entries[0]
-    }
-
-    func timeline(for configuration: ChatsWidgetIntent, in context: Context) async -> Timeline<ChatsEntry> {
-        await ChatsStore.entries(configuration.show.show, rows: ChatsStore.rows(for: context.family))
-    }
-}
-
-@available(iOSApplicationExtension 17.0, *)
-struct ChatsWidget: Widget {
-    var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: "askout.chats", intent: ChatsWidgetIntent.self, provider: ChatsIntentProvider()) { entry in
-            ChatsView(entry: entry)
-        }
-        .configurationDisplayName("Conversas")
-        .description("Suas últimas conversas, com a prévia das mensagens. Escolha: tudo, só grupos ou só individuais.")
-        .supportedFamilies([.systemMedium, .systemLarge])
-    }
-}
-
-/// iOS 16 (sem App Intents nos widgets): mostra todas as conversas.
-struct ChatsLegacyProvider: TimelineProvider {
-    func placeholder(in context: Context) -> ChatsEntry {
-        ChatsEntry(date: Date(), show: .all, state: .ready(.sample(.all)))
+        ChatsEntry(date: Date(), show: show, state: .ready(.sample(show)))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ChatsEntry) -> Void) {
@@ -242,23 +192,47 @@ struct ChatsLegacyProvider: TimelineProvider {
             completion(placeholder(in: context))
             return
         }
+        let show = self.show
         let rows = ChatsStore.rows(for: context.family)
-        Task { completion(await ChatsStore.entries(.all, rows: rows).entries[0]) }
+        Task { completion(await ChatsStore.entries(show, rows: rows).entries[0]) }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ChatsEntry>) -> Void) {
+        let show = self.show
         let rows = ChatsStore.rows(for: context.family)
-        Task { completion(await ChatsStore.entries(.all, rows: rows)) }
+        Task { completion(await ChatsStore.entries(show, rows: rows)) }
     }
 }
 
-struct ChatsLegacyWidget: Widget {
+struct ChatsWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "askout.chats", provider: ChatsLegacyProvider()) { entry in
+        StaticConfiguration(kind: "askout.chats", provider: ChatsProvider(show: .all)) { entry in
             ChatsView(entry: entry)
         }
         .configurationDisplayName("Conversas")
-        .description("Suas últimas conversas, com a prévia das mensagens.")
+        .description("Suas últimas conversas, grupos e individuais, com a prévia das mensagens.")
+        .supportedFamilies([.systemMedium, .systemLarge])
+    }
+}
+
+struct ChatsGroupsWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "askout.chats.group", provider: ChatsProvider(show: .group)) { entry in
+            ChatsView(entry: entry)
+        }
+        .configurationDisplayName("Grupos")
+        .description("Só os grupos, com a prévia das mensagens.")
+        .supportedFamilies([.systemMedium, .systemLarge])
+    }
+}
+
+struct ChatsDirectWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "askout.chats.direct", provider: ChatsProvider(show: .direct)) { entry in
+            ChatsView(entry: entry)
+        }
+        .configurationDisplayName("Conversas individuais")
+        .description("Só as conversas 1 a 1, com a prévia das mensagens.")
         .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
