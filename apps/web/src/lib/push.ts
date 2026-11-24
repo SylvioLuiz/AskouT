@@ -105,6 +105,8 @@ export interface NativePushBridge {
   register(): Promise<string | undefined>;
   /** O app sabe mostrar "Responder" na notificação de mensagem (versões novas da casca nativa). */
   replies?: boolean;
+  /** O app tem os sons do AskouT para os avisos (versões novas da casca nativa). */
+  sounds?: boolean;
   /** iPhone: token "push-to-start" da Live Activity da chegada ao vivo (versões novas da casca, iOS 17.2+). */
   liveActivityToken?(): Promise<string | undefined>;
   /** iPhone: a Live Activity da chegada `tag` está na tela? `undefined` onde não há. */
@@ -161,9 +163,9 @@ async function forgetLiveActivity(api: Api): Promise<void> {
   await api.pushUnsubscribe(liveStartEndpoint(token)).catch(() => undefined);
 }
 
-/** O que o app manda ao servidor para este aparelho receber avisos (com "Responder", se a casca souber). */
-export function nativeSubscription(bridge: Pick<NativePushBridge, 'replies'>, token: string): { endpoint: string; reply?: boolean } {
-  return bridge.replies === true ? { endpoint: nativeEndpoint(token), reply: true } : { endpoint: nativeEndpoint(token) };
+/** O que o app manda ao servidor para este aparelho receber avisos (com "Responder" e os sons, se a casca souber). */
+export function nativeSubscription(bridge: Pick<NativePushBridge, 'replies' | 'sounds'>, token: string): { endpoint: string; reply?: boolean; sounds?: boolean } {
+  return { endpoint: nativeEndpoint(token), ...(bridge.replies === true ? { reply: true } : {}), ...(bridge.sounds === true ? { sounds: true } : {}) };
 }
 
 export function nativePushBridge(host: unknown = typeof window === 'undefined' ? undefined : window): NativePushBridge | undefined {
