@@ -33,7 +33,7 @@
                 android:letterSpacing="0.08"
                 android:maxLines="1"
                 android:text="AGORA"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -70,7 +70,7 @@
                     android:maxLines="2"
                     android:ellipsize="end"
                     android:text="Carregando…"
-                    android:textColor="#FFF7F3FF"
+                    android:textColor="@color/widget_ink"
                     android:textSize="14sp"
                     android:textStyle="bold" />
                 <TextView
@@ -79,7 +79,7 @@
                     android:layout_height="wrap_content"
                     android:maxLines="1"
                     android:ellipsize="end"
-                    android:textColor="#FFB5ADCF"
+                    android:textColor="@color/widget_muted"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
@@ -100,7 +100,7 @@
             android:layout_marginTop="4dp"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="#FFB5ADCF"
+            android:textColor="@color/widget_muted"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
@@ -141,7 +141,7 @@
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:text="+ Convidar"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -174,12 +174,13 @@
                 android:src="@drawable/widget_dot"
                 android:importantForAccessibility="no" />
             <TextView
+                android:id="@+id/widget_friends_eyebrow"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:letterSpacing="0.08"
                 android:text="LIVRES"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
             <TextView
@@ -206,7 +207,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0"
-            android:textColor="#FFF7F3FF"
+            android:textColor="@color/widget_ink"
             android:textSize="28sp"
             android:textStyle="bold" />
         <TextView
@@ -216,7 +217,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:text="amigos livres"
-            android:textColor="#FFF7F3FF"
+            android:textColor="@color/widget_ink"
             android:textSize="13sp"
             android:textStyle="bold" />
         <TextView
@@ -225,7 +226,7 @@
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:ellipsize="end"
-            android:textColor="#FFB5ADCF"
+            android:textColor="@color/widget_muted"
             android:textSize="11sp" />
         <TextView
             android:id="@+id/widget_invites"
@@ -234,7 +235,7 @@
             android:layout_marginTop="2dp"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="#FFFF4FB0"
+            android:textColor="@color/widget_pink"
             android:textSize="11sp"
             android:textStyle="bold"
             android:visibility="gone" />

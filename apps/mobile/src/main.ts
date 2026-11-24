@@ -127,7 +127,15 @@ if (Capacitor.isNativePlatform()) {
   // (AskouTShareSession acima); no Android o mesmo set/clear do app web grava a sessão para o widget. Ao sair do app,
   // pede para o widget buscar de novo e já mostrar o que mudou (presença confirmada, NOW ligado, convite aceito...).
   if (Capacitor.isPluginAvailable('AskouTWidgets')) {
-    const widgets = registerPlugin<{ reload(): Promise<void>; set?(o: { token: string; apiBase: string }): Promise<void>; clear?(): Promise<void> }>('AskouTWidgets');
+    const widgets = registerPlugin<{
+      reload(): Promise<void>;
+      set?(o: { token: string; apiBase: string }): Promise<void>;
+      clear?(): Promise<void>;
+      setTheme(o: { theme: 'system' | 'light' | 'dark' }): Promise<void>;
+    }>('AskouTWidgets');
+    // Tema escolhido no app (claro, escuro ou automático): os widgets usam o mesmo (apps/web/src/lib/theme.ts).
+    // Build antigo, sem setTheme no plugin: a chamada falha e o widget segue como estava.
+    w['AskouTWidgetTheme'] = { set: (theme: 'system' | 'light' | 'dark') => widgets.setTheme({ theme }) };
     if (Capacitor.getPlatform() === 'android' && !w['AskouTShareSession']) {
       w['AskouTShareSession'] = {
         set: (o: { token: string; apiBase: string }) => widgets.set!(o),

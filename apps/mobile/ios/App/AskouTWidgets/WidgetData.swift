@@ -204,6 +204,21 @@ enum WidgetSession {
               let token = json["token"], !token.isEmpty, let base = json["apiBase"], base.hasPrefix("http") else { return nil }
         return (token, base.hasSuffix("/") ? String(base.dropLast()) : base)
     }
+
+    /// Tema escolhido no app ("light", "dark" ou "system"), que o app grava pelo WidgetsPlugin.setTheme; `nil` se nunca gravou.
+    static func theme() -> String? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "theme",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        if let group = accessGroup { query[kSecAttrAccessGroup as String] = group }
+        var out: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
 }
 
 // MARK: - Busca e cache

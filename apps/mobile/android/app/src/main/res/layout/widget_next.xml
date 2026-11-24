@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:text="HOJE"
-            android:textColor="#FFFF4FB0"
+            android:textColor="@color/widget_pink"
             android:textSize="11sp"
             android:textStyle="bold" />
         <TextView
@@ -31,7 +31,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="24"
-            android:textColor="#FFF7F3FF"
+            android:textColor="@color/widget_ink"
             android:textSize="30sp"
             android:textStyle="bold" />
         <TextView
@@ -39,7 +39,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="20h"
-            android:textColor="#FFB5ADCF"
+            android:textColor="@color/widget_muted"
             android:textSize="13sp" />
     </LinearLayout>
     <LinearLayout
@@ -64,7 +64,7 @@
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.08"
                 android:text="PRÓXIMO ENCONTRO"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -76,7 +76,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:text="Hoje 20h"
-            android:textColor="#FFFF4FB0"
+            android:textColor="@color/widget_pink"
             android:textSize="15sp"
             android:textStyle="bold" />
         <TextView
@@ -86,7 +86,7 @@
             android:maxLines="2"
             android:ellipsize="end"
             android:text="Carregando…"
-            android:textColor="#FFF7F3FF"
+            android:textColor="@color/widget_ink"
             android:textSize="15sp"
             android:textStyle="bold" />
         <TextView
@@ -95,7 +95,7 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="#FFB5ADCF"
+            android:textColor="@color/widget_muted"
             android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

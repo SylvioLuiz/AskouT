@@ -24,7 +24,7 @@
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.08"
                 android:text="AGENDA"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -35,7 +35,7 @@
         android:layout_weight="1"
         android:gravity="center_vertical"
         android:text="Nada marcado por enquanto.\nConfirme presença num evento ou crie um encontro."
-        android:textColor="#FFB5ADCF"
+        android:textColor="@color/widget_muted"
         android:textSize="13sp"
         android:visibility="gone" />
     <LinearLayout
@@ -63,7 +63,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="14sp"
                 android:textStyle="bold" />
             <TextView
@@ -72,7 +72,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
@@ -101,7 +101,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="14sp"
                 android:textStyle="bold" />
             <TextView
@@ -110,7 +110,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
@@ -139,7 +139,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="14sp"
                 android:textStyle="bold" />
             <TextView
@@ -148,7 +148,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
@@ -177,7 +177,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="14sp"
                 android:textStyle="bold" />
             <TextView
@@ -186,7 +186,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
@@ -215,7 +215,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFF7F3FF"
+                android:textColor="@color/widget_ink"
                 android:textSize="14sp"
                 android:textStyle="bold" />
             <TextView
@@ -224,7 +224,7 @@
                 android:layout_height="wrap_content"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>

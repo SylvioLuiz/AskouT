@@ -24,7 +24,7 @@
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.08"
                 android:text="NOW"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -37,7 +37,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="0"
-        android:textColor="#FFF7F3FF"
+        android:textColor="@color/widget_ink"
         android:textSize="30sp"
         android:textStyle="bold" />
     <TextView
@@ -47,7 +47,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="amigos livres agora"
-        android:textColor="#FFF7F3FF"
+        android:textColor="@color/widget_ink"
         android:textSize="13sp"
         android:textStyle="bold" />
     <TextView
@@ -56,7 +56,7 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="#FFB5ADCF"
+        android:textColor="@color/widget_muted"
         android:textSize="12sp" />
     <TextView
         android:id="@+id/widget_footer"
@@ -66,7 +66,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="Ligar o meu NOW →"
-        android:textColor="#FFFF4FB0"
+        android:textColor="@color/widget_pink"
         android:textSize="12sp"
         android:textStyle="bold" />
 </LinearLayout>
