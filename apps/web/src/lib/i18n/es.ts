@@ -568,6 +568,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Fixada no topo": "Fijada arriba",
   "Fixar e silenciar": "Fijar y silenciar",
   "Ver a votação": "Ver la votación",
+  "Ver local": "Ver lugar",
   "Ver o evento": "Ver el evento",
   "Fixada e silenciada": "Fijada y silenciada",
   "Fixada": "Fijada",

@@ -599,6 +599,16 @@ export interface ChatMemberRead {
   readAt: string | null;
 }
 
+/** Cartão de um local compartilhado na conversa. */
+export interface ChatVenueCard {
+  id: string;
+  name: string;
+  category: string | null;
+  address: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
@@ -625,6 +635,8 @@ export interface ChatMessage {
   reactions: ChatReaction[];
   /** Evento compartilhado (kind EVENT). */
   event: EventCard | null;
+  /** Local compartilhado: texto com o link da página do local; aparece o cartão que abre a página no app. */
+  venue?: ChatVenueCard | null;
   /** Cartão do encontro (kind MEETUP). */
   meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */

@@ -118,6 +118,8 @@
   .sharesheet__foot { margin-bottom: -20px; padding-bottom: 16px; border-radius: 0 0 20px 20px; }
 }
 
+.sharesheet__foot > .notice { margin: 0 0 12px; }
+
 .sharesheet__compose { display: flex; flex-direction: column; gap: 10px; }
 .sharesheet__message {
   min-height: 44px;
