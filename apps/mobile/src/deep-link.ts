@@ -6,6 +6,8 @@
 const ALLOWED = new Set(['/agenda']);
 /** Convite: `/convite/usuario` (o app leva ao cadastro ou ao perfil de quem convidou). */
 const INVITE = /^\/convite\/[a-z0-9._]{3,30}$/i;
+/** Encontro do NOW: tocar na Live Activity da chegada no iPhone (`br.com.askout://now/encontro/<id>`). */
+const MATCH = /^\/now\/encontro\/[A-Za-z0-9-]{1,64}$/;
 const WEB_HOSTS = new Set(['askout.com.br', 'www.askout.com.br']);
 
 export function deepLinkPath(url: string): string | undefined {
@@ -27,7 +29,7 @@ export function deepLinkPath(url: string): string | undefined {
     query = parsed.search;
   }
   const path = `/${rawPath.replace(/^\/+|\/+$/g, '')}`;
-  if (INVITE.test(path)) return path;
+  if (INVITE.test(path) || MATCH.test(path)) return path;
   if (!ALLOWED.has(path)) return undefined;
   return path + query;
 }

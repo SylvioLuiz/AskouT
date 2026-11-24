@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { ErrorState, Field, Loading } from './ui.tsx';
+import { PlaceSearchMore } from './place-search-more.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import type { LinkedPlace } from '../lib/post-draft.ts';
@@ -16,23 +17,26 @@ function useLinkPlaceSearch(q: string) {
   const term = useDebounced(q.trim(), 350);
   const where = useCurrentPosition();
   const position = where.status === 'ok' ? where.position : undefined;
+  // "Buscar mais no Google" vale só para o texto em que foi apertado; mudou o texto, volta à busca gratuita.
+  const [googleFor, setGoogleFor] = useState<string | null>(null);
+  const google = googleFor === term;
   const result = useAsync(
-    () => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng }) : Promise.resolve(null)),
-    [term, position?.lat, position?.lng],
+    () => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng, google }) : Promise.resolve(null)),
+    [term, position?.lat, position?.lng, google],
   );
-  return { term, result, places: result.data?.places ?? [] };
+  return { term, result, places: result.data?.places ?? [], google, searchGoogle: () => setGoogleFor(term) };
 }
 
 /** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto, do AskouT ou do Google). */
 export function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => void; onClose: () => void }) {
   const [q, setQ] = useState('');
   const [picking, setPicking] = useState<string | undefined>();
-  const { term, result, places } = useLinkPlaceSearch(q);
+  const { term, result, places, google, searchGoogle } = useLinkPlaceSearch(q);
 
   async function pick(p: ExplorePlace) {
     const base = { name: p.name, address: p.address, photo: p.photoPath ? { photoPath: p.photoPath, author: p.photoAuthor } : null };
     if (p.venue) return onPick({ ...base, venueId: p.venue.id });
-    // Lugar que ainda não está no AskouT: cria o local a partir do Google e já vincula.
+    // Lugar que ainda não está no AskouT: cria o local a partir do Google ou do OpenStreetMap e já vincula.
     setPicking(p.key);
     const venueId = await api
       .openExternalVenue({ key: p.key, lat: p.lat, lng: p.lng })
@@ -61,7 +65,7 @@ export function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlac
           </li>
         ))}
       </ul>
-      {places.some((p) => p.source === 'GOOGLE') ? <p className="muted">{t('Resultados do Google.')}</p> : null}
+      <PlaceSearchMore data={result.data} google={google} busy={result.loading || picking !== undefined} onGoogle={searchGoogle} />
     </Sheet>
   );
 }

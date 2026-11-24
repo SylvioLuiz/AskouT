@@ -54,7 +54,14 @@ export function openInApp(path: string, win: InAppWindow): void {
   win.dispatchEvent(new Event('popstate'));
 }
 
-export function createPushBridge(deps: { push: PushPluginLike; open: (path: string) => void; timeoutMs?: number }) {
+/** Plugin do app no iPhone (ArrivalActivities.swift): token "push-to-start" da Live Activity da chegada ao vivo. */
+export interface LiveActivityPluginLike {
+  startToken(): Promise<{ token?: string }>;
+  /** A chegada `tag` está na tela bloqueada agora? Sem `showing` onde não há Live Activity. */
+  isShowing?(options: { tag: string }): Promise<{ showing?: boolean }>;
+}
+
+export function createPushBridge(deps: { push: PushPluginLike; open: (path: string) => void; timeoutMs?: number; liveActivity?: LiveActivityPluginLike | undefined }) {
   const timeoutMs = deps.timeoutMs ?? 15_000;
   let listening = false;
   /** Só abre caminhos DENTRO do app (começam com uma barra, sem `//`): o conteúdo do aviso não é de confiança. */
@@ -82,6 +89,29 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
     },
     /** Esta casca mostra "Responder" na notificação de mensagem (AppDelegate no iPhone, ReplyMessagingService no Android). */
     replies: true as const,
+    /**
+     * Token "push-to-start" da Live Activity da chegada (iPhone com iOS 17.2+ e Atividades ao Vivo ligadas). Com ele
+     * o servidor abre a chegada do amigo na tela bloqueada, com a barra. `undefined` onde não há.
+     */
+    async liveActivityToken(): Promise<string | undefined> {
+      if (!deps.liveActivity) return undefined;
+      try {
+        const token = (await deps.liveActivity.startToken()).token;
+        return typeof token === 'string' && /^[0-9a-f]{32,200}$/i.test(token) ? token : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    /** A Live Activity da chegada `tag` está na tela? `undefined` onde não há (Android, iPhone antigo, build antigo). */
+    async liveActivityShowing(tag: string): Promise<boolean | undefined> {
+      if (!deps.liveActivity?.isShowing) return undefined;
+      try {
+        const { showing } = await deps.liveActivity.isShowing({ tag });
+        return typeof showing === 'boolean' ? showing : undefined;
+      } catch {
+        return undefined;
+      }
+    },
     async permission(): Promise<PushPermission> {
       return toPermission((await deps.push.checkPermissions()).receive);
     },

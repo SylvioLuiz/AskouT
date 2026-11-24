@@ -1,8 +1,20 @@
 package br.com.askout;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Shader;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Map;
 
 /**
@@ -10,12 +22,17 @@ import java.util.Map;
  * servidor atualiza a cada posição nova (mesma `tag`). Só existe se o amigo liberou (apps/api FlashService.setArrival).
  *
  * Dados do push (apps/api fcm-sender.ts): live = moving | arrived | stopped, progress 0–100, quiet 0/1,
- * until (fim do encontro, ms), title, body, url, tag.
+ * until (fim do encontro, ms), title, body, url, tag, image (foto de quem está chegando, https).
+ *
+ * Igual ao exemplo do site (askout.com.br): foto redonda do amigo, "agora" no topo e a barra cheia na chegada.
  */
 final class ArrivalNotifications {
 
     /** Id fixo; cada amigo tem a sua `tag` (arrival:<encontro>:<pessoa>). */
     private static final int NOTIFICATION_ID = 2;
+    static final String EXTRA_TAG = "askout_arrival_tag";
+    /** Chegadas que a pessoa ocultou pelo botão: as atualizações delas não voltam a aparecer. */
+    private static final String PREFS = "askout_arrival_hidden";
 
     private ArrivalNotifications() {}
 
@@ -26,9 +43,13 @@ final class ArrivalNotifications {
         if ("stopped".equals(state)) {
             // Parou de mostrar ou o encontro acabou: o aviso fixo some.
             NotificationManagerCompat.from(context).cancel(tag, NOTIFICATION_ID);
+            prefs(context).edit().remove(tag).apply();
             return;
         }
         boolean arrived = "arrived".equals(state);
+        // Ocultou pelo botão: só a chegada avisa de novo.
+        if (!arrived && prefs(context).getBoolean(tag, false)) return;
+        if (arrived) prefs(context).edit().remove(tag).apply();
         boolean quiet = "1".equals(data.get("quiet"));
         int progress = clamp(parse(data.get("progress"), 0), 0, 100);
         long until = parse(data.get("until"), 0L);
@@ -44,11 +65,22 @@ final class ArrivalNotifications {
             // Só a primeira (e a chegada) tocam; as atualizações trocam o texto e a barra em silêncio.
             .setOnlyAlertOnce(quiet)
             .setSilent(quiet)
-            .setShowWhen(false);
+            // Hora da última atualização: o Android mostra "agora" e vai contando ("1 min"...).
+            .setShowWhen(true)
+            .setWhen(System.currentTimeMillis());
+        Bitmap photo = photo(data.get("image"));
+        if (photo != null) builder.setLargeIcon(photo);
         if (arrived) {
-            builder.setOngoing(false).setAutoCancel(true).setProgress(0, 0, false);
+            // Chegou: a barra fica cheia (como no site) e o aviso deixa de ser fixo.
+            builder.setOngoing(false).setAutoCancel(true).setProgress(100, 100, false);
         } else {
-            builder.setOngoing(true).setAutoCancel(false).setProgress(100, progress, false);
+            // Fixo enquanto o amigo vem, como o carro chegando no Uber: some sozinho na chegada ou quando ele para.
+            // "Ocultar" tira antes disso (no Android 14+ também dá para arrastar para o lado).
+            Intent hide = new Intent(context, ArrivalDismissReceiver.class).putExtra(EXTRA_TAG, tag);
+            PendingIntent hideIntent = PendingIntent.getBroadcast(context, ("hide:" + tag).hashCode(), hide, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.setOngoing(true).setAutoCancel(false).setProgress(100, progress, false)
+                .addAction(0, "Ocultar", hideIntent)
+                .setDeleteIntent(hideIntent);
         }
         // Some sozinha quando o encontro acaba (mesmo se o aviso de "encerrado" não chegar).
         long left = until - System.currentTimeMillis();
@@ -60,6 +92,60 @@ final class ArrivalNotifications {
         } catch (SecurityException ignored) {
             // Sem permissão de notificações (Android 13+): não há o que mostrar.
         }
+    }
+
+    /** Última foto baixada: as atualizações (a cada ~45 s) são da mesma pessoa e não baixam de novo. */
+    private static String cachedUrl;
+    private static Bitmap cachedPhoto;
+
+    /**
+     * Foto redonda de quem está chegando. O aviso chega fora da tela principal (pode esperar alguns segundos); se a foto
+     * não vier rápido, o aviso sai sem ela.
+     */
+    private static synchronized Bitmap photo(String url) {
+        if (url == null || !url.startsWith("https://")) return null;
+        if (url.equals(cachedUrl)) return cachedPhoto;
+        Bitmap round = null;
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(4000);
+            connection.setReadTimeout(4000);
+            try (InputStream in = connection.getInputStream()) {
+                Bitmap raw = BitmapFactory.decodeStream(in);
+                if (raw != null) round = circle(raw, 192);
+            }
+        } catch (Exception ignored) {
+            // Sem a foto: o aviso sai só com o texto e a barra.
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+        if (round != null) {
+            cachedUrl = url;
+            cachedPhoto = round;
+        }
+        return round;
+    }
+
+    private static Bitmap circle(Bitmap source, int size) {
+        int side = Math.min(source.getWidth(), source.getHeight());
+        Bitmap square = Bitmap.createBitmap(source, (source.getWidth() - side) / 2, (source.getHeight() - side) / 2, side, side);
+        Bitmap scaled = Bitmap.createScaledBitmap(square, size, size, true);
+        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setShader(new BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        new Canvas(out).drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        return out;
+    }
+
+    /** Botão "Ocultar" (ou arrastou o aviso para o lado): tira e não mostra as próximas atualizações dessa chegada. */
+    static void hide(Context context, String tag) {
+        prefs(context).edit().putBoolean(tag, true).apply();
+        NotificationManagerCompat.from(context).cancel(tag, NOTIFICATION_ID);
+    }
+
+    private static SharedPreferences prefs(Context context) {
+        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private static String value(String v, String fallback) {

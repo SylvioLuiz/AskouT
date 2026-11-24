@@ -83,6 +83,13 @@ export class ArrivalTracker {
     return { progress, first: false };
   }
 
+  /** Progresso de agora, sem contar como envio (para reabrir o aviso no iPhone). */
+  current(key: string, estimate: ArrivalEstimate): number {
+    const prev = this.states.get(key);
+    if (!prev) return arrivalProgress(estimate.distanceM, estimate.distanceM);
+    return arrivalProgress(Math.max(prev.startM, estimate.distanceM), estimate.distanceM);
+  }
+
   forget(key: string): void {
     this.states.delete(key);
   }

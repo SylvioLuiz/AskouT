@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { DOUBLE_TAP_MS, LONG_PRESS_MS } from '../lib/chat.ts';
 import { api } from '../client.ts';
-import { PlayIcon, XIcon } from './icons.tsx';
+import { ChevronLeftIcon, ChevronRightIcon, PlayIcon, XIcon } from './icons.tsx';
+import { edgeResist, stepIndex, swipeAxis, swipeStep } from '../lib/media-gallery.ts';
 import type { ChatMessage } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -56,23 +57,73 @@ const ZOOM_TAP = 2.5;
 /** Arrastar a foto para baixo além disso fecha. */
 const CLOSE_DRAG = 120;
 
+/** Uma foto ou vídeo da conversa, para andar entre eles no visualizador. */
+export interface GalleryItem {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  label: string;
+}
+
+/** Descrição da foto ou vídeo para leitores de tela ("Foto enviada por Bia"). */
+export function mediaLabel(message: Pick<ChatMessage, 'kind' | 'senderName' | 'mine'>): string {
+  return `${message.kind === 'VIDEO' ? t('Vídeo enviado') : t('Foto enviada')} por ${message.mine ? 'você' : (message.senderName ?? 'alguém')}`;
+}
+
+/** Fotos e vídeos de uma lista de mensagens, na ordem da conversa (as apagadas ficam de fora). */
+export function galleryOf(messages: readonly ChatMessage[]): GalleryItem[] {
+  return messages.filter((m) => (m.kind === 'IMAGE' || m.kind === 'VIDEO') && !m.deleted).map((m) => ({ id: m.id, kind: m.kind as 'IMAGE' | 'VIDEO', label: mediaLabel(m) }));
+}
+
 /**
  * Foto ou vídeo em tela cheia, por cima de tudo (vai direto para o <body>, para nenhum balão "prender" a tela).
  * Foto: pinça para dar zoom, arrastar para andar com zoom, toque duplo alterna o zoom e arrastar para baixo fecha.
+ * Com `onPrev`/`onNext`: arrastar para o lado e as setas ← → do teclado trocam de foto.
  * Esc, o X ou tocar fora da foto também fecham.
  */
-export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VIDEO'; url: string; label: string; onClose: () => void }) {
+export function MediaViewer({
+  kind,
+  url,
+  label,
+  onClose,
+  onPrev,
+  onNext,
+  position,
+  failed,
+}: {
+  kind: 'IMAGE' | 'VIDEO';
+  url: string | undefined;
+  label: string;
+  onClose: () => void;
+  onPrev?: (() => void) | undefined;
+  onNext?: (() => void) | undefined;
+  position?: { index: number; total: number } | undefined;
+  failed?: boolean;
+}) {
   const mediaRef = useRef<HTMLImageElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const view = useRef({ scale: 1, x: 0, y: 0, drop: 0 });
+  const view = useRef({ scale: 1, x: 0, y: 0, drop: 0, swipe: 0 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ dist: number; scale: number } | undefined>(undefined);
   const lastTap = useRef<{ at: number; x: number; y: number } | undefined>(undefined);
   const moved = useRef(false);
+  /** Arrasto de um dedo: de onde saiu e se virou troca de foto (x) ou fechar (y). */
+  const drag = useRef<{ x: number; y: number; axis: 'x' | 'y' | undefined } | undefined>(undefined);
+  /** Lado de onde a próxima foto entra, depois de trocar. */
+  const enter = useRef<-1 | 0 | 1>(0);
+  const leaving = useRef(false);
+  const nav = useRef({ onPrev, onNext, onClose });
+  nav.current = { onPrev, onNext, onClose };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') nav.current.onClose();
+      else if (e.key === 'ArrowRight' && nav.current.onNext) {
+        e.preventDefault();
+        go(1);
+      } else if (e.key === 'ArrowLeft' && nav.current.onPrev) {
+        e.preventDefault();
+        go(-1);
+      }
     };
     window.addEventListener('keydown', onKey);
     const body = document.body.style;
@@ -82,14 +133,49 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
       window.removeEventListener('keydown', onKey);
       body.overflow = before;
     };
-  }, [onClose]);
+  }, []);
 
-  function paint(animate: boolean) {
+  // Foto nova: começa sem zoom e entra deslizando do lado certo.
+  useLayoutEffect(() => {
     const v = view.current;
-    const img = mediaRef.current;
+    const from = enter.current;
+    enter.current = 0;
+    leaving.current = false;
+    Object.assign(v, { scale: 1, x: 0, y: 0, drop: 0, swipe: from * (rootRef.current?.clientWidth ?? 0) * 0.35 });
+    paint(false);
+    if (from !== 0) {
+      const frame = window.requestAnimationFrame(() => {
+        v.swipe = 0;
+        paint(true);
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+    return undefined;
+  }, [url]);
+
+  /** Troca de foto: a atual sai deslizando e a outra entra do lado oposto. */
+  function go(step: -1 | 1) {
+    const target = step === 1 ? nav.current.onNext : nav.current.onPrev;
+    if (!target || leaving.current) return;
+    leaving.current = true;
+    const width = rootRef.current?.clientWidth ?? 0;
+    view.current.swipe = -step * width;
+    view.current.scale = 1;
+    view.current.x = 0;
+    view.current.y = 0;
+    paint(true, 160);
+    window.setTimeout(() => {
+      enter.current = step;
+      target();
+    }, 140);
+  }
+
+  function paint(animate: boolean, ms = 220) {
+    const v = view.current;
+    const img = mediaRef.current ?? (rootRef.current?.querySelector('.mediaviewer__media') as HTMLElement | null);
     if (img) {
-      img.style.transition = animate ? 'transform 220ms ease' : 'none';
-      img.style.transform = `translate(${v.x}px, ${v.y + v.drop}px) scale(${v.scale})`;
+      img.style.transition = animate ? `transform ${ms}ms ease` : 'none';
+      img.style.transform = `translate(${v.x + v.swipe}px, ${v.y + v.drop}px) scale(${v.scale})`;
     }
     if (rootRef.current) rootRef.current.style.setProperty('--fade', String(Math.max(0.3, 1 - Math.abs(v.drop) / 400)));
   }
@@ -112,13 +198,15 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
   }
 
   function down(e: ReactPointerEvent<HTMLDivElement>) {
-    if (kind !== 'IMAGE') return;
+    if (kind !== 'IMAGE' || leaving.current) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     moved.current = false;
+    drag.current = pointers.current.size === 1 ? { x: e.clientX, y: e.clientY, axis: undefined } : undefined;
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
       pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), scale: view.current.scale };
+      view.current.swipe = 0;
     }
   }
 
@@ -140,7 +228,14 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
         v.x += dx;
         v.y += dy;
       } else {
-        v.drop += dy;
+        const d = drag.current;
+        if (d && !d.axis) d.axis = swipeAxis(now.x - d.x, now.y - d.y);
+        if (d?.axis === 'x') {
+          const total = now.x - d.x;
+          v.swipe = edgeResist(total, total < 0 ? !!nav.current.onNext : !!nav.current.onPrev);
+        } else if (d?.axis === 'y') {
+          v.drop += dy;
+        }
       }
     }
     paint(false);
@@ -152,8 +247,18 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
     if (pointers.current.size < 2) pinch.current = undefined;
     if (pointers.current.size > 0) return;
     const v = view.current;
+    const d = drag.current;
+    drag.current = undefined;
     if (Math.abs(v.drop) > CLOSE_DRAG) return onClose();
     v.drop = 0;
+    if (d?.axis === 'x' && v.scale <= 1) {
+      const step = swipeStep(v.swipe, rootRef.current?.clientWidth ?? window.innerWidth);
+      if (step !== 0 && (step === 1 ? nav.current.onNext : nav.current.onPrev)) return go(step);
+      v.swipe = 0;
+      paint(true);
+      return;
+    }
+    v.swipe = 0;
     if (!moved.current) {
       // Toque duplo alterna o zoom (no ponto tocado); toque simples fora da foto fecha.
       const at = Date.now();
@@ -184,28 +289,98 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
     paint(true);
   }
 
+  // Vídeo: os controles precisam do toque, então só um arrasto lateral claro troca de item.
+  const videoSwipe = useRef<{ x: number; y: number } | undefined>(undefined);
+
   return createPortal(
     <div ref={rootRef} className="mediaviewer" role="dialog" aria-modal="true" aria-label={label}>
+      {position && position.total > 1 ? (
+        <span className="mediaviewer__count" aria-live="polite">
+          {position.index + 1} / {position.total}
+        </span>
+      ) : null}
       <button type="button" className="mediaviewer__close iconbtn" aria-label={t('Fechar')} onClick={onClose}>
         <XIcon />
       </button>
-      {kind === 'IMAGE' ? (
+      {!url ? (
+        <div className="mediaviewer__stage" onClick={(e) => e.target === e.currentTarget && onClose()}>
+          <p className="mediaviewer__wait">{failed ? (kind === 'VIDEO' ? t('Não consegui carregar o vídeo.') : t('Não consegui carregar a foto.')) : t('Carregando…')}</p>
+        </div>
+      ) : kind === 'IMAGE' ? (
         <div className="mediaviewer__stage" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
           <img ref={mediaRef} className="mediaviewer__media" src={url} alt={label} draggable={false} />
         </div>
       ) : (
-        <div className="mediaviewer__stage" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div
+          className="mediaviewer__stage"
+          onClick={(e) => e.target === e.currentTarget && onClose()}
+          onPointerDown={(e) => {
+            videoSwipe.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={(e) => {
+            const start = videoSwipe.current;
+            videoSwipe.current = undefined;
+            if (!start) return;
+            const dx = e.clientX - start.x;
+            const dy = e.clientY - start.y;
+            if (Math.abs(dx) > Math.abs(dy) * 1.5) {
+              const step = swipeStep(dx, rootRef.current?.clientWidth ?? window.innerWidth);
+              if (step !== 0) go(step);
+            }
+          }}
+        >
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video className="mediaviewer__media" src={url} controls autoPlay playsInline />
+          <video key={url} className="mediaviewer__media" src={url} controls autoPlay playsInline />
         </div>
       )}
+      {position && position.total > 1 ? (
+        <>
+          <button type="button" className="mediaviewer__nav mediaviewer__nav--prev" onClick={() => go(-1)} disabled={!onPrev} aria-label={t('Foto anterior')}>
+            <ChevronLeftIcon />
+          </button>
+          <button type="button" className="mediaviewer__nav mediaviewer__nav--next" onClick={() => go(1)} disabled={!onNext} aria-label={t('Próxima foto')}>
+            <ChevronRightIcon />
+          </button>
+        </>
+      ) : null}
     </div>,
     document.body,
   );
 }
 
+/**
+ * Visualizador que anda entre as fotos e vídeos da conversa, começando em `startId`.
+ * A lista fica fixa enquanto está aberto (mensagens novas não mudam a posição).
+ */
+export function MediaGallery({ conversationId, items, startId, onClose }: { conversationId: string; items: GalleryItem[]; startId: string; onClose: () => void }) {
+  const [list] = useState(items);
+  const [index, setIndex] = useState(() => Math.max(0, list.findIndex((x) => x.id === startId)));
+  const item = list[index] ?? list[0];
+  const media = useMessageMedia(conversationId, item?.id ?? startId);
+  // Deixa a foto vizinha pronta, para a troca não esperar o download.
+  const next = list[index + 1];
+  const prev = list[index - 1];
+  useMessageMedia(conversationId, next?.id ?? startId, next?.kind === 'IMAGE');
+  useMessageMedia(conversationId, prev?.id ?? startId, prev?.kind === 'IMAGE');
+  if (!item) return null;
+  const before = stepIndex(index, -1, list.length);
+  const after = stepIndex(index, 1, list.length);
+  return (
+    <MediaViewer
+      kind={item.kind}
+      url={media.url}
+      failed={media.failed}
+      label={item.label}
+      onClose={onClose}
+      position={{ index, total: list.length }}
+      onPrev={before === undefined ? undefined : () => setIndex(before)}
+      onNext={after === undefined ? undefined : () => setIndex(after)}
+    />
+  );
+}
+
 /** Foto ou vídeo dentro do balão: a foto aparece sozinha; o vídeo baixa quando a pessoa toca. */
-export function MediaBubble({ message, conversationId, onTap }: { message: Pick<ChatMessage, 'id' | 'kind' | 'senderName' | 'mine'>; conversationId: string; onTap?: (x: number, y: number) => boolean }) {
+export function MediaBubble({ message, conversationId, onTap, gallery }: { message: Pick<ChatMessage, 'id' | 'kind' | 'senderName' | 'mine'>; conversationId: string; onTap?: (x: number, y: number) => boolean; /** Fotos e vídeos da conversa: com mais de um, dá para andar entre eles. */ gallery?: GalleryItem[] }) {
   const isVideo = message.kind === 'VIDEO';
   const [wanted, setWanted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -214,7 +389,8 @@ export function MediaBubble({ message, conversationId, onTap }: { message: Pick<
   const pressedAt = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(openTimer.current), []);
   const media = useMessageMedia(conversationId, message.id, !isVideo || wanted);
-  const label = `${isVideo ? t('Vídeo enviado') : t('Foto enviada')} por ${message.mine ? 'você' : (message.senderName ?? 'alguém')}`;
+  const label = mediaLabel(message);
+  const browse = gallery !== undefined && gallery.length > 1 && gallery.some((x) => x.id === message.id);
 
   useEffect(() => {
     if (isVideo && wanted && media.url) setOpen(true);
@@ -244,7 +420,9 @@ export function MediaBubble({ message, conversationId, onTap }: { message: Pick<
             return;
           }
           const show = () => {
-            if (isVideo) {
+            if (browse) {
+              setOpen(true);
+            } else if (isVideo) {
               setWanted(true);
               if (media.url) setOpen(true);
             } else if (media.url) {
@@ -267,7 +445,9 @@ export function MediaBubble({ message, conversationId, onTap }: { message: Pick<
         ) : null}
         {!isVideo && !media.url ? <span className="mediabubble__wait">{t('Carregando…')}</span> : null}
       </button>
-      {open && media.url ? (
+      {open && browse ? (
+        <MediaGallery conversationId={conversationId} items={gallery} startId={message.id} onClose={() => setOpen(false)} />
+      ) : open && media.url ? (
         <MediaViewer
           kind={isVideo ? 'VIDEO' : 'IMAGE'}
           url={media.url}
@@ -294,7 +474,8 @@ export function ReplyThumb({ conversationId, messageId, kind }: { conversationId
 }
 
 /** Miniatura quadrada para a aba Mídia. */
-export function MediaThumb({ conversationId, messageId, kind, label }: { conversationId: string; messageId: string; kind: 'IMAGE' | 'VIDEO'; label: string }) {
+export function MediaThumb({ conversationId, messageId, kind, label, gallery }: { conversationId: string; messageId: string; kind: 'IMAGE' | 'VIDEO'; label: string; gallery?: GalleryItem[] }) {
+  const browse = gallery !== undefined && gallery.length > 1;
   const isVideo = kind === 'VIDEO';
   const [wanted, setWanted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -309,6 +490,7 @@ export function MediaThumb({ conversationId, messageId, kind, label }: { convers
         className="mediathumb"
         aria-label={`${isVideo ? t('Assistir vídeo') : 'Abrir foto'}. ${label}`}
         onClick={() => {
+          if (browse) return setOpen(true);
           setWanted(true);
           if (media.url) setOpen(true);
         }}
@@ -316,7 +498,11 @@ export function MediaThumb({ conversationId, messageId, kind, label }: { convers
         {!isVideo && media.url ? <img src={media.url} alt="" className="mediathumb__img" /> : null}
         {isVideo ? <PlayIcon /> : !media.url ? <span className="mediathumb__wait">{media.failed ? '!' : '…'}</span> : null}
       </button>
-      {open && media.url ? <MediaViewer kind={kind} url={media.url} label={label} onClose={() => { setOpen(false); setWanted(false); }} /> : null}
+      {open && browse ? (
+        <MediaGallery conversationId={conversationId} items={gallery} startId={messageId} onClose={() => setOpen(false)} />
+      ) : open && media.url ? (
+        <MediaViewer kind={kind} url={media.url} label={label} onClose={() => { setOpen(false); setWanted(false); }} />
+      ) : null}
     </>
   );
 }

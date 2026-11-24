@@ -1,7 +1,7 @@
 import { createPrivateKey, sign } from 'node:crypto';
 import { connect } from 'node:http2';
 import type { ClientHttp2Session } from 'node:http2';
-import type { PushMessage, PushResult, PushSender } from '../../core/ports.ts';
+import type { LiveActivityPush, PushMessage, PushResult, PushSender } from '../../core/ports.ts';
 import type { PushSubscriptionRecord } from '../../core/types.ts';
 
 /**
@@ -224,6 +224,60 @@ export class ApnsSender implements PushSender {
       return 'FAILED';
     }
   }
+
+  /**
+   * Live Activity da chegada (iPhone, iOS 17.2+): `start` pelo token "push-to-start", `update`/`end` pelo token da
+   * atividade. As chaves de `content-state` e `attributes` são as de ArrivalAttributes (apps/mobile/ios/App/ArrivalWidget).
+   */
+  async liveActivity(push: LiveActivityPush): Promise<PushResult> {
+    const nowSeconds = Math.floor(this.nowMs() / 1000);
+    const aps: Record<string, unknown> = {
+      timestamp: nowSeconds,
+      event: push.event,
+      'content-state': push.state,
+      'stale-date': Math.floor(push.staleAtMs / 1000),
+    };
+    if (push.event === 'start' && push.attributes) {
+      aps['attributes-type'] = 'ArrivalAttributes';
+      aps['attributes'] = push.attributes;
+    }
+    if (push.alert) aps['alert'] = { title: push.alert.title, body: push.alert.body, sound: 'default' };
+    if (push.event === 'end') aps['dismissal-date'] = Math.floor((push.dismissAtMs ?? this.nowMs()) / 1000);
+    const host = this.config.production ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
+    const body = JSON.stringify({ aps });
+    const attempt = async (forceNew: boolean): Promise<ApnsResponse> =>
+      this.transport({
+        host,
+        path: `/3/device/${push.token}`,
+        headers: {
+          authorization: `bearer ${this.token(forceNew)}`,
+          'apns-topic': `${this.config.bundleId}.push-type.liveactivity`,
+          'apns-push-type': 'liveactivity',
+          // Atualização silenciosa pode ir com prioridade baixa (a Apple limita as de prioridade alta).
+          'apns-priority': push.alert || push.event !== 'update' ? '10' : '5',
+          'apns-expiration': String(Math.floor(push.staleAtMs / 1000)),
+          'content-type': 'application/json',
+        },
+        body,
+      });
+    try {
+      let response = await attempt(false);
+      if (response.status === 403 && /ExpiredProviderToken/.test(response.body)) response = await attempt(true);
+      if (response.status === 200) return 'SENT';
+      let reason = '';
+      try {
+        reason = (JSON.parse(response.body) as { reason?: string }).reason ?? '';
+      } catch {
+        reason = '';
+      }
+      this.log(apnsFailureLine({ status: response.status, reason, production: this.config.production, bundleId: this.config.bundleId, deviceToken: push.token }));
+      if (response.status === 410 || GONE_REASONS.has(reason)) return 'GONE';
+      return 'FAILED';
+    } catch (failure) {
+      this.log(apnsFailureLine({ status: null, reason: '', production: this.config.production, bundleId: this.config.bundleId, deviceToken: push.token, error: failure instanceof Error ? failure.message : String(failure) }));
+      return 'FAILED';
+    }
+  }
 }
 
 /** Junta os dois caminhos: navegadores (Web Push) e o app do iPhone (APNs). Cada inscrição vai pelo caminho certo. */
@@ -243,5 +297,10 @@ export class CompositePushSender implements PushSender {
   send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     if (subscription.endpoint.startsWith(NATIVE_PREFIX) || subscription.endpoint.startsWith('fcm:')) return this.native ? this.native.send(subscription, message) : Promise.resolve('FAILED');
     return this.web.send(subscription, message);
+  }
+
+  get liveActivity(): ((push: LiveActivityPush) => Promise<PushResult>) | undefined {
+    const native = this.native;
+    return native?.liveActivity ? (push) => native.liveActivity!(push) : undefined;
   }
 }

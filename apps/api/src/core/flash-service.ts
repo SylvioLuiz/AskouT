@@ -681,7 +681,8 @@ export class FlashService {
     const estimate = estimateArrival(position, target);
     const step = this.arrivals.next(arrivalTag(invite.id, sharerId), estimate, now.getTime());
     if (!step) return;
-    const who = (await this.deps.users.findProfilesByIds([sharerId]))[0]?.username ?? 'Seu amigo';
+    const profile = (await this.deps.users.findProfilesByIds([sharerId]))[0];
+    const who = profile?.username ?? 'Seu amigo';
     const title = estimate.arrived ? `${who} chegou` : `${who} está a caminho`;
     const body = estimate.arrived
       ? dest
@@ -696,7 +697,42 @@ export class FlashService {
       url: `/now/encontro/${invite.id}`,
       tag: arrivalTag(invite.id, sharerId),
       live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: (!step.first || retarget) && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
+      who: { name: who, ...(profile?.avatarUrl ? { image: profile.avatarUrl } : {}) },
     });
+  }
+
+  /**
+   * Quem acompanha voltou ao NOW e a Live Activity da chegada do amigo não está na tela do iPhone (fechou): abre de
+   * novo, em silêncio, com o progresso de agora. Nada acontece se o amigo não mostra a chegada, não tem posição ou já chegou.
+   */
+  async reopenArrival(actorId: string, inviteId: string): Promise<{ reopened: boolean }> {
+    const now = this.deps.clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    const sharerId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    const notifier = this.deps.notifier;
+    if (!arrivalFor(invite, sharerId) || !notifier.live) return { reopened: false };
+    const positions = await this.deps.flash.listPositions(inviteId);
+    const position = positions.find((p) => p.userId === sharerId);
+    const dest = invite.destination;
+    const theirs = positions.find((p) => p.userId === actorId);
+    const target = dest ? { lat: dest.lat, lng: dest.lng } : theirs ? { lat: theirs.lat, lng: theirs.lng } : undefined;
+    if (!position || !target) return { reopened: false };
+    const estimate = estimateArrival(position, target);
+    if (estimate.arrived) return { reopened: false };
+    const profile = (await this.deps.users.findProfilesByIds([sharerId]))[0];
+    const who = profile?.username ?? 'Seu amigo';
+    await notifier.live({
+      userId: actorId,
+      type: 'FLASH_INVITE',
+      title: `${who} está a caminho`,
+      body: `Chega em ~${estimate.minutes} min · ${formatArrivalDistance(estimate.distanceM)} até ${dest ? dest.name : 'você'}`,
+      url: `/now/encontro/${invite.id}`,
+      tag: arrivalTag(invite.id, sharerId),
+      live: { state: 'moving', progress: this.arrivals.current(arrivalTag(invite.id, sharerId), estimate), quiet: true, untilMs: invite.expiresAt.getTime() },
+      who: { name: who, ...(profile?.avatarUrl ? { image: profile.avatarUrl } : {}) },
+      reopen: true,
+    });
+    return { reopened: true };
   }
 
   /** Troca o aviso fixo de quem acompanhava por um aviso final (o Android tira o fixo; o iPhone troca o texto). */

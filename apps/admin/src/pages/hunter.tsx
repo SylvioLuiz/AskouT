@@ -13,6 +13,22 @@ import type { ActionSpec } from '../ui.tsx';
 export function HunterPage() {
   const state = useAsync(() => api.hunter(100, 0), []);
   const [action, setAction] = useState<ActionSpec>();
+  const [syncMsg, setSyncMsg] = useState<string>();
+  const [syncing, setSyncing] = useState(false);
+
+  async function syncNow() {
+    setSyncing(true);
+    setSyncMsg(undefined);
+    try {
+      const r = await api.syncHunter();
+      setSyncMsg(r.error ? r.error : `Publicados ${r.published ?? 0}, devolvidos para revisão ${r.review ?? 0}, descartados por duplicidade ${r.rejected ?? 0}.`);
+      state.reload();
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : 'Não foi possível buscar agora.');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   function turnOn() {
     setAction({
@@ -81,7 +97,7 @@ export function HunterPage() {
               <p style={{ margin: '4px 0' }}>
                 <Badge tone={s.enabled ? 'ok' : 'neutral'}>{s.enabled ? 'Ligado' : 'Desligado'}</Badge>
               </p>
-              <p className="muted">{s.enabled ? 'O Hunter pode publicar eventos nos locais sem responsável.' : 'O Hunter está barrado: a API recusa tudo que ele pedir.'}</p>
+              <p className="muted">{s.enabled ? 'A gestão pode publicar o que o Hunter aprovou, nos locais sem responsável.' : 'O Hunter está barrado: a API recusa tudo que ele pedir.'}</p>
               <div>
                 {s.enabled ? (
                   <button type="button" className="btn btn--danger" onClick={turnOff}>
@@ -93,6 +109,18 @@ export function HunterPage() {
                   </button>
                 )}
               </div>
+            </div>
+            <div className="card" style={{ maxWidth: 560, marginTop: 12 }}>
+              <span className="card__label">Busca no Hunter</span>
+              <p className="muted">A gestão busca sozinha, a cada 10 minutos, o que foi aprovado no Hunter e publica nos locais sem responsável. O Hunter só descobre e separa.</p>
+              {s.lastSync ? <p className="muted small">Última busca: {new Date(s.lastSync.at).toLocaleString('pt-BR')}{s.lastSync.error ? ` — erro: ${s.lastSync.error}` : ` — publicados ${s.lastSync.published}, revisão ${s.lastSync.review}, duplicados ${s.lastSync.rejected}`}</p> : null}
+              <div>
+                <button type="button" className="btn btn--primary" onClick={() => void syncNow()} disabled={!s.enabled || !s.feedConfigured || syncing}>
+                  {syncing ? 'Buscando…' : 'Buscar agora'}
+                </button>
+              </div>
+              {syncMsg ? <p role="status" className="muted small">{syncMsg}</p> : null}
+              {!s.feedConfigured ? <p className="notice notice--warn" role="alert">O servidor ainda não sabe onde está o Hunter (HUNTER_URL e HUNTER_EXPORT_TOKEN, 32 caracteres ou mais).</p> : null}
             </div>
             {!s.serviceConfigured ? <p className="notice notice--warn" role="alert">O servidor ainda não tem a credencial do Hunter (HUNTER_SERVICE_TOKEN, 32 caracteres ou mais). Sem ela o Hunter não liga.</p> : null}
 

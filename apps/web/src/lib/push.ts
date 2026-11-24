@@ -105,6 +105,60 @@ export interface NativePushBridge {
   register(): Promise<string | undefined>;
   /** O app sabe mostrar "Responder" na notificação de mensagem (versões novas da casca nativa). */
   replies?: boolean;
+  /** iPhone: token "push-to-start" da Live Activity da chegada ao vivo (versões novas da casca, iOS 17.2+). */
+  liveActivityToken?(): Promise<string | undefined>;
+  /** iPhone: a Live Activity da chegada `tag` está na tela? `undefined` onde não há. */
+  liveActivityShowing?(tag: string): Promise<boolean | undefined>;
+}
+
+const LIVE_TOKEN_KEY = 'askout.push.live-token';
+/** Token "push-to-start" da Live Activity no servidor (ver apps/api NotificationService, LIVE_START_PREFIX). */
+export const liveStartEndpoint = (token: string): string => `apnsls:${token}`;
+
+function storedLiveToken(): string | null {
+  try {
+    return localStorage.getItem(LIVE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeLiveToken(token: string | null): void {
+  try {
+    if (token === null) localStorage.removeItem(LIVE_TOKEN_KEY);
+    else localStorage.setItem(LIVE_TOKEN_KEY, token);
+  } catch {
+    /* sem armazenamento: registra de novo na próxima abertura */
+  }
+}
+
+/**
+ * Junto com os avisos, o iPhone registra o token da Live Activity: a chegada do amigo no NOW aparece na tela
+ * bloqueada com a barra. Sem suporte (Android, iPhone antigo, servidor sem a Live Activity), não faz nada.
+ */
+async function syncLiveActivity(api: Api, bridge: NativePushBridge): Promise<void> {
+  if (!bridge.liveActivityToken) return;
+  try {
+    const token = await bridge.liveActivityToken();
+    const old = storedLiveToken();
+    // Desligou as Atividades ao Vivo do AskouT nos Ajustes: volta para o aviso comum.
+    if (!token) {
+      if (old) await forgetLiveActivity(api);
+      return;
+    }
+    await api.pushSubscribe({ endpoint: liveStartEndpoint(token) });
+    if (old && old !== token) await api.pushUnsubscribe(liveStartEndpoint(old)).catch(() => undefined);
+    storeLiveToken(token);
+  } catch {
+    /* a chegada continua como aviso comum */
+  }
+}
+
+async function forgetLiveActivity(api: Api): Promise<void> {
+  const token = storedLiveToken();
+  if (!token) return;
+  storeLiveToken(null);
+  await api.pushUnsubscribe(liveStartEndpoint(token)).catch(() => undefined);
 }
 
 /** O que o app manda ao servidor para este aparelho receber avisos (com "Responder", se a casca souber). */
@@ -161,6 +215,7 @@ export async function enableNativePush(api: Api, bridge: NativePushBridge): Prom
   await api.pushSubscribe(nativeSubscription(bridge, token));
   storeNativeToken(token);
   setOptedOut(false);
+  await syncLiveActivity(api, bridge);
 }
 
 /**
@@ -168,6 +223,7 @@ export async function enableNativePush(api: Api, bridge: NativePushBridge): Prom
  * pessoa. Não marca como "desligado por escolha": quem entrar depois ainda recebe o pedido normal de avisos.
  */
 export async function forgetNativePush(api: Api): Promise<void> {
+  await forgetLiveActivity(api);
   const token = storedNativeToken();
   if (!token) return;
   try {
@@ -178,6 +234,7 @@ export async function forgetNativePush(api: Api): Promise<void> {
 }
 
 export async function disableNativePush(api: Api): Promise<void> {
+  await forgetLiveActivity(api);
   const token = storedNativeToken();
   if (token) await api.pushUnsubscribe(nativeEndpoint(token));
   storeNativeToken(null);
@@ -212,6 +269,7 @@ export async function refreshNativeToken(api: Api, bridge: NativePushBridge): Pr
   await api.pushSubscribe(nativeSubscription(bridge, token));
   if (token !== old) await api.pushUnsubscribe(nativeEndpoint(old)).catch(() => undefined);
   storeNativeToken(token);
+  await syncLiveActivity(api, bridge);
 }
 
 const ASKED_KEY = 'askout.push.asked';

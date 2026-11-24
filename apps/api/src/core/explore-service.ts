@@ -17,6 +17,8 @@ export const EXPLORE_MAX_OFFSET = 2000;
 export const EXPLORE_MAX_SPAN_DAYS = 62;
 export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;
+/** Mínimo de letras para gastar uma busca paga no Google. */
+const GOOGLE_SEARCH_MIN_CHARS = 3;
 /** "Bombando": mínimo de pessoas com presença confirmada num evento que está acontecendo agora. */
 export const EXPLORE_HOT_MIN_GOING = 5;
 /** Raio máximo para a busca de lugares em fontes externas (OpenStreetMap/Google). */
@@ -474,7 +476,7 @@ export class ExploreService {
    * Vincular um rolê: busca pelo nome ou endereço os locais do AskouT (em qualquer lugar) e, na fonte externa (Google),
    * qualquer lugar que combine, mesmo longe ou fora dos tipos de bar. Com posição, o que está perto vem primeiro.
    */
-  async searchPlaces(actorId: string, input: { q?: unknown; lat?: unknown; lng?: unknown }): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean }> {
+  async searchPlaces(actorId: string, input: { q?: unknown; lat?: unknown; lng?: unknown; google?: unknown }): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean; canSearchGoogle: boolean }> {
     const text = typeof input.q === 'string' ? input.q.trim() : '';
     // eslint-disable-next-line no-control-regex
     if (text.length < 2 || text.length > EXPLORE_QUERY_MAX || /[\u0000-\u001f\u007f]/.test(text)) throw validationError('Busca inválida', { q: `De 2 a ${EXPLORE_QUERY_MAX} caracteres` });
@@ -491,8 +493,12 @@ export class ExploreService {
     const { placeItems } = await this.collectPlaces(actorId, venues, { center: undefined, radiusM: 0, now: this.deps.clock.now(), limit: VENUE_LIMIT });
 
     const source = this.deps.placeSource;
-    if (!source.search) return { places: placeItems, placesAvailable: false };
-    const ext = await source.search(text, center, 10);
+    // O Google cobra por busca: só entra quando a pessoa pede ("buscar no Google") e com pelo menos 3 letras.
+    // Sem isso, a busca usa o AskouT e o OpenStreetMap, que são gratuitos.
+    const premium = (input.google === true || input.google === 'true' || input.google === '1') && text.length >= GOOGLE_SEARCH_MIN_CHARS;
+    const canSearchGoogle = source.premiumSearch === true && !premium && text.length >= GOOGLE_SEARCH_MIN_CHARS;
+    if (!source.search) return { places: placeItems, placesAvailable: false, canSearchGoogle: false };
+    const ext = await source.search(text, center, 10, { premium });
     const seen = new Set(placeItems.map((p) => fold(p.name)));
     const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
     for (const p of ext.places) {
@@ -518,7 +524,7 @@ export class ExploreService {
         venue: null,
       });
     }
-    return { places: placeItems, placesAvailable: ext.available };
+    return { places: placeItems, placesAvailable: ext.available, canSearchGoogle };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */

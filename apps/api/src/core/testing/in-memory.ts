@@ -18,6 +18,7 @@ import type {
   SchedulingRepository,
   NotificationRepository,
   PushMessage,
+  LiveActivityPush,
   PushResult,
   PushSender,
   PushSubscriptionRepository,
@@ -2156,9 +2157,13 @@ export class FakePlaceSource implements PlaceSource {
   /** Busca por texto: lugares de `searchable` cujo nome ou endereço contém o texto. */
   searchable: ExternalPlace[] = [];
   searchCalls = 0;
+  /** Finge ter uma fonte paga (Google) para a busca: o app mostra o botão "buscar mais no Google". */
+  premiumSearch = false;
+  premiumCalls = 0;
 
-  async search(text: string): Promise<{ available: boolean; places: ExternalPlace[] }> {
+  async search(text: string, _center?: unknown, _limit?: number, opts?: { premium?: boolean }): Promise<{ available: boolean; places: ExternalPlace[] }> {
     this.searchCalls += 1;
+    if (opts?.premium) this.premiumCalls += 1;
     if (!this.available) return { available: false, places: [] };
     const needle = text.toLowerCase();
     return { available: true, places: this.searchable.filter((p) => `${p.name} ${p.address ?? ''}`.toLowerCase().includes(needle)).map((p) => ({ ...p })) };
@@ -2312,6 +2317,17 @@ export class FakePushSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     this.sent.push({ subscription, message });
     return this.results.get(subscription.endpoint) ?? 'SENT';
+  }
+
+  /** Live Activity do iPhone: só existe quando o teste liga (`liveActivities = true`). */
+  liveActivities = false;
+  readonly activities: LiveActivityPush[] = [];
+  get liveActivity(): ((push: LiveActivityPush) => Promise<PushResult>) | undefined {
+    if (!this.liveActivities) return undefined;
+    return async (push) => {
+      this.activities.push(push);
+      return this.results.get(`la:${push.token}`) ?? 'SENT';
+    };
   }
 }
 

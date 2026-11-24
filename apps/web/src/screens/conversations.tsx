@@ -8,8 +8,10 @@ import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '.
 import type { VoiceControl } from '../components/voice.tsx';
 import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
-import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
+import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { MediaBubble, ReplyThumb, galleryOf } from '../components/chat-media.tsx';
+import { ImageEditor } from '../components/image-editor.tsx';
+import { canEditImage } from '../lib/image-edit.ts';
 import { FileBubble } from '../components/chat-file.tsx';
 import { LinkedText } from '../components/linked-text.tsx';
 import { MatchPin } from '../components/match-pin.tsx';
@@ -30,7 +32,8 @@ import { api } from '../client.ts';
 import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { useWideDesktop } from '../lib/use-desktop.ts';
-import { allDeletable, announceChatsChanged, breakLabel, copyText, dayPillLabel, firstUnreadId, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
+import type { ConversationTab } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, breakLabel, copyText, dayPillLabel, firstUnreadId, filterConversations, formatClock, inConversationTab, unreadInTab, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
@@ -53,6 +56,17 @@ const UNDO_MS = 6000;
 let chatLeftAt = 0;
 const BACK_WINDOW_MS = 1500;
 
+/** A aba escolhida (Todas, Individuais, Grupos) fica lembrada enquanto o app está aberto, para voltar do chat nela. */
+const CONV_TAB_KEY = 'askout:conv-tab';
+function readConvTab(): ConversationTab {
+  try {
+    const saved = sessionStorage.getItem(CONV_TAB_KEY);
+    return saved === 'direct' || saved === 'group' ? saved : 'all';
+  } catch {
+    return 'all';
+  }
+}
+
 export function ConversationsScreen({ activeId, split = false }: { activeId?: string; split?: boolean } = {}) {
   // Lado a lado com o chat (computador): quem dá o título da aba é a conversa aberta.
   useTitle(split && activeId ? undefined : t('Conversas'));
@@ -64,6 +78,15 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   }, [list.data]);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<ConversationTab>(readConvTab);
+  function chooseTab(next: ConversationTab) {
+    setTab(next);
+    try {
+      sessionStorage.setItem(CONV_TAB_KEY, next);
+    } catch {
+      // Sem armazenamento (aba anônima etc.): a aba só não fica lembrada.
+    }
+  }
   const [prefsFor, setPrefsFor] = useState<ConversationItem | undefined>();
   const now = new Date();
 
@@ -91,7 +114,12 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   const items = list.data?.items ?? [];
   const requestCount = list.data?.requestCount ?? 0;
   const requestUnread = list.data?.requestUnread ?? 0;
-  const shown = filterConversations(items, query);
+  const shown = filterConversations(items, query).filter((c) => inConversationTab(c, tab));
+  const tabs: { id: ConversationTab; label: string }[] = [
+    { id: 'all', label: t('Todas') },
+    { id: 'direct', label: t('Individuais') },
+    { id: 'group', label: t('Grupos') },
+  ];
   const searching = query.trim() !== '';
 
   return (
@@ -143,7 +171,26 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
             </label>
             <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder={t('Buscar nas conversas')} value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
           </div>
-          {shown.length === 0 ? (
+          <div className="segtabs segtabs--fill convtabs" role="tablist" aria-label={t('Tipos de conversa')}>
+            {tabs.map((x) => {
+              const unread = unreadInTab(items, x.id);
+              return (
+                <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} className="segtabs__tab" onClick={() => chooseTab(x.id)}>
+                  {x.label}
+                  {unread > 0 ? (
+                    <span className="segtabs__n" aria-label={unread === 1 ? t('1 conversa não lida') : t('{count} conversas não lidas', { count: unread })}>
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          {shown.length === 0 && !searching && tab !== 'all' ? (
+            <EmptyState title={tab === 'group' ? t('Nenhum grupo ainda') : t('Nenhuma conversa individual ainda')}>
+              {tab === 'group' ? t('Toque em Nova conversa para criar um grupo com seus amigos.') : t('Escreva para um amigo pelo perfil dele ou toque em Nova conversa.')}
+            </EmptyState>
+          ) : shown.length === 0 ? (
             <EmptyState title={searching ? t('Nada encontrado para "{trim}"', { trim: query.trim() }) : t('Nenhuma conversa encontrada')}>
               {t('Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.')}
               {searching ? (
@@ -644,6 +691,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
+  /** Foto da prévia aberta no editor (girar, recortar, desenhar, escrever). */
+  const [editingId, setEditingId] = useState<string | undefined>();
   /** GIF escolhido, ainda não enviado: aparece acima do campo até tocar em enviar. */
   const [pendingGif, setPendingGif] = useState<CommentGif | undefined>();
   const stagedRef = useRef<StagedMedia[]>([]);
@@ -1047,6 +1096,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
+  /** A foto editada substitui a original na prévia, no mesmo lugar. */
+  function applyEdit(id: string, file: File) {
+    setEditingId(undefined);
+    setStaged((current) =>
+      current.map((x) => {
+        if (x.id !== id || x.file === file) return x;
+        URL.revokeObjectURL(x.url);
+        return { ...x, file, url: URL.createObjectURL(file) };
+      }),
+    );
+  }
+
   function unstage(id: string) {
     setStaged((current) => {
       const gone = current.find((x) => x.id === id);
@@ -1218,6 +1279,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const positions = runPositions(visible);
   const posOf = new Map(visible.map((m, i) => [m.id, positions[i] ?? 'single'] as const));
   const albums = groupAlbums(visible);
+  const gallery = galleryOf(visible);
   const seen = seenLabel(visible, data.members, isGroup);
   const profileOf = (senderId: string) => (data.other && data.other.userId === senderId ? data.other : data.members.find((x) => x.profile.userId === senderId)?.profile);
   const face = (senderId: string) => {
@@ -1284,7 +1346,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         ) : m.kind === 'AUDIO' && m.audio ? (
           <VoiceBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
-          <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} />
+          <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} gallery={gallery} />
         ) : m.kind === 'FILE' ? (
           <FileBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'EVENT' && m.event ? (
@@ -1507,7 +1569,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 <ul className="stagebar__list">
                   {staged.map((item, i) => (
                     <li key={item.id} className="stagebar__item">
-                      {item.kind === 'IMAGE' ? (
+                      {item.kind === 'IMAGE' && canEditImage(item.file.type) ? (
+                        <>
+                          <button type="button" className="stagebar__open" aria-label={t('Editar foto {n}', { n: i + 1 })} disabled={sending} onClick={() => setEditingId(item.id)}>
+                            <img src={item.url} alt="" draggable={false} />
+                          </button>
+                          <button type="button" className="stagebar__edit" aria-hidden="true" tabIndex={-1} disabled={sending} onClick={() => setEditingId(item.id)}>
+                            <EditIcon />
+                          </button>
+                        </>
+                      ) : item.kind === 'IMAGE' ? (
                         <img src={item.url} alt={t('Foto {n}', { n: i + 1 })} draggable={false} />
                       ) : (
                         <span className="stagebar__video">
@@ -1646,6 +1717,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         />
       ) : null}
 
+      {(() => {
+        const item = staged.find((x) => x.id === editingId);
+        return item ? <ImageEditor key={item.id} file={item.file} onDone={(file) => applyEdit(item.id, file)} onCancel={() => setEditingId(undefined)} /> : null;
+      })()}
       {pendingDelete ? (
         <div className="undobar" role="status">
           <span>{pendingDelete.length === 1 ? t('Mensagem apagada') : `${pendingDelete.length} mensagens apagadas`}</span>

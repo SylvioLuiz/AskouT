@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Body, Controller, Delete, ForbiddenException, Get, Headers, HttpCode, Inject, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Headers, HttpCode, Inject, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { HunterBridge } from '../../core/hunter-bridge.ts';
 import type { HunterRefusal } from '../../core/hunter-bridge.ts';
@@ -10,8 +10,10 @@ import { CurrentActor, Public } from '../decorators.ts';
 import { asBody, bearerToken, parseIntParam } from '../support/parse.ts';
 import { PRISMA } from '../tokens.ts';
 import { PrismaHunterStore } from './prisma-hunter-store.ts';
+import { HunterSync } from './hunter-feed.ts';
 
-export const HUNTER_BRIDGE = 'HUNTER_BRIDGE';
+import { HUNTER_BRIDGE } from './hunter-token.ts';
+export { HUNTER_BRIDGE };
 
 /** Cria a ponte. O token vem só do ambiente do servidor (HUNTER_SERVICE_TOKEN, mínimo de 32 caracteres). */
 export const hunterBridgeProvider = {
@@ -39,6 +41,7 @@ function sameToken(given: string, expected: string): boolean {
 
 /** Recusa com a resposta certa quando a regra de propriedade ou o interruptor barraram a operação. */
 function refuse(refusal: HunterRefusal): never {
+  if (refusal === 'DUPLICATE') throw new ConflictException({ code: 'HUNTER_DUPLICATE', message: 'Já existe um evento com o mesmo título, local e dia' });
   if (refusal === 'DISABLED') throw new ServiceUnavailableException({ code: 'HUNTER_DISABLED', message: 'O Hunter está desligado' });
   throw new ForbiddenException({ code: `HUNTER_${refusal}`, message: refusal === 'OWNED' ? 'O local tem responsável' : refusal === 'CLAIM_PENDING' ? 'Há um pedido de reivindicação pendente' : 'Local não encontrado ou situação desconhecida' });
 }
@@ -126,14 +129,25 @@ function assertAdmin(actor: Actor): void {
 export class HunterAdminController {
   private readonly bridge: HunterBridge;
 
-  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge) {
+  private readonly sync: HunterSync;
+
+  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge, @Inject(HunterSync) sync: HunterSync) {
     this.bridge = bridge;
+    this.sync = sync;
   }
 
   @Get()
-  overview(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown }) {
+  async overview(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown }) {
     assertAdmin(actor);
-    return this.bridge.adminOverview(Math.min(parseIntParam(q.limit) ?? 50, 100), parseIntParam(q.offset) ?? 0);
+    return { ...(await this.bridge.adminOverview(Math.min(parseIntParam(q.limit) ?? 50, 100), parseIntParam(q.offset) ?? 0)), feedConfigured: this.sync.configured, lastSync: this.sync.last ?? null };
+  }
+
+  /** Busca agora no Hunter o que foi aprovado e publica (o mesmo que roda sozinho a cada 10 minutos). */
+  @Post('sync')
+  @HttpCode(200)
+  async syncNow(@CurrentActor() actor: Actor) {
+    assertAdmin(actor);
+    return this.sync.run();
   }
 
   @Post('enabled')

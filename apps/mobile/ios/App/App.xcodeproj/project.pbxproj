@@ -21,6 +21,11 @@
 		A5C7E2112FF0000100A5C7E2 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E2012FF0000100A5C7E2 /* ShareViewController.swift */; };
 		A5C7E2152FF0000100A5C7E2 /* ShareSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E2052FF0000100A5C7E2 /* ShareSessionPlugin.swift */; };
 		A5C7E2142FF0000100A5C7E2 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A5C7E2042FF0000100A5C7E2 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A5C7E3012FF0000100A5C7E3 /* ArrivalAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E3112FF0000100A5C7E3 /* ArrivalAttributes.swift */; };
+		A5C7E3022FF0000100A5C7E3 /* ArrivalActivities.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E3122FF0000100A5C7E3 /* ArrivalActivities.swift */; };
+		A5C7E3032FF0000100A5C7E3 /* ArrivalLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E3132FF0000100A5C7E3 /* ArrivalLiveActivity.swift */; };
+		A5C7E3042FF0000100A5C7E3 /* ArrivalAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E3112FF0000100A5C7E3 /* ArrivalAttributes.swift */; };
+		A5C7E3052FF0000100A5C7E3 /* ArrivalWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,6 +35,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = A5C7E2312FF0000100A5C7E2;
 			remoteInfo = ShareExtension;
+		};
+		A5C7E3212FF0000100A5C7E3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A5C7E3242FF0000100A5C7E3;
+			remoteInfo = ArrivalWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -41,6 +53,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				A5C7E2142FF0000100A5C7E2 /* ShareExtension.appex in Embed Foundation Extensions */,
+				A5C7E3052FF0000100A5C7E3 /* ArrivalWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -67,6 +80,11 @@
 		A5C7E2032FF0000100A5C7E2 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		A5C7E2042FF0000100A5C7E2 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5C7E2052FF0000100A5C7E2 /* ShareSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSessionPlugin.swift; sourceTree = "<group>"; };
+		A5C7E3112FF0000100A5C7E3 /* ArrivalAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrivalAttributes.swift; sourceTree = "<group>"; };
+		A5C7E3122FF0000100A5C7E3 /* ArrivalActivities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrivalActivities.swift; sourceTree = "<group>"; };
+		A5C7E3132FF0000100A5C7E3 /* ArrivalLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrivalLiveActivity.swift; sourceTree = "<group>"; };
+		A5C7E3142FF0000100A5C7E3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ArrivalWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +103,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A5C7E3272FF0000100A5C7E3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -94,6 +119,7 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				A5C7E2212FF0000100A5C7E2 /* ShareExtension */,
+				A5C7E3232FF0000100A5C7E3 /* ArrivalWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +129,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				A5C7E2042FF0000100A5C7E2 /* ShareExtension.appex */,
+				A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -116,6 +143,7 @@
 				A5C7E1022FF0000100A5C7E1 /* GalleryPlugin.swift */,
 				A5C7E1042FF0000100A5C7E1 /* AudioPlugin.swift */,
 				A5C7E2052FF0000100A5C7E2 /* ShareSessionPlugin.swift */,
+				A5C7E3122FF0000100A5C7E3 /* ArrivalActivities.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -137,6 +165,16 @@
 			path = ShareExtension;
 			sourceTree = "<group>";
 		};
+		A5C7E3232FF0000100A5C7E3 /* ArrivalWidget */ = {
+			isa = PBXGroup;
+			children = (
+				A5C7E3112FF0000100A5C7E3 /* ArrivalAttributes.swift */,
+				A5C7E3132FF0000100A5C7E3 /* ArrivalLiveActivity.swift */,
+				A5C7E3142FF0000100A5C7E3 /* Info.plist */,
+			);
+			path = ArrivalWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -153,6 +191,7 @@
 			);
 			dependencies = (
 				A5C7E2372FF0000100A5C7E2 /* PBXTargetDependency */,
+				A5C7E3222FF0000100A5C7E3 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -179,6 +218,23 @@
 			productReference = A5C7E2042FF0000100A5C7E2 /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A5C7E3242FF0000100A5C7E3 /* ArrivalWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A5C7E3252FF0000100A5C7E3 /* Build configuration list for PBXNativeTarget "ArrivalWidget" */;
+			buildPhases = (
+				A5C7E3262FF0000100A5C7E3 /* Sources */,
+				A5C7E3272FF0000100A5C7E3 /* Frameworks */,
+				A5C7E3282FF0000100A5C7E3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ArrivalWidget;
+			productName = ArrivalWidget;
+			productReference = A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -194,6 +250,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					A5C7E2312FF0000100A5C7E2 = {
+						CreatedOnToolsVersion = 15.0;
+						ProvisioningStyle = Automatic;
+					};
+					A5C7E3242FF0000100A5C7E3 = {
 						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
 					};
@@ -217,6 +277,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				A5C7E2312FF0000100A5C7E2 /* ShareExtension */,
+				A5C7E3242FF0000100A5C7E3 /* ArrivalWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -242,6 +303,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A5C7E3282FF0000100A5C7E3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -254,6 +322,8 @@
 				A5C7E1012FF0000100A5C7E1 /* GalleryPlugin.swift in Sources */,
 				A5C7E1032FF0000100A5C7E1 /* AudioPlugin.swift in Sources */,
 				A5C7E2152FF0000100A5C7E2 /* ShareSessionPlugin.swift in Sources */,
+				A5C7E3012FF0000100A5C7E3 /* ArrivalAttributes.swift in Sources */,
+				A5C7E3022FF0000100A5C7E3 /* ArrivalActivities.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,6 +335,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A5C7E3262FF0000100A5C7E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5C7E3032FF0000100A5C7E3 /* ArrivalLiveActivity.swift in Sources */,
+				A5C7E3042FF0000100A5C7E3 /* ArrivalAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -272,6 +351,11 @@
 			isa = PBXTargetDependency;
 			target = A5C7E2312FF0000100A5C7E2 /* ShareExtension */;
 			targetProxy = A5C7E2362FF0000100A5C7E2 /* PBXContainerItemProxy */;
+		};
+		A5C7E3222FF0000100A5C7E3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A5C7E3242FF0000100A5C7E3 /* ArrivalWidget */;
+			targetProxy = A5C7E3212FF0000100A5C7E3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -504,6 +588,56 @@
 			};
 			name = Release;
 		};
+		A5C7E3292FF0000100A5C7E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 13;
+				DEVELOPMENT_TEAM = 359NDWACC5;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ArrivalWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.8;
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ArrivalWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A5C7E32A2FF0000100A5C7E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 13;
+				DEVELOPMENT_TEAM = 359NDWACC5;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ArrivalWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.8;
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.askout.ArrivalWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -530,6 +664,15 @@
 			buildConfigurations = (
 				A5C7E2412FF0000100A5C7E2 /* Debug */,
 				A5C7E2422FF0000100A5C7E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A5C7E3252FF0000100A5C7E3 /* Build configuration list for PBXNativeTarget "ArrivalWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A5C7E3292FF0000100A5C7E3 /* Debug */,
+				A5C7E32A2FF0000100A5C7E3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
