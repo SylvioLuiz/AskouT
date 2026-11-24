@@ -4003,7 +4003,8 @@ a.actlog__row:hover { background: var(--surface); }
 .postgrid__item { position: relative; display: block; aspect-ratio: 1; background: var(--line); overflow: hidden; }
 .postgrid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .postgrid__none { display: block; width: 100%; height: 100%; }
-.postgrid__text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 10px; box-sizing: border-box; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--ink); font-size: 0.8125rem; font-weight: 600; line-height: 1.3; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.postgrid__text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 8px; box-sizing: border-box; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--ink); font-size: 0.6875rem; font-weight: 600; line-height: 1.25; text-align: center; overflow: hidden; }
+.postgrid__clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; max-height: calc(5 * 1.25em); }
 .postgrid__multi { position: absolute; top: 6px; right: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
 .postgrid__multi .icon { width: 20px; height: 20px; }
 
@@ -4104,6 +4105,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .sharelist__item--danger strong, .sharelist__item--danger > svg { color: var(--danger); }
 .sharelist__item--on { border-color: var(--brand); }
 .sharelist__item--on strong::after { content: 'Ativo'; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 600; vertical-align: 1px; }
+/* Menu de opções do perfil: letra e espaçamento menores, folha com no máximo 70% da tela e rolagem só na lista. */
+.sheet__panel:has(> .sharelist--compact) { display: flex; flex-direction: column; max-height: min(70dvh, calc(92dvh - var(--sa-top))); overflow: hidden; }
+.sheet__panel:has(> .sharelist--compact) > * { flex: none; }
+.sheet__panel > .sharelist--compact { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; gap: 6px; margin-bottom: 0; }
+.sharelist--compact .sharelist__item { padding: 10px 12px; gap: 1px; }
+.sharelist--compact .sharelist__item strong { font-size: 0.9375rem; }
+.sharelist--compact .sharelist__item span { font-size: 0.8125rem; line-height: 1.3; }
 .inlineicon { display: inline-flex; vertical-align: middle; }
 .inlineicon .icon { width: 18px; height: 18px; }
 .reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
@@ -4194,6 +4202,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chathead__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .chathead__name { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chathead__sub { color: var(--muted); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chathead__online { color: #16a34a; font-weight: 600; }
 
 /* Informações da conversa */
 .chatinfo { display: flex; justify-content: center; margin: 4px 0 14px; }
@@ -4211,6 +4220,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .avatarflash { position: relative; flex: none; display: inline-block; }
 .avatarflash__bolt { position: absolute; left: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: var(--brand-ink); border: 2px solid var(--bg); box-sizing: content-box; }
 .avatarflash__bolt svg { width: 62%; height: 62%; }
+/* Bolinha verde de online: canto de baixo à direita (o raio do NOW fica à esquerda). */
+.avataronline { position: absolute; right: 0; bottom: 0; border-radius: 50%; background: #22c55e; border: 2px solid var(--bg); box-sizing: content-box; pointer-events: none; }
+.newsmedia .avataronline { display: none; }
 /* Nos flashes (stories), o selo fica "negativo": só o raio escuro, sem o círculo rosa em volta. */
 .homestories .avatarflash__bolt, .storyring .avatarflash__bolt { background: none; border: 0; color: var(--brand-ink); filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)); }
 .homestories .avatarflash__bolt svg, .storyring .avatarflash__bolt svg { width: 100%; height: 100%; }
@@ -4666,8 +4678,10 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 /* Pessoas que você talvez conheça (Home) */
 .suggest__track { display: flex; gap: 12px; margin: 0; padding: 4px 2px 8px; list-style: none; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .suggest__track::-webkit-scrollbar { display: none; }
-.suggest__card { flex: 0 0 auto; width: 120px; scroll-snap-align: start; }
-.suggest__link { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); text-align: center; color: var(--ink); text-decoration: none; }
+.suggest__card { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; width: 132px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); scroll-snap-align: start; }
+.suggest__link { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 10px; border-radius: var(--radius-panel) var(--radius-panel) 0 0; text-align: center; color: var(--ink); text-decoration: none; }
+/* "Seguir" no próprio cartão, sem abrir o perfil. */
+.suggest__card > .btn { width: auto; margin: 0 10px 12px; }
 .suggest__link:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; }
 .suggest__name { color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.9375rem; }
 .suggest__mutual { color: var(--muted); font-size: 0.75rem; line-height: 1.2; }

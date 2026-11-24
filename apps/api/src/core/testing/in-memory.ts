@@ -1348,6 +1348,21 @@ export class InMemoryConversationRepository implements ConversationRepository {
     else this.openDms.delete(userId);
   }
 
+  readonly hiddenOnline = new Set<string>();
+
+  async getShowOnline(userId: string): Promise<boolean> {
+    return !this.hiddenOnline.has(userId);
+  }
+
+  async setShowOnline(userId: string, on: boolean): Promise<void> {
+    if (on) this.hiddenOnline.delete(userId);
+    else this.hiddenOnline.add(userId);
+  }
+
+  async listHiddenOnline(userIds: readonly string[]): Promise<string[]> {
+    return userIds.filter((id) => this.hiddenOnline.has(id));
+  }
+
   async participantIds(conversationId: string): Promise<string[] | undefined> {
     const p = this.participants.get(conversationId);
     return p ? [...p.keys()] : undefined;
@@ -2295,6 +2310,18 @@ export class InMemoryNotificationRepository implements NotificationRepository {
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {
     return this.rows.some((n) => n.userId === userId && n.readAt === null && n.dedupeKey === dedupeKey);
+  }
+
+  async deleteByKey(userId: string, dedupeKey: string): Promise<number> {
+    let removed = 0;
+    for (let i = this.rows.length - 1; i >= 0; i--) {
+      const n = this.rows[i]!;
+      if (n.userId === userId && n.dedupeKey === dedupeKey) {
+        this.rows.splice(i, 1);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {

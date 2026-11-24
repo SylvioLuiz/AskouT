@@ -141,3 +141,31 @@ test('cancelar convite pendente: só a dona, e quem já aceitou não sai', async
   // Cancelado, pode ser convidada de novo.
   assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia])).invited, [bia]);
 });
+
+test('cancelar convite: quem mandou o convite também cancela, e o aviso some do sino de quem foi convidado', async () => {
+  const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
+  const post = await make(false);
+  // bia encaminha o evento público da ana para duda: duda fica convidada por bia.
+  await w.core.conversations.send(bia, (await w.core.conversations.open(bia, duda)).id, { eventId: post.id });
+  await w.core.conversations.send(ana, (await w.core.conversations.open(ana, caio)).id, { eventId: post.id });
+  // Quem não mandou o convite nem organiza não cancela.
+  await rejectsWith(w.core.posts.cancelInvite(caio, post.id, duda), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.cancelInvite(bia, post.id, caio), 'FORBIDDEN');
+  assert.deepEqual(await w.core.posts.cancelInvite(bia, post.id, duda), { cancelled: true });
+  assert.deepEqual(await invitedIds(ana, post.id), ['caio']);
+  // Quem já confirmou "Eu vou" não sai por aqui, e aparece como quem aceitou.
+  await w.core.eventPages.go(caio, post.id);
+  assert.equal((await w.core.eventPages.invites(ana, post.id)).invites[0]?.status, 'ACCEPTED');
+  await rejectsWith(w.core.posts.cancelInvite(ana, post.id, caio), 'CONFLICT');
+});
+
+test('cancelar convite de evento privado tira a marcação e o aviso do sino', async () => {
+  const { w, ana, bia, make } = await setup();
+  const post = await make(true, [bia]);
+  const tagNotes = async () => (await w.core.notifications.list(bia)).items.filter((n) => n.type === 'POST_TAG' && n.postId === post.id);
+  assert.equal((await tagNotes()).length, 1);
+  await w.core.posts.cancelInvite(ana, post.id, bia);
+  assert.equal((await tagNotes()).length, 0, 'o aviso do convite sai do sino');
+  assert.equal((await w.core.posts.pendingTags(bia)).items.length, 0);
+  await rejectsWith(w.core.eventPages.get(bia, post.id), 'NOT_FOUND');
+});

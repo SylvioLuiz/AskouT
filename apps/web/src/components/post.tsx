@@ -669,7 +669,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
           return (
             <li key={post.id}>
               <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? t('Post: {caption}', { caption: post.caption }) : t('Abrir post')}>
-                {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : !first && (post.event?.title || post.caption) ? <span className="postgrid__text">{post.event?.title ?? post.caption}</span> : <span className="postgrid__none" />}
+                {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : !first && (post.event?.title || post.caption) ? <span className="postgrid__text"><span className="postgrid__clamp">{post.event?.title ?? post.caption}</span></span> : <span className="postgrid__none" />}
                 {post.event ? <span className="postgrid__event">{t('Evento')}</span> : null}
                 {post.images.length > 1 ? (
                   <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}>

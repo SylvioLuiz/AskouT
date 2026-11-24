@@ -51,6 +51,12 @@ export class PrismaNotificationRepository implements NotificationRepository {
     return count > 0;
   }
 
+  async deleteByKey(userId: string, dedupeKey: string): Promise<number> {
+    if (!isUuid(userId)) return 0;
+    const result = await this.prisma.notification.deleteMany({ where: { userId, payload: { path: ['dedupeKey'], equals: dedupeKey } } });
+    return result.count;
+  }
+
   async getMuteSettings(userId: string): Promise<NotificationMuteSettings> {
     if (!isUuid(userId)) return { all: false, chats: false, events: false };
     const row = await this.prisma.notificationSetting.findUnique({ where: { userId } });

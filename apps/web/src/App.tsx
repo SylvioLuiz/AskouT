@@ -1,5 +1,6 @@
 import { Suspense, useEffect } from 'react';
 import { FlashPresenceProvider } from './components/flash-presence.tsx';
+import { OnlinePresenceProvider } from './components/online-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { TermsGate } from './components/terms-gate.tsx';
@@ -310,6 +311,7 @@ function AppRoutes() {
 
   return (
     <FlashPresenceProvider>
+      <OnlinePresenceProvider>
       <TermsGate>
         <Shell>
           <Suspense fallback={<ScreenFallback />}>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Suspense>
@@ -318,6 +320,7 @@ function AppRoutes() {
         <PositionAutoAsk />
         <PushAutoAsk />
       </TermsGate>
+      </OnlinePresenceProvider>
     </FlashPresenceProvider>
   );
 }

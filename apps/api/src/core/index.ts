@@ -4,6 +4,7 @@ import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
+import { PresenceService } from './presence-service.ts';
 import { StoryReactionService } from './story-reaction-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
@@ -98,6 +99,7 @@ export function createCore(input: CoreInput) {
     availability: new AvailabilityService(deps),
     flash,
     conversations,
+    presence: new PresenceService(deps),
     storyReactions: new StoryReactionService(deps, eventPages, conversations),
     suggestions: new SuggestionService(deps, flash),
     explore,
