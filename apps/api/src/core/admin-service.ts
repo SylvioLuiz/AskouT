@@ -39,6 +39,7 @@ export interface AdminVenueDetail {
   description: string | null;
   coverUrl: string | null;
   logoUrl: string | null;
+  instagram: string | null;
   owner: { id: string; username: string; displayName: string } | null;
   followers: number;
   eventsTotal: number;
@@ -605,6 +606,7 @@ export class AdminService {
       description: venue.description ?? null,
       coverUrl: venue.coverUrl ?? null,
       logoUrl: venue.logoUrl ?? null,
+      instagram: venue.instagram ?? null,
       owner: venue.ownerId ? { id: venue.ownerId, username: ownerProfile?.username ?? '(removido)', displayName: ownerProfile?.displayName ?? '' } : null,
       followers,
       eventsTotal: events.length,
@@ -631,8 +633,8 @@ export class AdminService {
       lat: coordOf(input.lat, current.lat, 'lat'), lng: coordOf(input.lng, current.lng, 'lng'),
       isSample: flagOf(input.isSample, current.isSample, 'isSample'), feedPolicy: feedPolicyOf(input.feedPolicy, feedBefore),
     };
-    const profile: VenueProfileInput = { name: input.name, address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, hours: input.hours };
-    const labels = { name: 'nome', address: 'endereço', category: 'tipo', description: 'descrição', coverUrl: 'capa', logoUrl: 'logo' };
+    const profile: VenueProfileInput = { name: input.name, address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, hours: input.hours, instagram: input.instagram };
+    const labels = { name: 'nome', address: 'endereço', category: 'tipo', description: 'descrição', coverUrl: 'capa', logoUrl: 'logo', instagram: 'instagram' };
     const preview = this.venues.checkProfileForAdmin(current, profile);
     const changes = [...changesOf(labels, { ...current }, { ...current, ...preview }), ...changesOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
     if (changes.length === 0) throw conflict('Nada mudou');

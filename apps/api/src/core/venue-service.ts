@@ -283,6 +283,8 @@ export interface VenueProfileInput {
   /** Logo: mesmas regras da capa (`logoUrl` https ou `logoData` até 128 KB). */
   logoUrl?: unknown;
   logoData?: unknown;
+  /** @ do Instagram: "@bardoze", "bardoze" ou o link do perfil. Vazio/nulo remove. */
+  instagram?: unknown;
 }
 
 export const TICKET_URL_MAX = 500;
@@ -361,6 +363,21 @@ function clipName(name: string): string {
 
 function summary(v: VenueRecord): VenueSummaryView {
   return { id: v.id, name: v.name, address: v.address, category: v.category, sample: v.isSample, organization: v.isOrganization === true };
+}
+
+const INSTAGRAM_HANDLE = /^(?!.*\.\.)(?!\.)(?!.*\.$)[a-z0-9._]{1,30}$/;
+
+/** @ do Instagram normalizado (sem "@", minúsculas). Aceita "@bar", "bar" ou o link do perfil; vazio/nulo remove. */
+export function instagramHandle(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') throw validationError('Dados inválidos', { instagram: 'Instagram inválido' });
+  let t = value.trim();
+  if (t === '') return null;
+  const link = /^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([^/?#]+)/i.exec(t);
+  if (link) t = link[1] ?? '';
+  t = t.replace(/^@/, '').toLowerCase();
+  if (!INSTAGRAM_HANDLE.test(t)) throw validationError('Dados inválidos', { instagram: 'Use o @ do Instagram: letras, números, ponto e _ (até 30)' });
+  return t;
 }
 
 function text(value: unknown, max: number, field: string, label: string, required = false): string | null {
@@ -710,7 +727,7 @@ export class VenueService {
   }
 
   /** Gestão: como ficaria o perfil com estes campos (sem gravar), para conferir o que muda. */
-  checkProfileForAdmin(venue: VenueRecord, input: VenueProfileInput): Pick<VenueRecord, 'name' | 'address' | 'category' | 'description' | 'coverUrl' | 'logoUrl'> {
+  checkProfileForAdmin(venue: VenueRecord, input: VenueProfileInput): Pick<VenueRecord, 'name' | 'address' | 'category' | 'description' | 'coverUrl' | 'logoUrl' | 'instagram'> {
     const name = input.name === undefined ? venue.name : (text(input.name, VENUE_NAME_MAX, 'name', 'Nome', true) as string);
     if (Array.from(name).length < 2) throw validationError('Dados inválidos', { name: 'O nome precisa de pelo menos 2 caracteres' });
     const address = input.address === undefined ? venue.address : text(input.address, VENUE_ADDRESS_MAX, 'address', 'Endereço');
@@ -718,7 +735,8 @@ export class VenueService {
     const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => '(foto enviada)');
     const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)');
-    return { name, address, category, description, coverUrl: cover.url, logoUrl: logo.url };
+    const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
+    return { name, address, category, description, coverUrl: cover.url, logoUrl: logo.url, instagram };
   }
 
   /** Gestão: como ficaria o evento com estes campos (sem gravar), para conferir o que muda. */
@@ -736,10 +754,11 @@ export class VenueService {
     const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
     const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
     const hours = input.hours === undefined ? (venue.hours ?? null) : parseHours(input.hours);
+    const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
     const now = this.deps.clock.now().getTime();
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => venueCoverPath(venue.id, now));
     const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now));
-    await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl: cover.url, logoUrl: logo.url });
+    await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl: cover.url, logoUrl: logo.url, instagram });
     const ownCover = cover.url !== null && cover.url.startsWith(`/venues/${venue.id}/cover`);
     const ownLogo = logo.url !== null && logo.url.startsWith(`/venues/${venue.id}/logo`);
     if (cover.upload) await this.deps.places.setVenueCover(venue.id, cover.upload.mime, cover.upload.bytes);

@@ -219,6 +219,8 @@ export interface VenueEdit {
   description?: string | null;
   imageUrl?: string | null;
   logoUrl?: string | null;
+  /** "@bar", "bar" ou o link do perfil; vazio/nulo remove. */
+  instagram?: string | null;
   lat?: number;
   lng?: number;
   isSample?: boolean;
@@ -255,6 +257,8 @@ export interface VenueDetail {
   description: string | null;
   coverUrl: string | null;
   logoUrl: string | null;
+  /** @ do Instagram, sem "@". */
+  instagram: string | null;
   owner: { id: string; username: string; displayName: string } | null;
   followers: number;
   eventsTotal: number;

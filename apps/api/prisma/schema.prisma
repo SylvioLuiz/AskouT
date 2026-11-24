@@ -879,6 +879,8 @@ model Venue {
   coverUrl    String?
   /// https ou `/venues/:id/logo?v=` (logo enviada, bytes em VenueLogo).
   logoUrl     String?
+  /// @ do Instagram do local, sem "@" e em minúsculas (ex.: "bardoze").
+  instagram   String?
   /// "google:ID" quando o local entrou de uma fonte externa; único.
   externalKey String?  @unique
   photoRef    String?
