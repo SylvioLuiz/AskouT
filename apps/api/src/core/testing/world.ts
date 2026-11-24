@@ -57,7 +57,8 @@ export const PASSWORD = 'uma-senha-forte-123';
 /** Monta o núcleo com repositórios em memória e hash rápido (custo baixo, só para testes). */
 export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnabled?: boolean; store?: FakeStoreVerifier; storePricePerDayCents?: number; pricePerDayCents?: number; routes?: RouteSource; gifs?: GifSource; noGoogleCalendar?: boolean; noSms?: boolean } = {}) {
   const blocks = new InMemoryBlockRepository();
-  const follows = new InMemoryFollowRepository(blocks);
+  const users = new InMemoryUserRepository();
+  const follows = new InMemoryFollowRepository(blocks, users);
   const availability = new InMemoryAvailabilityRepository();
   const flash = new InMemoryFlashRepository();
   const conversations = new InMemoryConversationRepository();
@@ -79,7 +80,6 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const calendars = new InMemoryCalendarRepository();
   const calendarFetcher = new FakeCalendarFetcher();
   const placeSource = new FakePlaceSource();
-  const users = new InMemoryUserRepository();
   const referrals = new InMemoryReferralRepository(users);
   const identitiesRepo = new InMemoryIdentityRepository();
   const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo, follows });

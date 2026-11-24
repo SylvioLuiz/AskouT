@@ -3799,4 +3799,12 @@ export const EN: Readonly<Record<string, string>> = {
   "Evento criado por quem é dono deste perfil": "Event created by this profile's owner",
   "Foi a convite: marcação, cartão numa conversa ou evento privado": "By invitation: tag, card in a chat or private event",
   "Evento aberto, sem convite": "Open event, no invitation",
+  "Buscar por nome ou @": "Search by name or @",
+  "Buscar amigo por nome ou @": "Search friends by name or @",
+  "Nenhum amigo encontrado": "No friends found",
+  "Confira o nome ou o @ digitado.": "Check the name or @ you typed.",
+  "{shown} de {total}": "{shown} of {total}",
+  "Ninguém encontrado": "No one found",
+  "resultado": "result",
+  "resultados": "results",
 };

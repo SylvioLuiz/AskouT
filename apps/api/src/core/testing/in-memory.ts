@@ -617,9 +617,12 @@ export class InMemoryFlashRepository implements FlashRepository {
 export class InMemoryFollowRepository implements FollowRepository {
   readonly rows = new Map<string, Follow>();
   private readonly blocks: BlockRepository;
+  private readonly users: InMemoryUserRepository | undefined;
 
-  constructor(blocks: BlockRepository) {
+  /** `users` é opcional: sem ele, a busca por `query` não encontra ninguém. */
+  constructor(blocks: BlockRepository, users?: InMemoryUserRepository) {
     this.blocks = blocks;
+    this.users = users;
   }
 
   private key(followerId: string, followeeId: string): string {
@@ -646,15 +649,15 @@ export class InMemoryFollowRepository implements FollowRepository {
     this.rows.delete(this.key(b, a));
   }
 
-  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
-    return this.matching(userId, direction, status)
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]> {
+    return this.matching(userId, direction, status, query)
       .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime() || x.followerId.localeCompare(y.followerId))
       .slice(page.offset, page.offset + page.limit)
       .map((f) => ({ ...f }));
   }
 
-  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
-    return this.matching(userId, direction, status).length;
+  async count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number> {
+    return this.matching(userId, direction, status, query).length;
   }
 
   async acceptAllPending(followeeId: string): Promise<number> {
@@ -689,10 +692,13 @@ export class InMemoryFollowRepository implements FollowRepository {
     return out;
   }
 
-  private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
-    return [...this.rows.values()].filter(
-      (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
-    );
+  private matching(userId: string, direction: Direction, status: FollowStatus, query?: string): Follow[] {
+    return [...this.rows.values()].filter((f) => {
+      if (f.status !== status || (direction === 'followers' ? f.followeeId !== userId : f.followerId !== userId)) return false;
+      if (!query) return true;
+      const p = this.users?.profiles.get(direction === 'followers' ? f.followerId : f.followeeId);
+      return !!p && (p.username.startsWith(query) || p.displayName.toLowerCase().includes(query));
+    });
   }
 }
 

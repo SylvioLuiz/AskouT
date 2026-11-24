@@ -7,6 +7,14 @@ function toFollow(row: { followerId: string; followeeId: string; status: FollowS
   return { followerId: row.followerId, followeeId: row.followeeId, status: row.status, createdAt: row.createdAt };
 }
 
+/** Filtro de `list`/`count`; com `query`, só a outra ponta cujo @ começa com o termo ou cujo nome o contém. */
+function connectionsWhere(userId: string, direction: Direction, status: FollowStatus, query?: string) {
+  const base = direction === 'followers' ? { followeeId: userId, status } : { followerId: userId, status };
+  if (!query) return base;
+  const profile = { is: { OR: [{ username: { startsWith: query } }, { displayName: { contains: query, mode: 'insensitive' as const } }] } };
+  return direction === 'followers' ? { ...base, follower: { profile } } : { ...base, followee: { profile } };
+}
+
 export class PrismaFollowRepository implements FollowRepository {
   private readonly prisma: PrismaClient;
 
@@ -54,10 +62,10 @@ export class PrismaFollowRepository implements FollowRepository {
     });
   }
 
-  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.follow.findMany({
-      where: direction === 'followers' ? { followeeId: userId, status } : { followerId: userId, status },
+      where: connectionsWhere(userId, direction, status, query),
       orderBy: [{ createdAt: 'desc' }, { followerId: 'asc' }],
       skip: page.offset,
       take: page.limit,
@@ -65,11 +73,9 @@ export class PrismaFollowRepository implements FollowRepository {
     return rows.map(toFollow);
   }
 
-  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
+  async count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number> {
     if (!isUuid(userId)) return 0;
-    return this.prisma.follow.count({
-      where: direction === 'followers' ? { followeeId: userId, status } : { followerId: userId, status },
-    });
+    return this.prisma.follow.count({ where: connectionsWhere(userId, direction, status, query) });
   }
 
   async acceptAllPending(followeeId: string): Promise<number> {

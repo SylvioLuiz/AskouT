@@ -62,9 +62,12 @@ export interface FollowRepository {
   delete(followerId: string, followeeId: string): Promise<boolean>;
   /** Remove o seguimento nos dois sentidos entre a e b. */
   deleteBetween(a: string, b: string): Promise<void>;
-  /** Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue. */
-  list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]>;
-  count(userId: string, direction: Direction, status: FollowStatus): Promise<number>;
+  /**
+   * Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue.
+   * `query` (já em minúsculas) filtra a outra ponta: @ começando com o termo ou nome contendo o termo.
+   */
+  list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]>;
+  count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number>;
   /** Aceita todas as solicitações pendentes recebidas por followeeId. Retorna quantas. */
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */
