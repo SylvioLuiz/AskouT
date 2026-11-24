@@ -378,7 +378,9 @@ export class VenueStoryService {
     const report: VenueStoryReportRecord | undefined = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.venueStories.findReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.venueStories.resolveReport(report.id, actor.userId, resolution as ReportResolution, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId: actor.userId, action: resolution === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', targetType: 'STORY_REPORT', targetId: report.id, note: text, createdAt: this.deps.clock.now() });
+    const story = await this.deps.venueStories.find(report.storyId);
+    const venue = story ? await this.deps.places.findVenue(story.venueId) : undefined;
+    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId: actor.userId, actorKind: 'ADMIN', action: resolution === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', targetType: 'VENUE_STORY_REPORT', targetId: report.id, targetLabel: venue?.name ?? null, note: text, createdAt: this.deps.clock.now() });
     return { resolved: true };
   }
 
@@ -386,8 +388,10 @@ export class VenueStoryService {
     this.assertAdmin(actor);
     const text = optionalText(note, 500, 'note', 'Nota');
     if (text === null) throw validationError('Informe o motivo', { note: 'Informe o motivo' });
+    const story = typeof storyId === 'string' && storyId.length > 0 && storyId.length <= 64 ? await this.deps.venueStories.find(storyId) : undefined;
+    const venue = story ? await this.deps.places.findVenue(story.venueId) : undefined;
     if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.venueStories.delete(storyId))) throw notFound('Flash não encontrado');
-    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId: actor.userId, action: 'STORY_REMOVED', targetType: 'STORY', targetId: storyId, note: text, createdAt: this.deps.clock.now() });
+    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId: actor.userId, actorKind: 'ADMIN', action: 'STORY_REMOVED', targetType: 'VENUE_STORY', targetId: storyId, targetLabel: venue?.name ?? null, note: text, createdAt: this.deps.clock.now() });
     return { deleted: true };
   }
 

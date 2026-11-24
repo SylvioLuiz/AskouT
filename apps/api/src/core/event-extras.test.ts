@@ -40,7 +40,7 @@ test('a gestão cadastra, edita, ordena e apaga configurações de evento; só a
   await w.core.admin.deleteEventExtra(A, park.id);
   assert.deepEqual((await w.core.eventExtras.list()).map((o) => o.label), ['Pode fumar?']);
   await rejectsWith(w.core.admin.deleteEventExtra(A, park.id), 'NOT_FOUND');
-  assert.deepEqual([...w.admin.audit.values()].map((a) => a.action), ['EVENT_EXTRA_CREATED', 'EVENT_EXTRA_CREATED', 'EVENT_EXTRA_UPDATED', 'EVENT_EXTRA_REMOVED']);
+  assert.deepEqual([...w.admin.audit.values()].map((a) => a.action), ['EVENT_EXTRA_CREATED', 'EVENT_EXTRA_CREATED', 'EVENT_EXTRA_MOVED', 'EVENT_EXTRA_UPDATED', 'EVENT_EXTRA_REMOVED']);
 });
 
 test('quem cria o evento responde; a página mostra ícone, nome e resposta; a edição troca as respostas', async () => {

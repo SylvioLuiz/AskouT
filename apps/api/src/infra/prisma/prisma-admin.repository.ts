@@ -4,7 +4,7 @@ import { dayOf } from '../../core/retention.ts';
 import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
   AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
-  AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
+  AuditAction, AuditActorKind, AuditChange, AuditFilter, AuditRecord, AuditRow, AuditTargetType, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
 const MISSING = '(removido)';
@@ -293,7 +293,11 @@ export class PrismaAdminRepository implements AdminRepository {
 
   async addAudit(record: AuditRecord): Promise<void> {
     await this.prisma.adminAudit.create({
-      data: { id: record.id, adminId: record.adminId, action: record.action, targetType: record.targetType, targetId: record.targetId, note: record.note, createdAt: record.createdAt },
+      data: {
+        id: record.id, adminId: record.adminId, actorKind: record.actorKind ?? 'ADMIN', action: record.action, targetType: record.targetType, targetId: record.targetId,
+        targetLabel: record.targetLabel ?? null, note: record.note, createdAt: record.createdAt,
+        ...(record.changes && record.changes.length > 0 ? { changes: record.changes as unknown as Prisma.InputJsonValue } : {}),
+      },
     });
   }
 
@@ -309,19 +313,41 @@ export class PrismaAdminRepository implements AdminRepository {
       case 'CONVERSATION_REPORTS': return this.prisma.conversationReport.count({ where: resolved });
       case 'STORY_REPORTS': return this.prisma.eventStoryReport.count({ where: resolved });
       case 'USER_REPORTS': return this.prisma.userReport.count({ where: resolved });
-      case 'AUDIT': return this.prisma.adminAudit.count();
+      case 'AUDIT': return this.countAudit();
     }
   }
 
-  async listAudit(page: Page): Promise<AuditRow[]> {
-    const rows = await this.prisma.adminAudit.findMany({ orderBy: [...auditOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit });
-    const ids = [...new Set(rows.map((r) => r.adminId))];
-    const profiles = await this.prisma.profile.findMany({ where: { userId: { in: ids } }, select: { userId: true, username: true } });
+  async countAudit(filter: AuditFilter = {}): Promise<number> {
+    return this.prisma.adminAudit.count({ where: await this.auditWhere(filter) });
+  }
+
+  async listAudit(page: Page, filter: AuditFilter = {}): Promise<AuditRow[]> {
+    const rows = await this.prisma.adminAudit.findMany({ where: await this.auditWhere(filter), orderBy: [...auditOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit });
+    const ids = [...new Set(rows.flatMap((r) => (r.adminId ? [r.adminId] : [])))];
+    const profiles = ids.length ? await this.prisma.profile.findMany({ where: { userId: { in: ids } }, select: { userId: true, username: true } }) : [];
     const names = new Map(profiles.map((p) => [p.userId, p.username]));
     return rows.map((r) => ({
-      id: r.id, adminId: r.adminId, action: r.action as AuditAction, targetType: r.targetType as AuditRecord['targetType'], targetId: r.targetId,
-      note: r.note, createdAt: r.createdAt, adminUsername: names.get(r.adminId) ?? MISSING,
+      id: r.id, adminId: r.adminId, actorKind: (r.actorKind || 'ADMIN') as AuditActorKind, action: r.action as AuditAction, targetType: r.targetType as AuditTargetType, targetId: r.targetId,
+      targetLabel: r.targetLabel, changes: Array.isArray(r.changes) ? (r.changes as unknown as AuditChange[]) : null,
+      note: r.note, createdAt: r.createdAt, adminUsername: r.adminId ? names.get(r.adminId) ?? MISSING : 'sistema',
     }));
+  }
+
+  /** Filtro da auditoria. A busca por texto também acha pelo @ de quem fez. */
+  private async auditWhere(f: AuditFilter): Promise<Prisma.AdminAuditWhereInput> {
+    const and: Prisma.AdminAuditWhereInput[] = [];
+    if (f.action) and.push({ action: f.action });
+    if (f.actorKind) and.push({ actorKind: f.actorKind });
+    if (f.targetType) and.push({ targetType: f.targetType });
+    if (f.actorId) and.push(isUuid(f.actorId) ? { adminId: f.actorId } : { id: { in: [] } });
+    if (f.targetId) and.push({ targetId: f.targetId });
+    if (f.from || f.to) and.push({ createdAt: { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lt: f.to } : {}) } });
+    const q = (f.text ?? '').trim();
+    if (q) {
+      const people = await this.prisma.profile.findMany({ where: { username: contains(q) }, select: { userId: true }, take: 50 });
+      and.push({ OR: [{ note: contains(q) }, { targetLabel: contains(q) }, { targetId: contains(q) }, ...(people.length ? [{ adminId: { in: people.map((p) => p.userId) } }] : [])] });
+    }
+    return and.length ? { AND: and } : {};
   }
 
   async userExtras(userId: string): Promise<AdminUserExtras | undefined> {

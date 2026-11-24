@@ -74,7 +74,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditFilter, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
 } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -3383,7 +3383,11 @@ export class InMemoryAdminRepository implements AdminRepository {
   }
 
   async addAudit(record: AuditRecord) {
-    this.audit.set(record.id, { ...record });
+    this.audit.set(record.id, { ...record, actorKind: record.actorKind ?? 'ADMIN', targetLabel: record.targetLabel ?? null, changes: record.changes ?? null });
+  }
+
+  async countAudit(filter: AuditFilter = {}) {
+    return (await this.listAudit({ limit: Number.MAX_SAFE_INTEGER, offset: 0 }, filter)).length;
   }
 
   async countList(kind: AdminCountKind, filter: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean } = {}): Promise<number> {
@@ -3399,19 +3403,29 @@ export class InMemoryAdminRepository implements AdminRepository {
       case 'CONVERSATION_REPORTS': return (await this.listConversationReports(open, all)).length;
       case 'STORY_REPORTS': return (await this.listStoryReports(open, all)).length;
       case 'USER_REPORTS': return (await this.listUserReports(open, all)).length;
-      case 'AUDIT': return (await this.listAudit(all)).length;
+      case 'AUDIT': return this.countAudit();
     }
   }
 
-  async listAudit(page: Page) {
+  async listAudit(page: Page, filter: AuditFilter = {}) {
+    const name = (id: string | null) => (id ? this.username(id) : 'sistema');
+    const text = filter.text?.toLowerCase();
     const rows = [...this.audit.values()]
+      .filter((r) => (!filter.action || r.action === filter.action)
+        && (!filter.actorKind || (r.actorKind ?? 'ADMIN') === filter.actorKind)
+        && (!filter.targetType || r.targetType === filter.targetType)
+        && (!filter.actorId || r.adminId === filter.actorId)
+        && (!filter.targetId || r.targetId === filter.targetId)
+        && (!filter.from || r.createdAt.getTime() >= filter.from.getTime())
+        && (!filter.to || r.createdAt.getTime() < filter.to.getTime())
+        && (!text || [r.note, r.targetLabel, r.targetId, name(r.adminId)].some((v) => v?.toLowerCase().includes(text))))
       .map((r, i) => ({ r, i }))
       .sort((a, b) => b.r.createdAt.getTime() - a.r.createdAt.getTime() || b.i - a.i)
       .map((x) => x.r);
     sortRows(rows, page, { action: (r) => r.action, targetType: (r) => r.targetType, createdAt: (r) => r.createdAt.getTime() });
     return rows
       .slice(page.offset, page.offset + page.limit)
-      .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
+      .map((r) => ({ ...r, actorKind: r.actorKind ?? 'ADMIN', targetLabel: r.targetLabel ?? null, changes: r.changes ?? null, adminUsername: name(r.adminId) }));
   }
 
   /** O que só a gestão troca e o registro em memória não guarda (quem publica no feed). */

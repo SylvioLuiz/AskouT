@@ -3,7 +3,7 @@ import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
 import type { Sort } from './sort.ts';
 import type {
-  AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
+  AuditFilter, AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -213,7 +213,8 @@ export const api = {
   deleteTaste: (id: string) => request<{ items: Taste[] }>('DELETE', `/admin/tastes/${encodeURIComponent(id)}`),
   deleteEventExtra: (id: string) => request<{ items: EventExtra[] }>('DELETE', `/admin/event-extras/${encodeURIComponent(id)}`),
 
-  audit: (offset: number, sort?: Sort) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset, limit: getPageSize(), ...sortParams(sort) })}`),
+  audit: (offset: number, sort?: Sort, filter: AuditFilter = {}, limit = getPageSize()) =>
+    request<Page<AuditRow>>('GET', `/admin/audit${query({ offset, limit, ...sortParams(sort), ...filter })}`),
 };
 
 /** Foto de uma publicação do feed (endereço público, como no app). */

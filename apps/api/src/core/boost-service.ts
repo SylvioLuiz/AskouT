@@ -1,4 +1,5 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
+import { brl, recordAudit } from './audit.ts';
 import type { MatchReach, MatchService } from './match-service.ts';
 import { MATCH_MAX_TAGS, MATCH_RADIUS_KM_OPTIONS } from './match.ts';
 import type { CoreDeps } from './ports.ts';
@@ -261,6 +262,11 @@ export class BoostService {
       matchTags: match?.tags ?? [],
     };
     await this.deps.boosts.create(boost);
+    await recordAudit(this.deps, {
+      actorId: ownerId, actorKind: 'USER', action: 'BOOST_ORDERED', targetType: 'BOOST', targetId: id, targetLabel: description.replace(/^Impulsionamento d[eo] /, ''),
+      note: `${days} dia(s), ${brl(amountCents)}, ${channel === 'WEB' ? 'pelo site' : channel === 'APPLE' ? 'App Store' : 'Google Play'}${audience === 'MATCH' ? ', Match' : ''}`,
+      changes: [{ field: 'local', before: null, after: venue.name }, { field: 'valor', before: null, after: brl(amountCents) }, { field: 'dias', before: null, after: String(days) }],
+    });
     return this.view(boost, now);
   }
 
@@ -276,6 +282,7 @@ export class BoostService {
     const boost = await this.ownedBoost(ownerId, boostId);
     if (boost.status !== 'PENDING_PAYMENT') throw conflict('Só dá para cancelar o que ainda não foi pago');
     await this.deps.boosts.transition(boost.id, ['PENDING_PAYMENT'], 'CANCELLED');
+    await recordAudit(this.deps, { actorId: ownerId, actorKind: 'USER', action: 'BOOST_CANCELLED', targetType: 'BOOST', targetId: boost.id, targetLabel: await this.boostLabel(boost), note: `Cancelou antes de pagar (${brl(boost.amountCents)})`, changes: [{ field: 'situação', before: 'aguardando pagamento', after: 'cancelado' }] });
     return this.view({ ...boost, status: 'CANCELLED' }, this.deps.clock.now());
   }
 
@@ -291,11 +298,32 @@ export class BoostService {
     const boost = await this.deps.boosts.findByChargeId(chargeId);
     if (!boost) return { confirmed: false };
     // Valor diferente do pedido: não libera (protege contra cobrança alterada ou aviso trocado).
-    if (receivedCents !== undefined && receivedCents !== boost.amountCents) return { confirmed: false };
+    if (receivedCents !== undefined && receivedCents !== boost.amountCents) {
+      await recordAudit(this.deps, {
+        actorId: null, actorKind: 'SYSTEM', action: 'BOOST_PAYMENT_REFUSED', targetType: 'BOOST', targetId: boost.id, targetLabel: await this.boostLabel(boost),
+        note: 'Aviso de pagamento com valor diferente do pedido: não liberado', changes: [{ field: 'valor', before: brl(boost.amountCents), after: brl(receivedCents) }],
+      });
+      return { confirmed: false };
+    }
     const now = this.deps.clock.now();
     const endsAt = new Date(now.getTime() + boost.days * DAY_MS);
     const confirmed = await this.deps.boosts.markPaid(boost.id, { paidAt: now, startsAt: now, endsAt });
+    if (confirmed) await this.auditPaid(boost, endsAt, 'pagamento confirmado pelo provedor');
     return { confirmed };
+  }
+
+  private async boostLabel(boost: BoostRecord): Promise<string> {
+    const venue = await this.deps.places.findVenue(boost.venueId);
+    const event = boost.eventId ? await this.deps.places.findEvent(boost.eventId) : undefined;
+    return event ? `${event.event.title} · ${venue?.name ?? ''}` : venue?.name ?? boost.venueId;
+  }
+
+  private async auditPaid(boost: BoostRecord, endsAt: Date, how: string): Promise<void> {
+    await recordAudit(this.deps, {
+      actorId: null, actorKind: 'SYSTEM', action: 'BOOST_PAID', targetType: 'BOOST', targetId: boost.id, targetLabel: await this.boostLabel(boost),
+      note: `${brl(boost.amountCents)}, ${boost.days} dia(s): ${how}`,
+      changes: [{ field: 'situação', before: 'aguardando pagamento', after: 'pago' }, { field: 'no ar até', before: null, after: endsAt.toISOString() }],
+    });
   }
 
   /** Aviso (webhook) do provedor de pagamento. Aviso inválido é ignorado (devolve false). */
@@ -340,6 +368,7 @@ export class BoostService {
     const endsAt = new Date(now.getTime() + boost.days * DAY_MS);
     const chargeId = `${store.toLowerCase()}:${purchase.transactionId}`;
     const confirmed = await this.deps.boosts.markPaid(boost.id, { paidAt: now, startsAt: now, endsAt, chargeId });
+    if (confirmed) await this.auditPaid(boost, endsAt, `compra confirmada na ${store === 'APPLE' ? 'App Store' : 'Google Play'}`);
     if (!confirmed) {
       const fresh = await this.deps.boosts.find(boost.id);
       if (fresh?.status === 'PAID') return this.view(fresh, now); // chamada repetida

@@ -1246,20 +1246,83 @@ export type AuditAction =
   | 'TASTE_REMOVED'
   | 'RECO_EXPERIMENT_ENABLED'
   | 'RECO_EXPERIMENT_CHANGED'
-  | 'RECO_EXPERIMENT_DISABLED';
+  | 'RECO_EXPERIMENT_DISABLED'
+  // Gestão (antes sem registro)
+  | 'ADMIN_LOGIN'
+  | 'ADMIN_PASSWORD_CHANGED'
+  | 'CLAIM_DOCUMENT_VIEWED'
+  | 'EVENT_EXTRA_MOVED'
+  | 'TASTE_MOVED'
+  | 'HUNTER_ENABLED'
+  | 'HUNTER_DISABLED'
+  | 'HUNTER_EVENT_REMOVED'
+  | 'HUNTER_EVENTS_REMOVED_ALL'
+  | 'HUNTER_SYNC_RUN'
+  // Ações sensíveis de quem usa o app
+  | 'ACCOUNT_DELETED'
+  | 'ACCOUNT_DATA_EXPORTED'
+  | 'MFA_ENABLED'
+  | 'MFA_DISABLED'
+  | 'MFA_RECOVERY_REGENERATED'
+  | 'BOOST_ORDERED'
+  | 'BOOST_CANCELLED'
+  // Sistema
+  | 'BOOST_PAID'
+  | 'BOOST_PAYMENT_REFUSED'
+  | 'ROLE_CHANGED';
+
+/** Quem fez: alguém da gestão, a própria pessoa no app ou o sistema (pagamento, script). */
+export type AuditActorKind = 'ADMIN' | 'USER' | 'SYSTEM';
+export const AUDIT_ACTOR_KINDS: readonly AuditActorKind[] = ['ADMIN', 'USER', 'SYSTEM'];
+
+export type AuditTargetType = 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'VENUE_STORY' | 'VENUE_STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'COMMENT' | 'SETTING' | 'BOOST' | 'HUNTER';
+export const AUDIT_TARGET_TYPES: readonly AuditTargetType[] = ['USER', 'CLAIM', 'VENUE', 'POST', 'PLACE_EVENT', 'POST_REPORT', 'CONVERSATION_REPORT', 'USER_REPORT', 'STORY', 'STORY_REPORT', 'VENUE_STORY', 'VENUE_STORY_REPORT', 'FEED_POST', 'FEED_COMMENT', 'FEED_REPORT', 'COMMENT', 'SETTING', 'BOOST', 'HUNTER'];
+
+/** Um campo que mudou: rótulo, valor antes e depois (já em texto, como a gestão lê). */
+export interface AuditChange {
+  field: string;
+  before: string | null;
+  after: string | null;
+}
 
 export interface AuditRecord {
   id: string;
-  adminId: string;
+  /** Quem fez. Nulo quando foi o sistema. */
+  adminId: string | null;
+  /** Padrão ADMIN (registros antigos). */
+  actorKind?: AuditActorKind;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'COMMENT' | 'SETTING';
+  targetType: AuditTargetType;
   targetId: string;
+  /** Nome do alvo no momento da ação (@usuário, nome do local, título do evento): continua legível se o alvo sumir. */
+  targetLabel?: string | null;
+  /** O que mudou, campo a campo (antes → depois). */
+  changes?: AuditChange[] | null;
   note: string | null;
   createdAt: Date;
 }
 
 export interface AuditRow extends AuditRecord {
+  actorKind: AuditActorKind;
+  targetLabel: string | null;
+  changes: AuditChange[] | null;
+  /** @usuário de quem fez ("sistema" quando não há pessoa). */
   adminUsername: string;
+}
+
+/** Filtros da lista da auditoria. */
+export interface AuditFilter {
+  action?: AuditAction;
+  actorKind?: AuditActorKind;
+  targetType?: AuditTargetType;
+  /** Só o que esta pessoa fez. */
+  actorId?: string;
+  /** Só o que aconteceu com este alvo. */
+  targetId?: string;
+  /** Busca no motivo, no nome do alvo, no id do alvo e no @ de quem fez. */
+  text?: string;
+  from?: Date;
+  to?: Date;
 }
 
 // ---------- Votação de datas ("Encontrar a melhor data") ----------

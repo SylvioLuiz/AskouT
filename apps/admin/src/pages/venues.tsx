@@ -8,6 +8,7 @@ import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 import { CheckInput, LinkedList, Mono, NumberInput, PersonLink, RecordLink, RecordModal, RecordView, SelectInput, TextArea, TextInput, YesNo, useOpenRecord, useRecordEditor, useReloadOnChange } from '../record.tsx';
 import type { RecordSection } from '../record.tsx';
+import { AuditTrail } from './audit.tsx';
 
 const SOURCE_LABEL = { GOOGLE: 'Google', OSM: 'OpenStreetMap', IMPORT: 'Importação de agenda' } as const;
 
@@ -233,6 +234,7 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
         </>
       ),
     },
+    { title: 'Auditoria', children: <AuditTrail filter={{ targetId: v.id }} empty="Nada registrado sobre este local." /> },
   ];
 
   return (

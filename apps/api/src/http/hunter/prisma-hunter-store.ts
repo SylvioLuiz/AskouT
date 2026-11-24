@@ -112,6 +112,6 @@ export class PrismaHunterStore implements HunterStore {
   }
 
   async audit(adminId: string, action: string, targetId: string, note: string | null, at: Date): Promise<void> {
-    await this.prisma.adminAudit.create({ data: { adminId, action, targetType: action.includes('EVENT') ? 'PLACE_EVENT' : 'SETTING', targetId, note, createdAt: at } });
+    await this.prisma.adminAudit.create({ data: { adminId, actorKind: 'ADMIN', action, targetType: 'HUNTER', targetId, targetLabel: 'Hunter', note, createdAt: at } });
   }
 }

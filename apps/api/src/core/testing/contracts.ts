@@ -1543,6 +1543,22 @@ export function defineRepositoryContract(
         assert.deepEqual([list[0]!.adminUsername, list[0]!.targetId, list[0]!.note, list[2]!.note], ['adm', target, 'ok', 'Spam']);
         assert.equal((await h.admin.listAudit({ limit: 1, offset: 1 })).length, 1, 'a paginação respeita limite e deslocamento');
       });
+
+      it('auditoria: ação do sistema e de quem usa o app, nome do alvo, antes/depois e filtros', async () => {
+        const dono = await newUser('donoaud');
+        const target = randomUUID();
+        await h.admin.addAudit({ id: randomUUID(), adminId: null, actorKind: 'SYSTEM', action: 'BOOST_PAID', targetType: 'BOOST', targetId: target, targetLabel: 'Bar Auditado', changes: [{ field: 'situação', before: 'aguardando pagamento', after: 'pago' }], note: 'R$ 69,90', createdAt: at(1) });
+        await h.admin.addAudit({ id: randomUUID(), adminId: dono, actorKind: 'USER', action: 'BOOST_ORDERED', targetType: 'BOOST', targetId: target, targetLabel: 'Bar Auditado', note: null, createdAt: at(0) });
+        const rows = await h.admin.listAudit({ limit: 10, offset: 0 }, { targetId: target });
+        assert.deepEqual(rows.map((r) => [r.action, r.actorKind, r.adminUsername]), [['BOOST_PAID', 'SYSTEM', 'sistema'], ['BOOST_ORDERED', 'USER', 'donoaud']]);
+        assert.deepEqual(rows[0]!.changes, [{ field: 'situação', before: 'aguardando pagamento', after: 'pago' }]);
+        assert.equal(rows[1]!.changes, null);
+        assert.equal(await h.admin.countAudit({ targetId: target, actorKind: 'SYSTEM' }), 1);
+        assert.equal(await h.admin.countAudit({ targetId: target, text: 'auditado' }), 2, 'busca no nome do alvo');
+        assert.equal(await h.admin.countAudit({ targetId: target, text: 'donoaud' }), 1, 'busca no @ de quem fez');
+        assert.equal(await h.admin.countAudit({ targetId: target, actorId: dono }), 1);
+        assert.equal(await h.admin.countAudit({ targetId: target, from: at(1) }), 1);
+      });
     });
 
     describe('locais com dono e reivindicações', () => {
