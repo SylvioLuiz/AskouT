@@ -3802,4 +3802,12 @@ export const ES: Readonly<Record<string, string>> = {
   "Evento aberto, sem convite": "Evento abierto, sin invitación",
   "Cadastre seu celular": "Registra tu celular",
   "Assim seus amigos acham você pela agenda do celular. O número não aparece para ninguém.": "Así tus amigos te encuentran por la agenda del celular. El número no se muestra a nadie.",
+  "Buscar por nome ou @": "Buscar por nombre o @",
+  "Buscar amigo por nome ou @": "Buscar amigo por nombre o @",
+  "Nenhum amigo encontrado": "No se encontró ningún amigo",
+  "Confira o nome ou o @ digitado.": "Revisa el nombre o el @ que escribiste.",
+  "{shown} de {total}": "{shown} de {total}",
+  "Ninguém encontrado": "No se encontró a nadie",
+  "resultado": "resultado",
+  "resultados": "resultados",
 };
