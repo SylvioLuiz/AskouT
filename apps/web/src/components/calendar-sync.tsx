@@ -156,7 +156,7 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
       <p className="muted">{t('Conecte suas agendas: os compromissos aparecem como "ocupado" na sua agenda do AskouT. Títulos e detalhes não saem da sua agenda.')}</p>
       {message ? (
         <Notice tone={message.tone}>
-          {message.tone === 'ok' ? <span className="calsync__check" aria-hidden="true"><CheckIcon /></span> : null}
+          {message.tone === 'ok' ? <span className="calsync__done" aria-hidden="true"><CheckIcon /></span> : null}
           {message.text}
         </Notice>
       ) : null}
