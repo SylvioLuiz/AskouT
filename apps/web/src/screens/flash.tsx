@@ -14,7 +14,7 @@ import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice
 import { OfferBanner } from '../components/offer-banner.tsx';
 import { api, apiBaseUrl, session } from '../client.ts';
 import { backgroundLocationBridge, ownArrivalStep, shouldSendFix } from '../lib/background-arrival.ts';
-import { reopenClosedArrivals } from '../lib/live-arrival.ts';
+import { arrivalTag, reopenClosedArrivals } from '../lib/live-arrival.ts';
 import { nativePushBridge } from '../lib/push.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
@@ -137,6 +137,8 @@ function FlashContent() {
     [matchKey],
   );
   useReopenLiveArrival(matchViews.data);
+  // Encontros em que o amigo deixou você acompanhar a chegada dele (botão "Mostrar a chegada" na lista).
+  const following = new Set((matchViews.data ?? []).filter((m) => m.themArrival).map((m) => m.inviteId));
   const share = useShareLocation(
     matchIds,
     () => {
@@ -331,7 +333,7 @@ function FlashContent() {
       <section className="nowoff" aria-label={t('Ligar o NOW')}>
         {feedbackLine}
         <OfferBanner />
-        <MatchList matches={invites.data?.matches ?? []} after onEnded={reloadAll} />
+        <MatchList matches={invites.data?.matches ?? []} after following={following} onEnded={reloadAll} />
         {(invites.data?.matches.length ?? 0) > 0 ? (
           <div className="nowloc-row">
             {share.state.phase === 'sharing' ? (
@@ -527,7 +529,7 @@ function FlashContent() {
         </>
       ) : null}
 
-      <MatchList matches={matches} onEnded={reloadAll} />
+      <MatchList matches={matches} following={following} onEnded={reloadAll} />
 
       <section className="nowcard" aria-label={t('Seu NOW')}>
         <button type="button" className="nowcard__plus" aria-haspopup="menu" aria-expanded={plusOpen} aria-label={t('Estender o NOW')} disabled={left >= 179} onClick={() => setPlusOpen((o) => !o)}>
@@ -1103,7 +1105,7 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
  * Encontros aceitos. `after`: o NOW já acabou, mas o encontro continua (com a localização) até terminar.
  * Cada um tem o "Encerrar" à mão: com o NOW desligado, é por aqui que a localização para.
  */
-function MatchList({ matches, after, onEnded }: { matches: readonly FlashInvite[]; after?: boolean; onEnded: () => void }) {
+function MatchList({ matches, after, following, onEnded }: { matches: readonly FlashInvite[]; after?: boolean; following?: ReadonlySet<string>; onEnded: () => void }) {
   const [ending, setEnding] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -1141,6 +1143,7 @@ function MatchList({ matches, after, onEnded }: { matches: readonly FlashInvite[
               </button>
             ) : null}
           </div>
+          {following?.has(invite.id) && ending !== invite.id ? <ShowArrivalButton inviteId={invite.id} other={invite.other} /> : null}
           {ending === invite.id ? (
             <>
               {problem ? <Notice tone="error">{problem}</Notice> : null}
@@ -1150,6 +1153,48 @@ function MatchList({ matches, after, onEnded }: { matches: readonly FlashInvite[
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * "Mostrar a chegada de {name}": o amigo deixou você acompanhar a chegada dele e você fechou o aviso (ou a Live
+ * Activity no iPhone). Manda de novo para a bandeja / tela bloqueada, em silêncio, com o progresso de agora.
+ */
+function ShowArrivalButton({ inviteId, other }: { inviteId: string; other: { userId: string; username: string } }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<Feedback>();
+  async function show() {
+    setBusy(true);
+    setNote(undefined);
+    try {
+      const bridge = nativePushBridge();
+      if (!bridge) {
+        setNote({ tone: 'error', text: t('A chegada aparece nas notificações do app do AskouT no celular.') });
+        return;
+      }
+      if ((await bridge.liveActivityShowing?.(arrivalTag(inviteId, other.userId))) === true) {
+        setNote({ tone: 'ok', text: t('A chegada de {name} já está na tela bloqueada.', { name: other.username }) });
+        return;
+      }
+      const { reopened } = await api.flashReopenArrival(inviteId);
+      setNote(
+        reopened
+          ? { tone: 'ok', text: t('Pronto: a chegada de {name} voltou para as notificações.', { name: other.username }) }
+          : { tone: 'error', text: t('{name} ainda não mandou a posição, ou já chegou.', { name: other.username }) },
+      );
+    } catch (failure) {
+      setNote({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <Button variant="secondary" full loading={busy} onClick={() => void show()}>
+        {t('Mostrar a chegada de {name} na notificação', { name: other.username })}
+      </Button>
+      {note ? <Notice tone={note.tone}>{note.text}</Notice> : null}
+    </>
   );
 }
 
@@ -1296,7 +1341,12 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
     setDismissed(true);
   }
 
-  const theirs = match.themArrival ? <p className="muted">{t('{name} liberou você a acompanhar a chegada pelas notificações do celular.', { name })}</p> : null;
+  const theirs = match.themArrival ? (
+    <>
+      <p className="muted">{t('{name} liberou você a acompanhar a chegada pelas notificações do celular.', { name })}</p>
+      <ShowArrivalButton inviteId={match.inviteId} other={match.other} />
+    </>
+  ) : null;
 
   if (match.meArrival) {
     return (
