@@ -7277,9 +7277,10 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 /* Encerrar no topo da tela do encontro. */
 .matchend { min-height: 36px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 999px; background: transparent; color: var(--danger); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .nowmatch { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; background: color-mix(in srgb, var(--now-pink) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--now-pink) 40%, transparent); color: var(--ink); text-decoration: none; }
-.nowmatch > span { display: grid; flex: 1; min-width: 0; }
+/* Só o bloco de texto estica: o círculo das iniciais (também um span) mantém o tamanho e fica redondo. */
+.nowmatch > span:not(.nowface) { display: grid; flex: 1; min-width: 0; }
 .nowmatch strong { font-size: 0.9375rem; }
-.nowmatch span span { color: var(--muted); font-size: 0.8125rem; }
+.nowmatch span:not(.nowface) span { color: var(--muted); font-size: 0.8125rem; }
 .nowmatch > svg { width: 18px; height: 18px; color: var(--muted); }
 
 .nowfree { display: flex; flex-direction: column; gap: 12px; }
@@ -7296,7 +7297,9 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .nowfriend { display: grid; justify-items: center; gap: 4px; width: 78px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; cursor: pointer; }
 .nowfriend .nownote { max-width: 78px; margin-bottom: 4px; padding: 3px 8px; font-size: 0.6875rem; }
 .nowfriend__name { max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; font-weight: 700; }
-.nowfriend__detail { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.nowfriends > li { flex: none; }
+/* Distância e estado ("Encontro", "Convidado") quebram linha dentro da coluna, sem invadir o amigo do lado. */
+.nowfriend__detail { max-width: 78px; color: var(--muted); font-size: 0.75rem; line-height: 1.25; text-align: center; overflow-wrap: anywhere; }
 .nowfree__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .nowempty { display: grid; gap: 4px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); text-align: center; }
 .nowempty span { color: var(--muted); font-size: 0.875rem; }
