@@ -55,7 +55,7 @@ export class PostsController {
           return i;
         })
       : b.images;
-    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId }));
+    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId, groupId: b.groupId }));
   }
 
   /** Seus posts arquivados (só você vê). Vem antes de `posts/:id`. */

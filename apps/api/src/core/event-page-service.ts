@@ -1,3 +1,4 @@
+import { originGroupFor } from './community-service.ts';
 import { canOpenByInvite } from './event-invites.ts';
 import { VISITOR_ID } from './visitor.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
@@ -160,6 +161,11 @@ export interface EventPageView {
   group: { conversationId: string; name: string } | null;
   /** Quem criou o evento (de pessoa) ainda não está num grupo dele: vê o botão para criar. */
   canCreateGroup: boolean;
+  /**
+   * Grupo de amigos onde o evento foi criado. Só aparece para quem está no grupo: para os outros (mesmo com o evento
+   * aberto ao público) o grupo de origem não existe.
+   */
+  originGroup: { conversationId: string; name: string } | null;
 }
 
 /** Pessoa convidada para um evento criado por uma pessoa. */
@@ -312,7 +318,13 @@ export class EventPageService {
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
       datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
       ...(await this.groupFor(viewerId, ref, isOwner)),
+      originGroup: ref.source === 'USER' ? await this.originGroupOf(viewerId, ref.id) : null,
     };
+  }
+
+  private async originGroupOf(viewerId: string, postId: string): Promise<EventPageView['originGroup']> {
+    const post = (await this.deps.posts.findById(postId))?.post;
+    return post ? originGroupFor(this.deps, viewerId, post) : null;
   }
 
   /** Grupo do evento em que o visitante está (só mostra conversa de que ele já faz parte) e se ele pode criar um. */
@@ -404,6 +416,7 @@ export class EventPageService {
       datePollId: null,
       group: null,
       canCreateGroup: false,
+      originGroup: null,
     };
   }
 
@@ -424,7 +437,7 @@ export class EventPageService {
     return toPublicProfile(author);
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup'> }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup' | 'originGroup'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');

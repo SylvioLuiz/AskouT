@@ -210,7 +210,7 @@ export class ConversationsController {
   /** `{userIds: string[]}`: adiciona amigos ao grupo. */
   @Post(':id/members')
   addMembers(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
-    return this.core.conversations.addMembers(actor.userId, id, asBody(body).userIds);
+    return this.core.conversations.addMembers(actor.userId, id, asBody(body).userIds, asBody(body).shareHistory);
   }
 
   /** `{admin: true|false}`: faz ou desfaz um administrador do grupo. */

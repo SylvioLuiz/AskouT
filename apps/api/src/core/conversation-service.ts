@@ -245,6 +245,8 @@ export interface GroupDetails {
   meetups: MeetupView[];
   /** Fotos e vídeos da conversa ficam na aba Mídia (`GET .../shared`). */
   mediaAvailable: true;
+  /** Grupo de amigos: convites, eventos do grupo e "Criar evento no grupo" vêm de `GET /groups/:id`. */
+  community: boolean;
 }
 
 /** Evento ao qual o grupo pertence. */
@@ -1271,7 +1273,7 @@ export class ConversationService {
           return { id: found.card.id, title: found.card.title, coverUrl: found.card.imageUrl, coverImageId, canEditCover: coverImageId !== null };
         })()
       : null;
-    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl ?? event?.coverUrl ?? null, ownImage: conversation.imageUrl !== null, event, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true };
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl ?? event?.coverUrl ?? null, ownImage: conversation.imageUrl !== null, event, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true, community: conversation.community === true };
   }
 
   // ---------- Gestão do grupo ----------
@@ -1359,11 +1361,17 @@ export class ConversationService {
     return { imageUrl };
   }
 
-  /** Quem criou o grupo e os administradores adicionam amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou. */
-  async addMembers(actorId: string, conversationId: string, userIds: unknown): Promise<{ added: number }> {
+  /**
+   * Quem criou o grupo e os administradores adicionam amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou.
+   * `shareHistory: false` esconde de quem entra as mensagens de antes (vê só o que vier depois); ausente ou true mostra tudo.
+   * Grupo de amigos não usa esta rota: lá as pessoas são convidadas e só entram quando aceitam.
+   */
+  async addMembers(actorId: string, conversationId: string, userIds: unknown, rawShareHistory?: unknown): Promise<{ added: number }> {
     const { conversations, follows, blocks, clock } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
     await this.requireManager(actorId, conversationId, conversation.ownerId, 'adicionar pessoas');
+    if (conversation.community) throw conflict('Neste grupo as pessoas entram por convite: convide e elas entram quando aceitarem');
+    const shareHistory = parseShareHistory(rawShareHistory);
     if (!Array.isArray(userIds) || userIds.length === 0) throw validationError('Escolha as pessoas', { userIds: 'Escolha ao menos uma pessoa' });
     const targets = [...new Set(userIds)];
     for (const t of targets) if (typeof t !== 'string' || t === '' || t.length > 64) throw validationError('Pessoa inválida', { userIds: 'Pessoa inválida' });
@@ -1379,6 +1387,7 @@ export class ConversationService {
     const actorName = await this.nameOf(actorId);
     for (const t of wanted) {
       await conversations.addParticipant(conversationId, t, now);
+      if (!shareHistory) await hideHistoryFor(conversations, conversationId, t, now);
       await this.postSystem(conversationId, actorId, `${actorName} adicionou ${await this.nameOf(t)}`, now);
     }
     await this.notifyMembers(actorId, actorName, conversation, wanted, 'adicionou você ao grupo');
@@ -1544,6 +1553,18 @@ export class ConversationService {
     if (!other) throw notFound('Conversa não encontrada');
     return { conversation: await this.settle(conversation), memberIds: members, otherId, other };
   }
+}
+
+/** "Compartilhar o histórico" ao colocar alguém num grupo: ausente vale sim (como sempre foi). */
+export function parseShareHistory(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'boolean') throw validationError('Valor inválido', { shareHistory: 'Use true ou false' });
+  return value;
+}
+
+/** Quem entra sem o histórico só vê as mensagens a partir de agora (o aviso de entrada, gravado em seguida, aparece). */
+export async function hideHistoryFor(conversations: CoreDeps['conversations'], conversationId: string, userId: string, now: Date): Promise<void> {
+  await conversations.setCleared(conversationId, userId, new Date(now.getTime() - 1));
 }
 
 /** Pedaço da mensagem para o aviso: uma linha só, até 100 caracteres (sem cortar emoji ao meio), com "…" se passar. */

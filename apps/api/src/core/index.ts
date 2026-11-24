@@ -4,6 +4,7 @@ import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
+import { CommunityService } from './community-service.ts';
 import { PresenceService } from './presence-service.ts';
 import { StoryReactionService } from './story-reaction-service.ts';
 import { FollowService } from './follow-service.ts';
@@ -103,6 +104,8 @@ export function createCore(input: CoreInput) {
     availability: new AvailabilityService(deps),
     flash,
     conversations,
+    /** Grupos de amigos: convite com aceite e eventos criados dentro do grupo. */
+    communities: new CommunityService(deps),
     presence: new PresenceService(deps),
     storyReactions: new StoryReactionService(deps, eventPages, conversations),
     suggestions: new SuggestionService(deps, flash),
@@ -205,6 +208,8 @@ export type {
   PositionView,
 } from './flash-service.ts';
 export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion } from './conversation-service.ts';
+export { CommunityService, COMMUNITY_MAX_MEMBERS, COMMUNITY_NAME_MAX } from './community-service.ts';
+export type { CommunityInviteView, CommunityPendingView, CommunitySummaryView, CommunityView } from './community-service.ts';
 export type { ConversationListItem, ConversationView, GroupDetails, MessageView } from './conversation-service.ts';
 export { RecommendationService } from './recommendation-service.ts';
 export type { RecommendationItem, RecommendationsView } from './recommendation-service.ts';

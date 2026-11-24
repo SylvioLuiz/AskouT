@@ -81,7 +81,7 @@ import type {
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository, AdminCountKind, MfaRepository } from '../ports.ts';
-import type { UserMfa } from '../types.ts';
+import type { GroupInviteRecord, UserMfa } from '../types.ts';
 import type { ActivityAction, ActivityRecord, ActivityTarget } from '../types.ts';
 
 /**
@@ -1387,11 +1387,33 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return p ? [...p.keys()] : undefined;
   }
 
-  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord> {
-    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, createdAt: input.now };
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string; community?: boolean }): Promise<ConversationRecord> {
+    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, community: input.community === true, createdAt: input.now };
     this.conversations.set(input.id, record);
     this.participants.set(input.id, new Map([[input.ownerId, null]]));
     return { ...record };
+  }
+
+  /** Convites pendentes de grupo de amigos: `conversa|pessoa`. */
+  readonly groupInvites = new Map<string, GroupInviteRecord>();
+
+  async addGroupInvite(conversationId: string, userId: string, invitedById: string, now: Date, shareHistory: boolean): Promise<boolean> {
+    const key = `${conversationId}|${userId}`;
+    if (this.groupInvites.has(key) || !this.conversations.has(conversationId)) return false;
+    this.groupInvites.set(key, { conversationId, userId, invitedById, shareHistory, createdAt: now });
+    return true;
+  }
+
+  async removeGroupInvite(conversationId: string, userId: string): Promise<boolean> {
+    return this.groupInvites.delete(`${conversationId}|${userId}`);
+  }
+
+  async listGroupInvites(conversationId: string): Promise<GroupInviteRecord[]> {
+    return [...this.groupInvites.values()].filter((i) => i.conversationId === conversationId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((i) => ({ ...i }));
+  }
+
+  async listGroupInvitesForUser(userId: string): Promise<GroupInviteRecord[]> {
+    return [...this.groupInvites.values()].filter((i) => i.userId === userId && this.conversations.has(i.conversationId)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).map((i) => ({ ...i }));
   }
 
   async groupIdsForEventPost(postId: string): Promise<string[]> {
@@ -1409,6 +1431,8 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async removeParticipant(conversationId: string, userId: string): Promise<void> {
     this.participants.get(conversationId)?.delete(userId);
     this.groupAdmins.get(conversationId)?.delete(userId);
+    // Como no banco: a linha de quem participa some, e com ela o "limpar conversa".
+    this.cleared.delete(`${conversationId}|${userId}`);
   }
 
   async deleteGroup(conversationId: string): Promise<void> {
@@ -1417,6 +1441,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
     this.conversations.delete(conversationId);
     this.participants.delete(conversationId);
     this.groupAdmins.delete(conversationId);
+    for (const key of [...this.groupInvites.keys()]) if (key.startsWith(`${conversationId}|`)) this.groupInvites.delete(key);
     for (let i = this.messages.length - 1; i >= 0; i--) if (this.messages[i]!.conversationId === conversationId) this.messages.splice(i, 1);
     for (const key of [...this.cleared.keys()]) if (key.startsWith(`${conversationId}|`)) this.cleared.delete(key);
     for (const key of [...this.prefs.keys()]) if (key.startsWith(`${conversationId}|`)) this.prefs.delete(key);
@@ -2530,6 +2555,10 @@ export class InMemoryPostRepository implements PostRepository {
 
   async listInvites(postId: string): Promise<EventInviteRecord[]> {
     return [...this.invites.values()].filter((i) => i.postId === postId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((i) => ({ ...i }));
+  }
+
+  async listByOriginGroup(conversationId: string): Promise<PostWithImages[]> {
+    return [...this.posts.values()].filter((p) => p.originGroupId === conversationId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).map((p) => this.withImages(p));
   }
 
   async isInvited(postId: string, userId: string): Promise<boolean> {

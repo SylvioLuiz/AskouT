@@ -1,3 +1,4 @@
+import { communityForEvent, shareGroupEvent } from './community-service.ts';
 import { canOpenByInvite } from './event-invites.ts';
 import { canManageVenue, managedVenueIds } from './venue-access.ts';
 import { decodeImageDataUrl } from './image.ts';
@@ -47,6 +48,8 @@ export interface PostInput {
   event?: unknown;
   /** Votação de datas concluída da qual este evento é consequência (só quem organizou a votação). */
   datePollId?: unknown;
+  /** Evento criado dentro de um grupo de amigos (id da conversa do grupo): nasce privado e o convite vai para todos do grupo. */
+  groupId?: unknown;
 }
 
 export interface PostImageView {
@@ -247,7 +250,10 @@ export class PostService {
     const placeName = venue ? venue.name : (optionalText(input.placeName, 120, 'placeName', 'Nome do local') ?? placeVenue?.name.slice(0, 120) ?? null);
     const placeAddress = venue ? venue.address : (optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço') ?? placeVenue?.address?.slice(0, 200) ?? null);
     const event = this.parseEvent(input.event, placeName);
-    const eventPrivate = event !== null && this.parsePrivate(input.event);
+    // Evento no grupo de amigos: só quem está no grupo cria, e nasce privado (dá para abrir ao público depois, editando).
+    const community = input.groupId === undefined || input.groupId === null || input.groupId === '' ? undefined : await communityForEvent(this.deps, actorId, input.groupId);
+    if (community && (event === null || venue)) throw validationError('Só eventos são criados no grupo', { groupId: 'Crie um evento para o grupo' });
+    const eventPrivate = event !== null && (community !== undefined || this.parsePrivate(input.event));
     const eventExtras = event !== null ? await this.parseExtras(input.event) : [];
     const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
     // Evento criado pela pessoa já é o próprio evento; post de local já tem o local. Os demais vinculam um evento ou um rolê.
@@ -280,7 +286,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do local por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null, originGroupId: community?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       // Marcar alguém no evento já é convidar: aparece como convidado e abre o evento (mesmo privado).
@@ -288,6 +294,7 @@ export class PostService {
       await this.notifyTagged(actorId, postId, event?.title ?? null, tagIds);
     }
     if (poll && event) await this.linkPoll(poll, postId, event.title, actorId);
+    if (community && event) await shareGroupEvent(this.deps, actorId, community, { id: postId, title: event.title });
     const created = await posts.findById(postId);
     if (!created) throw notFound('Post não encontrado');
     return (await this.views(actorId, [created]))[0] as PostView;

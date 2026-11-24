@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { DirectActivityRow, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import type { DirectActivityRow, GroupInviteRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { DELETED_BODY } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
@@ -47,7 +47,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; venueId?: string | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; venueId?: string | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null; community?: boolean } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -57,6 +57,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
   eventPostId: c.group?.eventPostId ?? null,
+  community: c.group?.community === true,
   ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null, venueId: c.venueId ?? null } : {}),
   createdAt: c.createdAt,
 });
@@ -185,7 +186,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     return rows.length > 0 ? rows.map((r) => r.userId) : undefined;
   }
 
-  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord> {
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string; community?: boolean }): Promise<ConversationRecord> {
     const groupId = randomUUID();
     await this.prisma.group.create({
       data: {
@@ -193,12 +194,44 @@ export class PrismaConversationRepository implements ConversationRepository {
         ownerId: input.ownerId,
         name: input.name,
         ...(input.eventPostId ? { eventPostId: input.eventPostId } : {}),
+        community: input.community === true,
         createdAt: input.now,
         members: { create: [{ userId: input.ownerId, role: 'OWNER', joinedAt: input.now }] },
         conversation: { create: { id: input.id, type: 'GROUP', createdAt: input.now, participants: { create: [{ userId: input.ownerId }] } } },
       },
     });
-    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, createdAt: input.now };
+    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, community: input.community === true, createdAt: input.now };
+  }
+
+  private async groupIdOf(conversationId: string): Promise<string | null> {
+    if (!isUuid(conversationId)) return null;
+    return (await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } }))?.groupId ?? null;
+  }
+
+  async addGroupInvite(conversationId: string, userId: string, invitedById: string, now: Date, shareHistory: boolean): Promise<boolean> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId || !isUuid(userId)) return false;
+    const created = await this.prisma.groupInvite.createMany({ data: [{ groupId, userId, invitedById: isUuid(invitedById) ? invitedById : null, shareHistory, createdAt: now }], skipDuplicates: true });
+    return created.count > 0;
+  }
+
+  async removeGroupInvite(conversationId: string, userId: string): Promise<boolean> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId || !isUuid(userId)) return false;
+    return (await this.prisma.groupInvite.deleteMany({ where: { groupId, userId } })).count > 0;
+  }
+
+  async listGroupInvites(conversationId: string): Promise<GroupInviteRecord[]> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId) return [];
+    const rows = await this.prisma.groupInvite.findMany({ where: { groupId }, orderBy: [{ createdAt: 'asc' }, { userId: 'asc' }], take: 500 });
+    return rows.map((r) => ({ conversationId, userId: r.userId, invitedById: r.invitedById, shareHistory: r.shareHistory, createdAt: r.createdAt }));
+  }
+
+  async listGroupInvitesForUser(userId: string): Promise<GroupInviteRecord[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.groupInvite.findMany({ where: { userId }, include: { group: { select: { conversation: { select: { id: true } } } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return rows.flatMap((r) => (r.group.conversation ? [{ conversationId: r.group.conversation.id, userId: r.userId, invitedById: r.invitedById, shareHistory: r.shareHistory, createdAt: r.createdAt }] : []));
   }
 
   async groupIdsForEventPost(postId: string): Promise<string[]> {

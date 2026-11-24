@@ -287,6 +287,8 @@ export interface ConversationRecord {
   imageUrl: string | null;
   /** Grupo criado para um evento de pessoa (post): pela página do evento ou pela votação da data. */
   eventPostId?: string | null;
+  /** Grupo de amigos (turma): só entra quem aceita o convite, e os eventos criados nele já convidam todos. */
+  community?: boolean;
   /** Só DIRECT: solicitação de mensagem pendente para esta pessoa (nula = conversa normal). */
   requestToId?: string | null;
   /** Quem recebeu a solicitação recusou: some para ela até chegar mensagem nova. */
@@ -600,6 +602,18 @@ export interface PostRecord {
   placeVenueId?: string | null;
   /** Evento vinculado ao post (id de um evento de local ou de um post que é evento). */
   linkedEventId?: string | null;
+  /** Evento criado dentro de um grupo de amigos: id da conversa do grupo. Só quem está no grupo vê esse vínculo. */
+  originGroupId?: string | null;
+}
+
+/** Convite pendente para entrar num grupo de amigos (pela conversa do grupo). */
+export interface GroupInviteRecord {
+  conversationId: string;
+  userId: string;
+  invitedById: string | null;
+  /** Quem entrar vê as mensagens de antes de entrar. Falso: só o que vier depois. */
+  shareHistory: boolean;
+  createdAt: Date;
 }
 
 export interface PostImageRecord {
