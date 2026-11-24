@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { DOUBLE_TAP_MS, LONG_PRESS_MS } from '../lib/chat.ts';
 import { api } from '../client.ts';
 import { ChevronLeftIcon, ChevronRightIcon, PlayIcon, XIcon } from './icons.tsx';
+import { useCloseOnBack } from './photo-viewer.tsx';
 import { edgeResist, stepIndex, swipeAxis, swipeStep } from '../lib/media-gallery.ts';
 import type { ChatMessage } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
@@ -78,7 +79,7 @@ export function galleryOf(messages: readonly ChatMessage[]): GalleryItem[] {
  * Foto ou vídeo em tela cheia, por cima de tudo (vai direto para o <body>, para nenhum balão "prender" a tela).
  * Foto: pinça para dar zoom, arrastar para andar com zoom, toque duplo alterna o zoom e arrastar para baixo fecha.
  * Com `onPrev`/`onNext`: arrastar para o lado e as setas ← → do teclado trocam de foto.
- * Esc, o X ou tocar fora da foto também fecham.
+ * Esc, o X, o "voltar" do aparelho ou tocar fora da foto também fecham.
  */
 export function MediaViewer({
   kind,
@@ -126,14 +127,11 @@ export function MediaViewer({
       }
     };
     window.addEventListener('keydown', onKey);
-    const body = document.body.style;
-    const before = body.overflow;
-    body.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      body.overflow = before;
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // O "voltar" do aparelho fecha a foto/vídeo em vez de sair da conversa (também trava a rolagem do fundo).
+  useCloseOnBack(onClose);
 
   // Foto nova: começa sem zoom e entra deslizando do lado certo.
   useLayoutEffect(() => {
