@@ -67,6 +67,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import { matchesNotificationFilter, type NotificationFilter } from '../notification-categories.ts';
+import { DEFAULT_SOUNDS, type NotificationSoundSettings } from '../notification-sounds.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
@@ -2291,6 +2292,16 @@ export class InMemoryNotificationRepository implements NotificationRepository {
 
   async setMuteSettings(userId: string, settings: NotificationMuteSettings): Promise<void> {
     this.muted.set(userId, { ...settings });
+  }
+
+  readonly sounds = new Map<string, NotificationSoundSettings>();
+
+  async getSoundSettings(userId: string): Promise<NotificationSoundSettings> {
+    return { ...DEFAULT_SOUNDS, ...this.sounds.get(userId) };
+  }
+
+  async setSoundSettings(userId: string, settings: NotificationSoundSettings): Promise<void> {
+    this.sounds.set(userId, { ...settings });
   }
 
   async create(record: NotificationRecord): Promise<void> {

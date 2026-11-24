@@ -65,6 +65,18 @@ export class NotificationsController {
     return this.core.notifications.setMuteSettings(actor.userId, { all: b.all, chats: b.chats, events: b.events });
   }
 
+  /** Som do push por grupo: `{chats, invites, arrival, other}`. */
+  @Get('sounds')
+  sounds(@CurrentActor() actor: Actor) {
+    return this.core.notifications.soundSettings(actor.userId);
+  }
+
+  /** `{chats?, invites?, arrival?, other?}`, cada um `padrao`, `silencioso` ou um som do app: muda só o que vier. */
+  @Put('sounds')
+  setSounds(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.notifications.setSoundSettings(actor.userId, body);
+  }
+
   /** Chave pública VAPID (ou `null` se o push não está configurado). */
   @Get('push-key')
   pushKey() {
@@ -75,7 +87,7 @@ export class NotificationsController {
   @HttpCode(200)
   subscribe(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.notifications.subscribe(actor.userId, { endpoint: b.endpoint, keys: b.keys, reply: b.reply });
+    return this.core.notifications.subscribe(actor.userId, { endpoint: b.endpoint, keys: b.keys, reply: b.reply, sounds: b.sounds });
   }
 
   @Post('push/remove')

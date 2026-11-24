@@ -67,6 +67,7 @@ import type {
   EventPage,
   EventInvite,
   NotificationMute,
+  NotificationSounds,
   EventStoryGroup,
   CommentGif,
   RollingNowItem,
@@ -470,6 +471,8 @@ export function createApi(deps: ApiDeps) {
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
+    notificationSounds: () => request<NotificationSounds>('GET', '/notifications/sounds'),
+    setNotificationSounds: (patch: Partial<NotificationSounds>) => request<NotificationSounds>('PUT', '/notifications/sounds', { body: patch }),
 
     // Explorar
     explore: (params: ExploreParams) => {
@@ -937,7 +940,7 @@ export function createApi(deps: ApiDeps) {
     /** Manda um aviso de teste para os aparelhos da própria pessoa. */
     pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
-    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean; sounds?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Álbuns dos encontros

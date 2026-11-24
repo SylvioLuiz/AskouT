@@ -739,6 +739,11 @@ model NotificationSetting {
   muteAll    Boolean  @default(false)
   muteChats  Boolean  @default(false)
   muteEvents Boolean  @default(false)
+  /// Som do push por grupo (ver apps/api/src/core/notification-sounds.ts): `padrao`, `silencioso` ou um som do app.
+  soundChats   String @default("padrao")
+  soundInvites String @default("padrao")
+  soundArrival String @default("padrao")
+  soundOther   String @default("padrao")
   updatedAt  DateTime @default(now())
 
   user User @relation("NotificationSettingUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -789,6 +794,8 @@ model PushSubscription {
   createdAt DateTime @default(now())
   /// O app do aparelho mostra o campo "Responder" na notificação (no Android, o push vai só com dados).
   replyable Boolean  @default(false)
+  /// O app do aparelho tem os sons do AskouT (no Android, os canais de cada som). Sem isso, só o som padrão.
+  sounds    Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

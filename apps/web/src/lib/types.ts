@@ -828,6 +828,16 @@ export interface NotificationMute {
   events: boolean;
 }
 
+/** Som do push: o do aparelho, nenhum, ou um som do AskouT (arquivos em public/sons e dentro do app). */
+export type NotificationSound = 'padrao' | 'askout' | 'pop' | 'sino' | 'brilho' | 'silencioso';
+/** Som de cada grupo de aviso: conversas, convites (encontros e NOW), chegada do amigo e o resto. */
+export interface NotificationSounds {
+  chats: NotificationSound;
+  invites: NotificationSound;
+  arrival: NotificationSound;
+  other: NotificationSound;
+}
+
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';

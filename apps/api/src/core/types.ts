@@ -560,6 +560,8 @@ export interface PushSubscriptionRecord {
    * (só dados, o app monta o aviso); versões antigas do app não mostrariam nada, então só vale quando o app avisa.
    */
   replyable?: boolean;
+  /** O app desse aparelho tem os sons do AskouT (no Android, os canais de cada som). Versões antigas: só o som padrão. */
+  sounds?: boolean;
 }
 
 /** Foto de perfil guardada no banco (já reduzida pelo app). */

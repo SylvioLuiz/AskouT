@@ -71,5 +71,6 @@ describe('"Responder" na notificação', () => {
     const iphone = 'a'.repeat(64);
     assert.deepEqual(nativeSubscription({ replies: true }, iphone), { endpoint: `apns:${iphone}`, reply: true });
     assert.deepEqual(nativeSubscription({}, iphone), { endpoint: `apns:${iphone}` }, 'app antigo: aviso de sempre (no Android, o novo formato não apareceria)');
+    assert.deepEqual(nativeSubscription({ replies: true, sounds: true }, iphone), { endpoint: `apns:${iphone}`, reply: true, sounds: true }, 'casca com os sons do AskouT');
   });
 });
