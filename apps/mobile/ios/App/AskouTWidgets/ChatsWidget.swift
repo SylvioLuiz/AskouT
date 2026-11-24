@@ -104,8 +104,9 @@ enum ChatsStore {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
         request.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let (data, response) = try? await URLSession.shared.data(for: request) {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if let result = try? await URLSession.shared.data(for: request) {
+            let data = result.0
+            let status = (result.1 as? HTTPURLResponse)?.statusCode ?? 0
             if status == 401 {
                 forget()
                 return .loggedOut
@@ -120,39 +121,47 @@ enum ChatsStore {
 
     /// Fotos das linhas que cabem: data URL (foto do grupo) ou https (perfil, logo do local), reduzidas para o círculo.
     static func photos(for chats: [WidgetChat]) async -> [String: UIImage] {
-        await withTaskGroup(of: (String, UIImage?).self) { group in
+        // As tarefas devolvem só os bytes (Data é Sendable); a imagem é montada aqui, fora delas.
+        let raw = await withTaskGroup(of: (String, Data?).self, returning: [String: Data].self) { group in
             for chat in chats {
-                guard let raw = chat.photoUrl else { continue }
-                group.addTask { (chat.id, await image(from: raw)) }
+                guard let url = chat.photoUrl else { continue }
+                let id = chat.id
+                group.addTask { (id, await ChatsStore.bytes(from: url)) }
             }
-            var out: [String: UIImage] = [:]
-            for await (id, image) in group { if let image = image { out[id] = image } }
+            var out: [String: Data] = [:]
+            for await (id, data) in group { if let data = data { out[id] = data } }
             return out
         }
+        var out: [String: UIImage] = [:]
+        for (id, data) in raw { if let picture = ChatsStore.circle(data) { out[id] = picture } }
+        return out
     }
 
-    private static func image(from raw: String) async -> UIImage? {
-        var data: Data?
+    private static func bytes(from raw: String) async -> Data? {
         if raw.hasPrefix("data:image/"), let comma = raw.firstIndex(of: ",") {
-            data = Data(base64Encoded: String(raw[raw.index(after: comma)...]))
-        } else if raw.hasPrefix("https://"), let url = URL(string: raw) {
-            data = try? await URLSession.shared.data(from: url).0
+            return Data(base64Encoded: String(raw[raw.index(after: comma)...]))
         }
-        guard let data = data, let image = UIImage(data: data) else { return nil }
-        // O widget tem pouca memória: guarda só o tamanho do círculo.
+        guard raw.hasPrefix("https://"), let url = URL(string: raw) else { return nil }
+        guard let result = try? await URLSession.shared.data(from: url) else { return nil }
+        return result.0
+    }
+
+    /// O widget tem pouca memória: guarda só o tamanho do círculo.
+    private static func circle(_ data: Data) -> UIImage? {
+        guard let source = UIImage(data: data), source.size.width > 0, source.size.height > 0 else { return nil }
         let side: CGFloat = 96
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side))
         return renderer.image { _ in
-            let scale = max(side / image.size.width, side / image.size.height)
-            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            image.draw(in: CGRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
+            let scale = max(side / source.size.width, side / source.size.height)
+            let size = CGSize(width: source.size.width * scale, height: source.size.height * scale)
+            source.draw(in: CGRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
         }
     }
 
     static func entries(_ show: ChatsShow, rows: Int) async -> Timeline<ChatsEntry> {
         let state = await load(show)
         var photos: [String: UIImage] = [:]
-        if case .ready(let snapshot) = state { photos = await self.photos(for: Array(snapshot.chats.prefix(rows))) }
+        if case .ready(let snapshot) = state { photos = await ChatsStore.photos(for: Array(snapshot.chats.prefix(rows))) }
         let now = Date()
         var entries = [ChatsEntry(date: now, show: show, state: state, photos: photos)]
         // À meia-noite, "14:05" vira "Ontem" sem precisar buscar.
