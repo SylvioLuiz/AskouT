@@ -470,6 +470,19 @@ export function EventScreen({ eventId }: { eventId: string }) {
               );
             })()
           ) : null}
+          {/* Grupo de amigos onde o evento foi criado: só quem está no grupo vê (para os outros, mesmo com o evento público, ele não existe). */}
+          {!visitor && e.originGroup ? (
+            <Link to={`/conversas/${encodeURIComponent(e.originGroup.conversationId)}/grupo`} className="evhost evgroup">
+              <span className="evgroup__icon" aria-hidden="true">
+                <UsersIcon />
+              </span>
+              <span className="evhost__text">
+                <span className="evhost__label">{t('Criado no grupo')}</span>
+                <strong className="evhost__name">{e.originGroup.name || t('Abrir o grupo')}</strong>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+          ) : null}
           {/* Grupo do evento: aparece só para quem está nele; quem criou o evento e ainda não tem grupo pode criar. */}
           {!visitor && e.group ? (
             <Link to={`/conversas/${encodeURIComponent(e.group.conversationId)}`} className="evhost evgroup">

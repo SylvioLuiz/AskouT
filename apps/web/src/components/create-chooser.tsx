@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { Sheet } from './agenda.tsx';
-import { CalendarPlusIcon, ChevronRightIcon, PhotoIcon } from './icons.tsx';
+import { CalendarPlusIcon, ChevronRightIcon, UsersIcon, PhotoIcon } from './icons.tsx';
 import { navigate, rememberScroll } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 /** Rotas de criar: postagem (sempre num evento ou local) ou evento (tela única do evento). */
 export const CREATE_POST_PATH = '/criar';
 export const CREATE_EVENT_PATH = '/criar?tipo=evento';
+export const CREATE_GROUP_PATH = '/grupos?criar=1';
 
 /** Folha do botão +: escolher entre criar uma postagem ou um evento. */
 export function CreateChooser({ onClose }: { onClose: () => void }) {
@@ -47,6 +48,7 @@ export function CreateChooser({ onClose }: { onClose: () => void }) {
   const options = [
     { to: CREATE_POST_PATH, icon: <PhotoIcon />, title: t('Postagem'), text: t('Fotos ou vídeo de um evento ou de um local onde você foi.') },
     { to: CREATE_EVENT_PATH, icon: <CalendarPlusIcon />, title: t('Evento'), text: t('Marque um rolê com dia e hora e chame a galera.') },
+    { to: CREATE_GROUP_PATH, icon: <UsersIcon />, title: t('Grupo'), text: t('Convide amigos para uma turma e crie eventos que já chegam para todos.') },
   ];
   return (
     <Sheet title={t('O que você quer criar?')} onClose={onClose}>

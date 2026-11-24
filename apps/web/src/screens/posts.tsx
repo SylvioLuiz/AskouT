@@ -174,7 +174,10 @@ export function CreatePostScreen() {
   // Data e horário também vêm de um compromisso da agenda (`/criar?tipo=evento&inicio=...&fim=...`).
   const [eventStart, setEventStart] = useState(startAsEvent ? (prefill.get('inicio') ?? '') : '');
   const [eventEnd, setEventEnd] = useState(startAsEvent ? (prefill.get('fim') ?? '') : '');
-  const [eventPrivate, setEventPrivate] = useState(false);
+  // Evento criado dentro de um grupo de amigos (`?grupo=<conversa>`): nasce privado e o convite vai para todos do grupo.
+  const groupId = startAsEvent ? prefill.get('grupo') : null;
+  const originGroup = useAsync(() => (groupId ? api.community(groupId).catch(() => null) : Promise.resolve(null)), [groupId]);
+  const [eventPrivate, setEventPrivate] = useState(groupId !== null);
   // Data decidida depois, numa votação: o evento nasce sem data.
   const [eventDateByPoll, setEventDateByPoll] = useState(false);
   // Configurações de evento da gestão ("Pode fumar?", "Estacionamento"...), respondidas num acordeon recolhido.
@@ -304,7 +307,7 @@ export function CreatePostScreen() {
         }
         videoFile = await videoJob.current!.promise;
       }
-      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao'), linkedEvent));
+      const created = await api.createPost({ ...buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao'), linkedEvent), ...(groupId && eventDraft ? { groupId } : {}) });
       const video = draftVideo && videoFile ? { ...draftVideo, file: videoFile } : undefined;
       if (video) {
         // O vídeo segue logo depois do post, no item da capa. Se falhar, o post não fica pela metade (só com a capa).
@@ -319,6 +322,11 @@ export function CreatePostScreen() {
         }
       }
       setUpload(undefined);
+      if (created.event && groupId && created.event.startsAt !== null) {
+        // Evento do grupo: o convite já foi para todo mundo do grupo. Vai direto para a página do evento.
+        navigate(`/eventos/${encodeURIComponent(created.id)}`, { replace: true });
+        return;
+      }
       if (created.event) {
         // O evento já existe: agora (e só agora) vem o passo de enviar para conversas, que dá para pular.
         const byPoll = created.event.startsAt === null;
@@ -587,7 +595,11 @@ export function CreatePostScreen() {
             }
           />
           <EventRow icon={<EventKindIcon kind={eventKind} />} label={t('Tipo')} value={kindLabel} onClick={() => setSheet('kind')} disabled={busy} />
-          <EventRow icon={eventPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={eventPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy} />
+          {groupId ? (
+            <EventRow icon={<UsersIcon />} label={t('No grupo')} value={`${originGroup.data?.name ?? t('Grupo')} · ${t('Só o grupo')}`} onClick={() => setMessage({ tone: 'ok', text: t('O evento do grupo nasce privado e o convite vai para todos do grupo. Depois de criado, dá para abrir ao público editando o evento; o grupo continua fechado.') })} disabled={busy} />
+          ) : (
+            <EventRow icon={eventPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={eventPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy} />
+          )}
         </ul>
 
         <div className={`evmore${moreOpen ? ' evmore--open' : ''}`}>

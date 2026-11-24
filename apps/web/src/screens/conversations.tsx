@@ -8,7 +8,7 @@ import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '.
 import type { VoiceControl } from '../components/voice.tsx';
 import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { UsersIcon, ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb, galleryOf } from '../components/chat-media.tsx';
 import { ImageEditor } from '../components/image-editor.tsx';
 import { canEditImage } from '../lib/image-edit.ts';
@@ -73,6 +73,9 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   useTitle(split && activeId ? undefined : t('Conversas'));
   const [cameBack] = useState(() => Date.now() - chatLeftAt < BACK_WINDOW_MS);
   const list = useAsync(() => api.conversations(), []);
+  // Convites para grupos de amigos ainda sem resposta (o atalho "Grupos de amigos" mostra quantos). Falha aqui não atrapalha a lista.
+  const communities = useAsync(() => api.communities().catch(() => ({ items: [], invites: [] })), []);
+  const groupInvites = communities.data?.invites.length ?? 0;
   useLiveRefresh(list.reload, 5_000);
   useEffect(() => {
     if (list.data) announceChatsChanged();
@@ -134,6 +137,16 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
     >
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead title={t('Conversas')} />
+      <Link to="/grupos" className={`convrequests groupslink${groupInvites > 0 ? ' convrequests--unread' : ''}`}>
+        <span className="convrequests__icon" aria-hidden="true">
+          <UsersIcon />
+        </span>
+        <span className="convrequests__text">
+          <strong>{t('Grupos de amigos')}</strong>
+          <span>{groupInvites > 0 ? (groupInvites === 1 ? t('1 convite para um grupo') : t('{count} convites para grupos', { count: groupInvites })) : t('Seus grupos, convites e eventos de cada grupo')}</span>
+        </span>
+        {groupInvites > 0 ? <span className="convrow__count">{groupInvites > 9 ? '9+' : groupInvites}</span> : null}
+      </Link>
       {requestCount > 0 ? (
         <Link to="/conversas/solicitacoes" className={`convrequests${requestUnread > 0 ? ' convrequests--unread' : ''}`}>
           <span className="convrequests__icon" aria-hidden="true">
@@ -254,7 +267,7 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
           muted={prefsFor.muted}
           onClose={() => setPrefsFor(undefined)}
           onChanged={() => list.reload()}
-          remove={{ group: prefsFor.type === 'GROUP', onRemoved: () => list.reload() }}
+          remove={{ group: prefsFor.type === 'GROUP', community: prefsFor.community === true, left: prefsFor.left === true, onRemoved: () => list.reload() }}
         />
       ) : null}
     </div>
@@ -1699,6 +1712,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </form>
           </div>
         </>
+      ) : data.left ? (
+        <LeftGroupBar conversationId={conversationId} />
       ) : data.request === 'INCOMING' && data.other ? (
         <MessageRequestBar conversationId={conversationId} other={data.other} onAccepted={view.reload} />
       ) : (
@@ -1767,6 +1782,37 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** Grupo de que você saiu (ou que foi excluído): as mensagens até ali ficam para ler; excluir tira a conversa da sua lista. */
+function LeftGroupBar({ conversationId }: { conversationId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  async function forget() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await api.forgetConversation(conversationId);
+      navigate('/conversas');
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="leftbar" role="status">
+      <p className="muted">{t('Você não faz mais parte deste grupo. As mensagens até a sua saída continuam aqui para você.')}</p>
+      {problem ? <p className="sugcard__problem">{problem}</p> : null}
+      {confirming ? (
+        <Confirm danger question={t('Excluir esta conversa? Ela some da sua lista e as mensagens somem para você.')} confirmLabel={t('Excluir conversa')} busy={busy} onCancel={() => setConfirming(false)} onConfirm={() => void forget()} />
+      ) : (
+        <Button full variant="secondary" onClick={() => setConfirming(true)}>
+          {t('Excluir conversa')}
+        </Button>
+      )}
     </div>
   );
 }
