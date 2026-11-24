@@ -1321,16 +1321,27 @@ model AppSetting {
 }
 
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.
+/// Auditoria: o que a gestão decidiu, ações sensíveis de quem usa o app e do sistema. Só cresce.
 model AdminAudit {
-  id         String   @id @default(uuid()) @db.Uuid
-  adminId    String   @db.Uuid
-  action     String
-  targetType String
-  targetId   String
-  note       String?
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid()) @db.Uuid
+  /// Quem fez. Nulo quando foi o sistema (pagamento confirmado, script).
+  adminId     String?  @db.Uuid
+  /// ADMIN, USER ou SYSTEM.
+  actorKind   String   @default("ADMIN")
+  action      String
+  targetType  String
+  targetId    String
+  /// Nome do alvo no momento (@usuário, local, evento): continua legível se o alvo for apagado.
+  targetLabel String?
+  /// O que mudou, campo a campo: [{ field, before, after }].
+  changes     Json?
+  note        String?
+  createdAt   DateTime @default(now())
 
   @@index([createdAt])
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
 }
 
 /// Capa enviada pelo dono do local (JPEG/PNG/WebP até 256 KB), servida em `/place-events/:id/cover`.

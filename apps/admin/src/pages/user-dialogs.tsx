@@ -8,6 +8,7 @@ import { Badge, Modal } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { DateInput, LinkedList, Mono, PersonLink, RecordLink, RecordModal, RecordView, TextArea, TextInput, YesNo, useRecordEditor } from '../record.tsx';
 import type { RecordAction, RecordSection } from '../record.tsx';
+import { AuditTrail } from './audit.tsx';
 
 export const ROLE_LABEL: Record<UserRow['role'], string> = { USER: 'Pessoa', VENUE_OWNER: 'Responsável por local', ADMIN: 'Admin' };
 const VENUE_ROLE_LABEL = { OWNER: 'Dono', MANAGER: 'Administra', FOLLOWER: 'Segue' } as const;
@@ -297,6 +298,8 @@ function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => 
       children: x ? <LinkedList items={x.groups} total={x.counts.groups} empty="" keyOf={(g) => g.id} render={(g) => ({ main: g.name, side: `${GROUP_ROLE_LABEL[g.role] ?? g.role} · desde ${formatDate(g.joinedAt)}` })} /> : null,
     },
     { title: 'Atividade', children: <ActivityList userId={u.id} compact /> },
+    { title: 'Auditoria: com esta conta', children: <AuditTrail filter={{ targetId: u.id }} empty="Nada registrado sobre esta conta." /> },
+    { title: 'Auditoria: feito por esta conta', hidden: u.role === 'USER', children: <AuditTrail filter={{ actorId: u.id }} empty="Nada registrado." /> },
   ];
 
   return (

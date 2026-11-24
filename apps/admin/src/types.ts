@@ -458,15 +458,40 @@ export interface UserReportRow {
   resolutionNote: string | null;
 }
 
+export type AuditActorKind = 'ADMIN' | 'USER' | 'SYSTEM';
+
+export interface AuditChange {
+  field: string;
+  before: string | null;
+  after: string | null;
+}
+
 export interface AuditRow {
   id: string;
-  adminId: string;
+  /** Nulo quando foi o sistema. */
+  adminId: string | null;
   adminUsername: string;
+  actorKind: AuditActorKind;
   action: string;
   targetType: string;
   targetId: string;
+  /** Nome do alvo no momento (continua legível se o alvo for apagado). */
+  targetLabel: string | null;
+  changes: AuditChange[] | null;
   note: string | null;
   createdAt: string;
+}
+
+export interface AuditFilter {
+  q?: string;
+  action?: string;
+  actorKind?: AuditActorKind;
+  targetType?: string;
+  actorId?: string;
+  targetId?: string;
+  /** AAAA-MM-DD */
+  from?: string;
+  to?: string;
 }
 
 // ---------- Pagamentos ----------

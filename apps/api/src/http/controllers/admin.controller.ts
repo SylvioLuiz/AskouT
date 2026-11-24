@@ -395,7 +395,7 @@ export class AdminController {
   }
 
   @Get('audit')
-  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
+  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown; q?: unknown; action?: unknown; actorKind?: unknown; targetType?: unknown; actorId?: unknown; targetId?: unknown; from?: unknown; to?: unknown }) {
     return this.core.admin.audit(actor, q);
   }
 }
