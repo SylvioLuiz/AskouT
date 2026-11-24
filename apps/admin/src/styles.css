@@ -311,3 +311,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .record__note { margin-top: 16px; }
 .record__foot { position: sticky; bottom: -24px; background: var(--surface); padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--line); align-items: center; }
 .record__changed { margin-right: auto; }
+
+/* Retenção: taxa colorida pela faixa (bom, atenção, ruim) e legenda. */
+.rate { display: inline-block; border-radius: 6px; padding: 1px 7px; font-weight: 700; }
+.rate--ok { background: var(--ok-bg); color: var(--ok); }
+.rate--warn { background: var(--warn-bg); color: var(--warn); }
+.rate--bad { background: var(--danger-bg); color: var(--danger); }
+.rate--neutral { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin: 8px 0 4px; }
+.legend__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.legend__title { font-weight: 600; margin-right: 4px; }
