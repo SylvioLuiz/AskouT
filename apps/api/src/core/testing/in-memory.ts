@@ -112,6 +112,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   readonly photos = new Map<string, ProfilePhotoRecord>();
+  readonly phonePrompts = new Map<string, { count: number; lastAt: Date | null }>();
 
   async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
     if (photo) this.photos.set(userId, { ...photo, data: new Uint8Array(photo.data) });
@@ -214,6 +215,15 @@ export class InMemoryUserRepository implements UserRepository {
   async markOnboarded(userId: string, at: Date): Promise<void> {
     const u = this.users.get(userId);
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
+  }
+
+  async getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }> {
+    return { ...(this.phonePrompts.get(userId) ?? { count: 0, lastAt: null }) };
+  }
+
+  async markPhonePrompted(userId: string, at: Date): Promise<void> {
+    const now = this.phonePrompts.get(userId) ?? { count: 0, lastAt: null };
+    this.phonePrompts.set(userId, { count: now.count + 1, lastAt: at });
   }
 
   async setTastes(userId: string, tastes: string[]): Promise<void> {
@@ -617,9 +627,12 @@ export class InMemoryFlashRepository implements FlashRepository {
 export class InMemoryFollowRepository implements FollowRepository {
   readonly rows = new Map<string, Follow>();
   private readonly blocks: BlockRepository;
+  private readonly users: InMemoryUserRepository | undefined;
 
-  constructor(blocks: BlockRepository) {
+  /** `users` é opcional: sem ele, a busca por `query` não encontra ninguém. */
+  constructor(blocks: BlockRepository, users?: InMemoryUserRepository) {
     this.blocks = blocks;
+    this.users = users;
   }
 
   private key(followerId: string, followeeId: string): string {
@@ -646,15 +659,15 @@ export class InMemoryFollowRepository implements FollowRepository {
     this.rows.delete(this.key(b, a));
   }
 
-  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
-    return this.matching(userId, direction, status)
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]> {
+    return this.matching(userId, direction, status, query)
       .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime() || x.followerId.localeCompare(y.followerId))
       .slice(page.offset, page.offset + page.limit)
       .map((f) => ({ ...f }));
   }
 
-  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
-    return this.matching(userId, direction, status).length;
+  async count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number> {
+    return this.matching(userId, direction, status, query).length;
   }
 
   async acceptAllPending(followeeId: string): Promise<number> {
@@ -689,10 +702,13 @@ export class InMemoryFollowRepository implements FollowRepository {
     return out;
   }
 
-  private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
-    return [...this.rows.values()].filter(
-      (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
-    );
+  private matching(userId: string, direction: Direction, status: FollowStatus, query?: string): Follow[] {
+    return [...this.rows.values()].filter((f) => {
+      if (f.status !== status || (direction === 'followers' ? f.followeeId !== userId : f.followerId !== userId)) return false;
+      if (!query) return true;
+      const p = this.users?.profiles.get(direction === 'followers' ? f.followerId : f.followeeId);
+      return !!p && (p.username.startsWith(query) || p.displayName.toLowerCase().includes(query));
+    });
   }
 }
 

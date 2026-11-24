@@ -32,6 +32,10 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Quantas vezes o app já pediu para cadastrar o celular e quando foi a última (vale para todos os aparelhos). */
+  getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }>;
+  /** Registra mais um pedido de cadastro do celular. */
+  markPhonePrompted(userId: string, at: Date): Promise<void>;
   /** Troca os gostos de rolê da pessoa (já validados). */
   setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
@@ -62,9 +66,12 @@ export interface FollowRepository {
   delete(followerId: string, followeeId: string): Promise<boolean>;
   /** Remove o seguimento nos dois sentidos entre a e b. */
   deleteBetween(a: string, b: string): Promise<void>;
-  /** Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue. */
-  list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]>;
-  count(userId: string, direction: Direction, status: FollowStatus): Promise<number>;
+  /**
+   * Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue.
+   * `query` (já em minúsculas) filtra a outra ponta: @ começando com o termo ou nome contendo o termo.
+   */
+  list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]>;
+  count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number>;
   /** Aceita todas as solicitações pendentes recebidas por followeeId. Retorna quantas. */
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */

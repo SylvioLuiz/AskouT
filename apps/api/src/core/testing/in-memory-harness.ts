@@ -38,7 +38,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let users = new InMemoryUserRepository();
   let referrals = new InMemoryReferralRepository(users);
   let blocks = new InMemoryBlockRepository();
-  let follows = new InMemoryFollowRepository(blocks);
+  let follows = new InMemoryFollowRepository(blocks, users);
   let pending = new InMemoryPendingSignupRepository();
   let passwordResets = new InMemoryPasswordResetRepository();
   let boosts = new InMemoryBoostRepository();
@@ -170,7 +170,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       users = new InMemoryUserRepository();
       referrals = new InMemoryReferralRepository(users);
       blocks = new InMemoryBlockRepository();
-      follows = new InMemoryFollowRepository(blocks);
+      follows = new InMemoryFollowRepository(blocks, users);
       pending = new InMemoryPendingSignupRepository();
       passwordResets = new InMemoryPasswordResetRepository();
       boosts = new InMemoryBoostRepository();
