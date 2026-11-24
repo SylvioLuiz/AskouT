@@ -1255,11 +1255,20 @@ export class ConversationService {
     await this.postSystem(conversationId, actorId, `${name} saiu do grupo`, now);
     await conversations.removeParticipant(conversationId, actorId);
     await meetups.declineAllFor(conversationId, actorId, now);
+    await this.leaveGroupPolls(conversationId, actorId);
     if (conversation.ownerId === actorId) {
       const next = memberIds.find((id) => id !== actorId);
       if (next) await conversations.updateGroup(conversationId, { ownerId: next });
     }
     return { ok: true };
+  }
+
+  /** Quem sai do grupo sai também das votações de data ainda abertas nele (com os votos), e a contagem se ajusta. */
+  private async leaveGroupPolls(conversationId: string, userId: string): Promise<void> {
+    const { scheduling } = this.deps;
+    for (const poll of await scheduling.listForConversation(conversationId)) {
+      if (poll.status === 'VOTING' && poll.organizerId !== userId) await scheduling.removeParticipant(poll.id, userId);
+    }
   }
 
   /** Apaga o grupo para todos. Só quem criou. Os outros membros recebem um aviso. */
@@ -1290,6 +1299,7 @@ export class ConversationService {
     const now = clock.now();
     await conversations.removeParticipant(conversationId, targetId);
     await meetups.declineAllFor(conversationId, targetId, now);
+    await this.leaveGroupPolls(conversationId, targetId);
     await this.postSystem(conversationId, actorId, `${await this.nameOf(targetId)} foi removido(a) por ${await this.nameOf(actorId)}`, now);
     await this.deps.notifier.notify({ userId: targetId, type: 'GROUP_REMOVED', title: conversation.name ?? 'Grupo', body: 'Você foi removido(a) do grupo', url: '/conversas' });
     return { ok: true };

@@ -608,6 +608,16 @@ export class PostService {
     return this.get(actorId, post.id);
   }
 
+  /** Troca a capa do próprio evento por uma foto enviada (a foto do lugar ou o vídeo que era a capa saem; as outras fotos ficam). */
+  async setCover(actorId: string, postId: unknown, dataUrl: unknown): Promise<PostView> {
+    const { post } = await this.seeable(actorId, postId);
+    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento troca a capa');
+    if (post.eventTitle === null) throw notFound('Evento não encontrado');
+    const decoded = decodeImageDataUrl(dataUrl, POST_IMAGE_MAX_BYTES, '100 KB');
+    await this.deps.posts.setCover(post.id, this.deps.ids.next(), decoded.mime, new Uint8Array(decoded.bytes));
+    return this.get(actorId, post.id);
+  }
+
   async archive(actorId: string, postId: unknown): Promise<{ archived: true }> {
     const { post } = await this.seeable(actorId, postId);
     if (!(await this.deps.posts.setArchived(post.id, actorId, this.deps.clock.now()))) throw forbidden('Só quem publicou arquiva o post');

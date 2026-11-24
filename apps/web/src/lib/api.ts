@@ -373,6 +373,7 @@ export function createApi(deps: ApiDeps) {
     editPost: (postId: string, patch: PostEdit) => request<PostView>('PATCH', `/posts/${id(postId)}`, { body: patch }),
     inviteToEvent: (postId: string, userIds: string[]) => request<{ invited: string[] }>('POST', `/posts/${id(postId)}/invites`, { body: { userIds } }),
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
+    setPostCover: (postId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/cover`, { body: { image } }),
     adjustPostImage: (postId: string, imageId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/images/${id(imageId)}`, { body: { image } }),
     archivePost: (postId: string) => request<{ archived: true }>('POST', `/posts/${id(postId)}/archive`),
     unarchivePost: (postId: string) => request<{ archived: false }>('DELETE', `/posts/${id(postId)}/archive`),

@@ -246,6 +246,14 @@ export class PrismaPostRepository implements PostRepository {
     return result.count > 0;
   }
 
+  async setCover(postId: string, newId: string, mime: string, data: Uint8Array): Promise<void> {
+    if (!isUuid(postId) || !isUuid(newId)) return;
+    const first = await this.prisma.postImage.findFirst({ where: { postId }, orderBy: { position: 'asc' }, select: { id: true } });
+    const bytes = Buffer.from(data);
+    if (first) await this.prisma.postImage.update({ where: { id: first.id }, data: { id: newId, mime, data: bytes, placePhotoRef: null, placePhotoAuthor: null, videoMime: null, videoData: null } });
+    else await this.prisma.postImage.create({ data: { id: newId, postId, position: 0, mime, data: bytes } });
+  }
+
   async hide(postId: string, userId: string): Promise<void> {
     if (!isUuid(postId) || !isUuid(userId)) return;
     await this.prisma.postHidden.createMany({ data: [{ postId, userId }], skipDuplicates: true });

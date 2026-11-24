@@ -2519,6 +2519,12 @@ export class InMemoryPostRepository implements PostRepository {
     return true;
   }
 
+  async setCover(postId: string, newId: string, mime: string, data: Uint8Array): Promise<void> {
+    const first = [...this.images.values()].filter((i) => i.postId === postId).sort((a, b) => a.position - b.position)[0];
+    if (first) this.images.delete(first.id);
+    this.images.set(newId, { id: newId, postId, position: first?.position ?? 0, mime, data: new Uint8Array(data), placePhotoRef: null, placePhotoAuthor: null, videoMime: null, videoData: null });
+  }
+
   async hide(postId: string, userId: string): Promise<void> {
     this.hidden.add(`${postId}|${userId}`);
   }
@@ -3582,6 +3588,12 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
     void at;
     const m = this.participants.get(pollId);
     if (m && !m.has(userId)) m.set(userId, null);
+  }
+
+  async removeParticipant(pollId: string, userId: string): Promise<void> {
+    this.participants.get(pollId)?.delete(userId);
+    const votes = this.votes.get(pollId);
+    if (votes) for (const [key, v] of votes) if (v.userId === userId) votes.delete(key);
   }
 
   async setFinished(pollId: string, userId: string, at: Date | null): Promise<void> {

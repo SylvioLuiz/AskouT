@@ -536,6 +536,8 @@ export interface SchedulingRepository {
   listParticipants(pollId: string): Promise<PollParticipantRecord[]>;
   /** Põe mais alguém na votação (idempotente). */
   addParticipant(pollId: string, userId: string, at: Date): Promise<void>;
+  /** Tira alguém da votação, com os votos dele (idempotente). */
+  removeParticipant(pollId: string, userId: string): Promise<void>;
   listVotes(pollId: string): Promise<PollVoteRecord[]>;
   /** Define (ou, com `null`, apaga) o voto da pessoa nos dias. Um voto por pessoa, votação e dia. */
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
@@ -609,6 +611,8 @@ export interface PostRepository {
    * e nenhum cache mostrar a versão antiga. Devolve false se a foto não é desse post ou é de lugar.
    */
   replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean>;
+  /** Troca a capa (a primeira foto) por uma foto enviada; sem fotos, a foto enviada vira a capa. */
+  setCover(postId: string, newId: string, mime: string, data: Uint8Array): Promise<void>;
   /** "Não tenho interesse": o post some das listas de `userId` (`listFor` com `scope.hideFor`). */
   hide(postId: string, userId: string): Promise<void>;
   /** Dos `postIds`, os que `userId` escondeu com "Não tenho interesse". */
