@@ -1,3 +1,4 @@
+import { mediaSrc } from './image.ts';
 import { getPageSize } from './page-size.ts';
 import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
@@ -215,6 +216,9 @@ export const api = {
 
   audit: (offset: number, sort?: Sort) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset, limit: getPageSize(), ...sortParams(sort) })}`),
 };
+
+/** Capa/logo do local para o <img>: https, data URL ou caminho da API (imagem enviada pelo app). */
+export const venueMediaUrl = (value: string | null | undefined) => mediaSrc(API_BASE, value);
 
 /** Foto de uma publicação do feed (endereço público, como no app). */
 export const feedImageUrl = (imageId: string) => `${API_BASE}/feed/images/${encodeURIComponent(imageId)}`;

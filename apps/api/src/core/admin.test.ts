@@ -525,6 +525,31 @@ test('editar local pela gestão: @ do Instagram normalizado, link aceito, vazio 
   assert.equal(vazio.instagram, null);
 });
 
+test('editar local pela gestão: capa e logo anexadas viram imagem do local; erro cai no campo certo', async () => {
+  const { w, A } = await setup();
+  const png = (n: number) => `data:image/png;base64,${Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(n)]).toString('base64')}`;
+  const d = await w.core.admin.editVenue(A, 'v1', { imageData: png(16), logoData: png(8), note: 'fotos do dono' });
+  assert.match(d.coverUrl ?? '', /^\/venues\/v1\/cover\?v=/);
+  assert.match(d.logoUrl ?? '', /^\/venues\/v1\/logo\?v=/);
+  assert.equal((await w.core.venues.venueCover('v1'))?.mime, 'image/png');
+  assert.equal((await w.core.venues.venueLogo('v1'))?.mime, 'image/png');
+  const log = (await w.core.admin.audit(A, {})).items[0]!;
+  assert.match(log.note ?? '', /capa: .*→/);
+  assert.match(log.note ?? '', /logo: .*→/);
+  const fieldsOf = async (p: Promise<unknown>) => {
+    try {
+      await p;
+    } catch (e) {
+      return Object.keys((e as { details?: Record<string, string> }).details ?? {});
+    }
+    assert.fail('devia recusar');
+  };
+  assert.deepEqual(await fieldsOf(w.core.admin.editVenue(A, 'v1', { logoUrl: 'http://x/logo.png', note: 'logo' })), ['logoUrl']);
+  assert.deepEqual(await fieldsOf(w.core.admin.editVenue(A, 'v1', { logoData: 'data:image/png;base64,AAAA', note: 'logo' })), ['logoData']);
+  assert.deepEqual(await fieldsOf(w.core.admin.editVenue(A, 'v1', { imageData: png(300 * 1024), note: 'capa' })), ['imageData']);
+  assert.deepEqual(await fieldsOf(w.core.admin.editVenue(A, 'v1', { imageUrl: 'ftp://x', note: 'capa' })), ['imageUrl']);
+});
+
 test('editar evento de local pela gestão: mesmas regras de quem administra e auditoria', async () => {
   const { w, A, U, ana } = await setup();
   const now = w.clock.now().getTime();

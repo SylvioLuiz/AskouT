@@ -239,7 +239,11 @@ export interface VenueEdit {
   category?: string | null;
   description?: string | null;
   imageUrl?: string | null;
+  /** Capa anexada (data URL JPEG/PNG/WebP), no lugar do endereço. */
+  imageData?: string;
   logoUrl?: string | null;
+  /** Logo anexada (data URL JPEG/PNG/WebP), no lugar do endereço. */
+  logoData?: string;
   /** "@bar", "bar" ou o link do perfil; vazio/nulo remove. */
   instagram?: string | null;
   lat?: number;

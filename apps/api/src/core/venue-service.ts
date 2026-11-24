@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { decodeImageDataUrl } from './image.ts';
-import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
+import { DomainError, conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
@@ -180,11 +180,18 @@ export function venueLogoPath(venueId: string, version: number): string {
 }
 
 /** Troca de uma imagem do perfil (capa ou logo): mantém, remove, usa link https ou guarda um arquivo enviado. */
-function resolveImage(input: { url: unknown; data: unknown }, current: string | null, ownPrefix: string, maxBytes: number, maxLabel: string, ownPath: () => string): { url: string | null; upload?: { mime: string; bytes: Uint8Array } } {
+/** `fields` diz em qual campo cai o erro (capa: imageUrl/imageData; logo: logoUrl/logoData), para a tela marcar o campo certo. */
+function resolveImage(input: { url: unknown; data: unknown }, current: string | null, ownPrefix: string, maxBytes: number, maxLabel: string, ownPath: () => string, fields: { url: string; data: string } = { url: 'imageUrl', data: 'imageData' }): { url: string | null; upload?: { mime: string; bytes: Uint8Array } } {
   const own = current !== null && current.startsWith(ownPrefix) ? current : null;
-  const badUrl = () => validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+  const badUrl = () => validationError('Dados inválidos', { [fields.url]: 'Use um endereço de imagem que comece com https://' });
   if (input.data !== undefined && input.data !== null && input.data !== '') {
-    const img = decodeImageDataUrl(input.data, maxBytes, maxLabel);
+    let img: ReturnType<typeof decodeImageDataUrl>;
+    try {
+      img = decodeImageDataUrl(input.data, maxBytes, maxLabel);
+    } catch (e) {
+      if (e instanceof DomainError && e.details?.image) throw validationError(e.message, { [fields.data]: e.details.image });
+      throw e;
+    }
     return { url: ownPath(), upload: { mime: img.mime, bytes: img.bytes } };
   }
   if (input.url === null || input.url === '') return { url: null };
@@ -734,7 +741,7 @@ export class VenueService {
     const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
     const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => '(foto enviada)');
-    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)');
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)', { url: 'logoUrl', data: 'logoData' });
     const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
     return { name, address, category, description, coverUrl: cover.url, logoUrl: logo.url, instagram };
   }
@@ -757,7 +764,7 @@ export class VenueService {
     const instagram = input.instagram === undefined ? (venue.instagram ?? null) : instagramHandle(input.instagram);
     const now = this.deps.clock.now().getTime();
     const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => venueCoverPath(venue.id, now));
-    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now));
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now), { url: 'logoUrl', data: 'logoData' });
     await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl: cover.url, logoUrl: logo.url, instagram });
     const ownCover = cover.url !== null && cover.url.startsWith(`/venues/${venue.id}/cover`);
     const ownLogo = logo.url !== null && logo.url.startsWith(`/venues/${venue.id}/logo`);

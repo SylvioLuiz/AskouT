@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { api, appUrl } from '../api.ts';
+import { useId, useState } from 'react';
+import { api, appUrl, venueMediaUrl } from '../api.ts';
+import { VENUE_COVER, VENUE_LOGO, resizeImage } from '../image.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { CLAIM_LABEL, EVENT_KIND_LABEL, FEED_POLICY_LABEL, formatDate, formatDateTime, formatEventWhen, plural } from '../labels.ts';
 import type { FeedPolicy, VenueDetail } from '../types.ts';
@@ -7,7 +8,7 @@ import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, SortTh } fro
 import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 import { CheckInput, LinkedList, Mono, NumberInput, PersonLink, RecordLink, RecordModal, RecordView, SelectInput, TextArea, TextInput, YesNo, useOpenRecord, useRecordEditor, useReloadOnChange } from '../record.tsx';
-import type { RecordSection } from '../record.tsx';
+import type { RecordEditor, RecordSection } from '../record.tsx';
 
 const SOURCE_LABEL = { GOOGLE: 'Google', OSM: 'OpenStreetMap', IMPORT: 'Importação de agenda' } as const;
 
@@ -19,13 +20,88 @@ type VenueDraft = {
   category: string;
   description: string;
   imageUrl: string;
+  /** Capa anexada agora (data URL), ainda não salva. */
+  imageData: string;
   logoUrl: string;
+  /** Logo anexada agora (data URL), ainda não salva. */
+  logoData: string;
   instagram: string;
   lat: string;
   lng: string;
   isSample: boolean;
   feedPolicy: FeedPolicy;
 };
+
+const VENUE_LABELS: Partial<Record<keyof VenueDraft, string>> = {
+  name: 'Nome', address: 'Endereço', category: 'Tipo', description: 'Descrição', imageUrl: 'Capa', imageData: 'Capa', logoUrl: 'Logo', logoData: 'Logo', instagram: 'Instagram', lat: 'Latitude', lng: 'Longitude', feedPolicy: 'Quem publica no feed', isSample: 'Dado de teste',
+};
+
+/**
+ * Capa ou logo na edição: anexar do computador (reduz no navegador, como o app do dono), colar um endereço https ou tirar.
+ * O anexo vai como `imageData`/`logoData`; o endereço, como `imageUrl`/`logoUrl`.
+ */
+function ImageField({ editor, urlKey, dataKey, logo = false }: { editor: RecordEditor<VenueDraft>; urlKey: 'imageUrl' | 'logoUrl'; dataKey: 'imageData' | 'logoData'; logo?: boolean }) {
+  const [reading, setReading] = useState(false);
+  const [problem, setProblem] = useState<string>();
+  const fileId = useId();
+  const data = editor.draft[dataKey];
+  const url = editor.draft[urlKey];
+  const preview = venueMediaUrl(data || url);
+  const what = logo ? 'logo' : 'capa';
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setProblem(undefined);
+    setReading(true);
+    try {
+      editor.set(dataKey, await resizeImage(file, logo ? VENUE_LOGO : VENUE_COVER));
+      editor.set(urlKey, '');
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Não foi possível ler essa imagem.');
+    } finally {
+      setReading(false);
+    }
+  };
+  return (
+    <div className="imagefield">
+      {preview ? <img className={logo ? 'imagefield__img imagefield__img--logo' : 'imagefield__img'} src={preview} alt={logo ? 'Logo' : 'Capa'} referrerPolicy="no-referrer" /> : <span className="muted small">Sem {what}.</span>}
+      <div className="imagefield__actions">
+        <label className="btn btn--small" htmlFor={fileId} aria-busy={reading || undefined}>
+          {reading ? 'Lendo…' : data ? `Trocar ${what}` : `Anexar ${what}`}
+        </label>
+        <input
+          id={fileId}
+          className="visually-hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={reading}
+          onChange={(e) => {
+            void pick(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+        {preview ? (
+          <button
+            type="button"
+            className="btn btn--small btn--danger-quiet"
+            onClick={() => {
+              editor.set(dataKey, '');
+              editor.set(urlKey, '');
+            }}
+          >
+            Tirar {what}
+          </button>
+        ) : null}
+      </div>
+      {data ? <span className="muted small">Imagem anexada: vai junto ao salvar.</span> : null}
+      {problem ? (
+        <span className="small alert" role="alert">
+          {problem}
+        </span>
+      ) : null}
+      <TextInput editor={editor} k={urlKey} type="url" placeholder="ou cole um endereço https://" />
+    </div>
+  );
+}
 
 const FEED_OPTIONS = (Object.keys(FEED_POLICY_LABEL) as FeedPolicy[]).map((value) => ({ value, label: FEED_POLICY_LABEL[value] }));
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -63,15 +139,18 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
   const x = v.extra;
   const editor = useRecordEditor<VenueDraft>({
     initial: {
-      name: v.name, address: v.address ?? '', category: v.category ?? '', description: v.description ?? '', imageUrl: v.coverUrl ?? '', logoUrl: v.logoUrl ?? '', instagram: v.instagram ? `@${v.instagram}` : '',
+      name: v.name, address: v.address ?? '', category: v.category ?? '', description: v.description ?? '', imageUrl: v.coverUrl ?? '', imageData: '', logoUrl: v.logoUrl ?? '', logoData: '', instagram: v.instagram ? `@${v.instagram}` : '',
       lat: String(v.lat), lng: String(v.lng), isSample: v.isSample, feedPolicy: x?.feedPolicy ?? 'OWNER_ONLY',
     },
+    labels: VENUE_LABELS,
+    // A API chama de `image` o problema do arquivo anexado.
+    alias: { image: 'imageData' },
     check: (d) => {
       const lat = coordProblem(d.lat, 90, 'Latitude');
       const lng = coordProblem(d.lng, 180, 'Longitude');
       return { ...(d.name.trim().length < 2 ? { name: 'O nome precisa de pelo menos 2 caracteres' } : {}), ...(lat ? { lat } : {}), ...(lng ? { lng } : {}) };
     },
-    save: (c, note) => {
+    save: (c, note, d) => {
       const opt = (t: string) => (t.trim() === '' ? null : t.trim());
       return api.editVenue(
         v.id,
@@ -80,8 +159,9 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
           ...(c.address !== undefined ? { address: opt(c.address) } : {}),
           ...(c.category !== undefined ? { category: opt(c.category) } : {}),
           ...(c.description !== undefined ? { description: c.description.trim() === '' ? null : c.description } : {}),
-          ...(c.imageUrl !== undefined ? { imageUrl: opt(c.imageUrl) } : {}),
-          ...(c.logoUrl !== undefined ? { logoUrl: opt(c.logoUrl) } : {}),
+          // Anexo novo vai como arquivo; senão, o endereço (vazio tira a imagem).
+          ...(d.imageData ? { imageData: d.imageData } : c.imageUrl !== undefined ? { imageUrl: opt(c.imageUrl) } : {}),
+          ...(d.logoData ? { logoData: d.logoData } : c.logoUrl !== undefined ? { logoUrl: opt(c.logoUrl) } : {}),
           ...(c.instagram !== undefined ? { instagram: opt(c.instagram) } : {}),
           ...(c.lat !== undefined ? { lat: Number(c.lat.replace(',', '.')) } : {}),
           ...(c.lng !== undefined ? { lng: Number(c.lng.replace(',', '.')) } : {}),
@@ -129,8 +209,8 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
           problem: p.instagram,
         },
         { label: 'Horários', value: hoursText(x?.hoursJson ?? null), wide: true },
-        { label: 'Capa (endereço)', value: v.coverUrl ? <span className="clip mono small">{v.coverUrl}</span> : null, input: <TextInput editor={editor} k="imageUrl" type="url" placeholder="https://" />, hint: 'Vazio tira a capa.', problem: p.imageUrl, wide: true },
-        { label: 'Logo (endereço)', value: v.logoUrl ? <span className="clip mono small">{v.logoUrl}</span> : null, input: <TextInput editor={editor} k="logoUrl" type="url" placeholder="https://" />, hint: 'Vazio tira a logo.', problem: p.logoUrl, wide: true },
+        { label: 'Capa', value: v.coverUrl ? <span className="clip mono small">{v.coverUrl}</span> : null, input: <ImageField editor={editor} urlKey="imageUrl" dataKey="imageData" />, hint: 'JPEG, PNG ou WebP; reduzida para até 1280 px.', problem: p.imageData ?? p.imageUrl, wide: true },
+        { label: 'Logo', value: v.logoUrl ? <span className="clip mono small">{v.logoUrl}</span> : null, input: <ImageField editor={editor} urlKey="logoUrl" dataKey="logoData" logo />, hint: 'Quadrada de preferência; reduzida para até 384 px.', problem: p.logoData ?? p.logoUrl, wide: true },
       ],
     },
     {
@@ -248,8 +328,8 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
       media={
         v.coverUrl || v.logoUrl ? (
           <div className={v.logoUrl ? 'venuehead venuehead--logo' : 'venuehead'}>
-            {v.coverUrl ? <img className="venuehead__cover" src={v.coverUrl} alt="" referrerPolicy="no-referrer" /> : <div className="venuehead__cover venuehead__cover--empty" />}
-            {v.logoUrl ? <img className="venuehead__logo" src={v.logoUrl} alt={`Logo de ${v.name}`} referrerPolicy="no-referrer" /> : null}
+            {v.coverUrl ? <img className="venuehead__cover" src={venueMediaUrl(v.coverUrl) ?? undefined} alt="" referrerPolicy="no-referrer" /> : <div className="venuehead__cover venuehead__cover--empty" />}
+            {v.logoUrl ? <img className="venuehead__logo" src={venueMediaUrl(v.logoUrl) ?? undefined} alt={`Logo de ${v.name}`} referrerPolicy="no-referrer" /> : null}
           </div>
         ) : undefined
       }
@@ -266,7 +346,7 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
       sections={sections}
       actions={[{ label: 'Tirar responsável', danger: true, hidden: !v.owner, confirm: removeOwnerAction(v.id, v.name, v.owner?.username ?? '') }]}
       editor={editor}
-      editHint="Corrige o que o dono edita e o que só a gestão troca (posição, teste, feed). Horários, fotos enviadas e equipe continuam com o dono. O que mudou fica na auditoria."
+      editHint="Corrige o que o dono edita e o que só a gestão troca (posição, teste, feed). Capa e logo podem ser anexadas aqui. Horários e equipe continuam com o dono. O que mudou fica na auditoria."
       onClose={onClose}
       onChanged={reload}
     />
