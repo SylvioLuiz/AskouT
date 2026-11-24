@@ -674,7 +674,7 @@ export interface PlaceRepository {
   findEvent(id: string): Promise<{ event: PlaceEventRecord; venue: VenueRecord } | undefined>;
   /** Hashtags de eventos que ainda não acabaram, com a contagem, filtradas pelo começo do texto. */
   listTags(prefix: string, from: Date, to: Date, limit: number): Promise<{ tag: string; count: number }[]>;
-  /** Locais do AskouT pelo nome (qualquer parte). Sem `center`, não filtra por distância. */
+  /** Locais do AskouT pelo nome (qualquer parte), os mais perto primeiro. Sem `center` ou com `radiusM` 0, não filtra por distância. */
   searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number): Promise<{ venue: VenueRecord; distanceM: number | null }[]>;
   findVenue(id: string): Promise<VenueRecord | undefined>;
   listVenuesByOwner(ownerId: string): Promise<VenueRecord[]>;

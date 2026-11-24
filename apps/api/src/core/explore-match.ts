@@ -71,7 +71,8 @@ export function matchVenue(venue: VenueRecord, text: string, center: { lat: numb
   let distanceM: number | null = null;
   if (center) {
     distanceM = distanceMeters(center, venue);
-    if (distanceM > radiusM) return undefined;
+    // Raio 0: sem limite de distância, a posição só serve para pôr os mais perto primeiro.
+    if (radiusM > 0 && distanceM > radiusM) return undefined;
   }
   return { venue: { ...venue }, distanceM };
 }
