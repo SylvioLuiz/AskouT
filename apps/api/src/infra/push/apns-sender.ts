@@ -3,6 +3,7 @@ import { connect } from 'node:http2';
 import type { ClientHttp2Session } from 'node:http2';
 import type { LiveActivityPush, PushMessage, PushResult, PushSender } from '../../core/ports.ts';
 import type { PushSubscriptionRecord } from '../../core/types.ts';
+import { apnsSoundFor } from '../../core/notification-sounds.ts';
 
 /**
  * Envio de aviso (push) para o app no iPhone, direto na Apple (APNs, HTTP/2 com chave `.p8`), sem bibliotecas.
@@ -174,12 +175,15 @@ export class ApnsSender implements PushSender {
     // Chegada do amigo (live): mesmo `apns-collapse-id` a cada envio, então o iPhone troca o aviso no lugar. Só o
     // primeiro toca; os seguintes chegam em silêncio ("passive": não acende a tela nem faz barulho).
     const live = message.live;
+    // Som escolhido pela pessoa (arquivo dentro do app, `default` ou nenhum). Sem escolha, o som padrão de sempre.
+    const sound = apnsSoundFor(message.sound ?? 'padrao');
+    const soundField = sound ? { sound } : {};
     const body = JSON.stringify(
       live
         ? {
             aps: {
               alert: { title: message.title, body: message.body },
-              ...(live.quiet ? {} : { sound: 'default' }),
+              ...(live.quiet ? {} : soundField),
               'interruption-level': live.quiet ? 'passive' : 'active',
               'thread-id': message.tag.slice(0, 64),
             },
@@ -187,8 +191,8 @@ export class ApnsSender implements PushSender {
             live: { state: live.state, progress: live.progress, until: live.untilMs },
           }
         : message.reply
-        ? { aps: { alert: { title: message.title, body: message.body }, sound: 'default', category: APNS_REPLY_CATEGORY, 'thread-id': message.tag.slice(0, 64) }, url: message.url, reply: message.reply }
-        : { aps: { alert: { title: message.title, body: message.body }, sound: 'default' }, url: message.url },
+        ? { aps: { alert: { title: message.title, body: message.body }, ...soundField, category: APNS_REPLY_CATEGORY, 'thread-id': message.tag.slice(0, 64) }, url: message.url, reply: message.reply }
+        : { aps: { alert: { title: message.title, body: message.body }, ...soundField }, url: message.url },
     );
     const host = this.config.production ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
     const attempt = async (forceNew: boolean): Promise<ApnsResponse> =>
@@ -241,7 +245,10 @@ export class ApnsSender implements PushSender {
       aps['attributes-type'] = 'ArrivalAttributes';
       aps['attributes'] = push.attributes;
     }
-    if (push.alert) aps['alert'] = { title: push.alert.title, body: push.alert.body, sound: 'default' };
+    if (push.alert) {
+      const sound = apnsSoundFor(push.sound ?? 'padrao');
+      aps['alert'] = { title: push.alert.title, body: push.alert.body, ...(sound ? { sound } : {}) };
+    }
     if (push.event === 'end') aps['dismissal-date'] = Math.floor((push.dismissAtMs ?? this.nowMs()) / 1000);
     const host = this.config.production ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
     const body = JSON.stringify({ aps });

@@ -68,7 +68,7 @@ export interface AdminEventDetail {
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
   /** Primeiras pessoas que confirmaram (até 20), na ordem da confirmação. */
-  going: { id: string; username: string; displayName: string; at: string }[];
+  going: { id: string; username: string; displayName: string; avatarUrl: string | null; at: string }[];
   /** Outras datas do mesmo evento: eventos do mesmo local com o mesmo nome (sem contar este), as mais próximas primeiro. */
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com o mesmo nome, contando este. */
@@ -836,7 +836,7 @@ export class AdminService {
       status,
       venue: { id: venue.id, name: venue.name, address: venue.address, owner: venue.ownerId ? { id: venue.ownerId, username: profiles.get(venue.ownerId)?.username ?? '(removido)' } : null },
       goingCount: attendance.length,
-      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
+      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', avatarUrl: profiles.get(a.userId)?.avatarUrl ?? null, at: a.createdAt.toISOString() })),
       sameTitle: others.map((e) => ({ id: e.id, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), upcoming: e.endsAt.getTime() >= now })),
       sameTitleTotal: Math.max(siblings.length, 1),
       extra: (await this.deps.admin.placeEventExtras(event.id)) ?? null,

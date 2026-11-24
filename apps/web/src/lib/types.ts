@@ -46,6 +46,19 @@ export interface ProfileView {
   canViewContent: boolean;
   /** Selo de quem trouxe amigos: quantos, ou null sem selo (não alcançou ou escondeu). Ausente em versões antigas da API. */
   referralBadge?: number | null;
+  /** Selos do perfil. No próprio perfil vêm também os escondidos (`hidden`). Ausente em versões antigas da API. */
+  badges?: ProfileBadge[];
+}
+
+export type BadgeId = 'REFERRAL' | 'ORGANIZER' | 'REGULAR' | 'NOW';
+
+export interface ProfileBadge {
+  id: BadgeId;
+  /** Amigos (REFERRAL), eventos (ORGANIZER e REGULAR) ou pessoas (NOW). */
+  count: number;
+  /** Mínimo para ganhar o selo. */
+  threshold: number;
+  hidden: boolean;
 }
 
 /** Convite com contagem: quem entrou pelo seu link e o progresso do selo. */
@@ -826,6 +839,16 @@ export interface NotificationMute {
   all: boolean;
   chats: boolean;
   events: boolean;
+}
+
+/** Som do push: o do aparelho, nenhum, ou um som do AskouT (arquivos em public/sons e dentro do app). */
+export type NotificationSound = 'padrao' | 'askout' | 'pop' | 'sino' | 'brilho' | 'silencioso';
+/** Som de cada grupo de aviso: conversas, convites (encontros e NOW), chegada do amigo e o resto. */
+export interface NotificationSounds {
+  chats: NotificationSound;
+  invites: NotificationSound;
+  arrival: NotificationSound;
+  other: NotificationSound;
 }
 
 export interface EventStoryItem {

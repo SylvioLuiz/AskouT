@@ -92,6 +92,8 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
     },
     /** Esta casca mostra "Responder" na notificação de mensagem (AppDelegate no iPhone, ReplyMessagingService no Android). */
     replies: true as const,
+    /** Esta casca tem os sons do AskouT (arquivos no iPhone; canais de cada som no Android, NotificationSounds.java). */
+    sounds: true as const,
     /**
      * Token "push-to-start" da Live Activity da chegada (iPhone com iOS 17.2+ e Atividades ao Vivo ligadas). Com ele
      * o servidor abre a chegada do amigo na tela bloqueada, com a barra. `undefined` onde não há.

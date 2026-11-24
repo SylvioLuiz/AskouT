@@ -14,6 +14,8 @@ public class MainActivity extends BridgeActivity {
         // Widgets da tela inicial: sessão para o widget e "busque de novo" quando o app vai para o segundo plano.
         registerPlugin(br.com.askout.widgets.WidgetsPlugin.class);
         super.onCreate(savedInstanceState);
+        // Canais de aviso, um por som (o servidor escolhe o canal conforme o som que a pessoa escolheu no app).
+        NotificationSounds.ensureChannels(this);
         // Aberto por "Compartilhar" de outro app: guarda os arquivos para a tela "Enviar para…".
         if (savedInstanceState == null) ShareInPlugin.receive(this, getIntent());
     }

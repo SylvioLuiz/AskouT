@@ -1068,6 +1068,9 @@ export interface NotificationRepository {
   /** O que a pessoa silenciou (tudo falso se nunca mexeu). */
   getMuteSettings(userId: string): Promise<NotificationMuteSettings>;
   setMuteSettings(userId: string, settings: NotificationMuteSettings, at: Date): Promise<void>;
+  /** Som de cada grupo de aviso (tudo `padrao` se nunca mexeu). */
+  getSoundSettings(userId: string): Promise<import('./notification-sounds.ts').NotificationSoundSettings>;
+  setSoundSettings(userId: string, settings: import('./notification-sounds.ts').NotificationSoundSettings, at: Date): Promise<void>;
 }
 
 export interface PushSubscriptionRepository {
@@ -1096,6 +1099,11 @@ export interface PushMessage {
   live?: PushLive;
   /** Foto (https) de quem o aviso fala: o Android mostra redonda no aviso da chegada. */
   image?: string;
+  /**
+   * Som escolhido pela pessoa para esse tipo de aviso (ver notification-sounds.ts). Sem ele, o som padrão do aparelho.
+   * Só vem diferente de `padrao` para aparelhos que têm os sons (o app avisou ao se inscrever) e para o navegador.
+   */
+  sound?: import('./notification-sounds.ts').NotificationSound;
 }
 
 /**
@@ -1110,6 +1118,8 @@ export interface LiveActivityPush {
   attributes?: { name: string; tag: string; url: string; registration: string };
   /** Toca/acende a tela (a primeira e a chegada); as outras trocam em silêncio. */
   alert?: { title: string; body: string };
+  /** Som do `alert`, escolhido pela pessoa para a chegada. Sem ele, o padrão do iPhone. */
+  sound?: import('./notification-sounds.ts').NotificationSound;
   /** Depois disto a atividade aparece como desatualizada (fim do encontro). */
   staleAtMs: number;
   /** Só no `end`: quando some da tela bloqueada. */

@@ -315,6 +315,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .record__listside { flex-shrink: 0; text-align: right; }
 .record__list .linkbtn { text-align: left; }
 .record__photos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.personlink__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.personlink__avatar--empty { background: var(--line); color: var(--muted); font-size: 12px; font-weight: 600; }
 .record__avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
 .record__activity .table { font-size: 13px; }
 .record__activity { max-height: 360px; overflow: auto; margin-bottom: 10px; }

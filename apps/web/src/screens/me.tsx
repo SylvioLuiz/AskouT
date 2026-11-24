@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent, ReactNode } from 'react';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
-import { MuteCard, PushCard, PushTestCard } from '../components/notifications.tsx';
+import { MuteCard, PushCard, PushTestCard, SoundCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -359,6 +359,8 @@ export function NotificationSettingsScreen() {
       <PushTestCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
+      <h2 className="profile__section">{t('Som dos avisos')}</h2>
+      <SoundCard />
     </>
   );
 }

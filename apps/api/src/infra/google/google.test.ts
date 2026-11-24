@@ -89,6 +89,21 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(android.notification['visibility'], 'PRIVATE');
   });
 
+  it('som escolhido: canal do som (Android 8+) e o nome do som (Android 7); "sem som" vai no canal silencioso', async () => {
+    const g = fakeGoogle(() => ok({ name: 'projects/askout-1/messages/1' }));
+    const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher });
+    await sender.send(sub(`fcm:${FCM_TOKEN}`), { ...msg, sound: 'pop' });
+    await sender.send(sub(`fcm:${FCM_TOKEN}`), { ...msg, sound: 'silencioso' });
+    await sender.send(sub(`fcm:${FCM_TOKEN}`), { ...msg, tag: 'msg:1', reply: 'rpl.x.y', sound: 'brilho' });
+    const bodies = g.calls.filter((c) => c.url.includes('fcm.googleapis.com')).map((c) => JSON.parse(c.body!) as { message: { android: { notification?: Record<string, unknown> }; data: Record<string, string> } });
+    assert.equal(bodies[0]!.message.android.notification!['channel_id'], 'som_pop');
+    assert.equal(bodies[0]!.message.android.notification!['sound'], 'pop');
+    assert.equal(bodies[0]!.message.android.notification!['default_sound'], undefined);
+    assert.equal(bodies[1]!.message.android.notification!['channel_id'], 'som_silencioso');
+    assert.equal(bodies[1]!.message.android.notification!['sound'], undefined);
+    assert.equal(bodies[2]!.message.data['channel'], 'som_brilho', 'aviso montado pelo app: o canal vai nos dados');
+  });
+
   it('com "Responder", vai só com dados (o app monta o aviso com o campo de resposta)', async () => {
     const g = fakeGoogle(() => ok({ name: 'projects/askout-1/messages/1' }));
     const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher });

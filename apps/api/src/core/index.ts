@@ -47,6 +47,7 @@ import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepo
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
 import { ReferralService } from './referral-service.ts';
+import { BadgeService } from './badge-service.ts';
 
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   /** Valor do impulsionamento por dia, em centavos. */
@@ -66,7 +67,8 @@ export function createCore(input: CoreInput) {
   const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
   const referrals = new ReferralService(deps);
-  const profiles = new ProfileService(deps, referrals);
+  const badges = new BadgeService(deps, referrals);
+  const profiles = new ProfileService(deps, referrals, badges);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
@@ -94,6 +96,7 @@ export function createCore(input: CoreInput) {
     offers: new OfferService(deps),
     auth,
     referrals,
+    badges,
     profiles,
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
@@ -242,6 +245,8 @@ export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
 export { ReferralService, REFERRAL_BADGE_THRESHOLD } from './referral-service.ts';
+export { BadgeService, BADGE_IDS, ORGANIZER_MIN_GUESTS, REGULAR_MIN_EVENTS, NOW_MIN_PEOPLE } from './badge-service.ts';
+export type { BadgeId, ProfileBadgeView } from './badge-service.ts';
 export type { ReferralOverview, ReferralPersonView, TopInviterView } from './referral-service.ts';
 export { ProfileService } from './profile-service.ts';
 export type { ProfilePatch, ProfileView, RelationState } from './profile-service.ts';

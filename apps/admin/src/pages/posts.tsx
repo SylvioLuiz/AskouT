@@ -88,6 +88,37 @@ function PostRecord({ p, onClose }: { p: PostDetailData; onClose: () => void }) 
       children: <LinkedList items={p.tagged} empty="" keyOf={(t) => t.id} render={(t) => ({ main: <PersonLink id={t.id} username={t.username} displayName={t.displayName} />, side: formatDateTime(t.at) })} />,
     },
     {
+      title: 'Quem vai',
+      count: p.counts.attendees,
+      hidden: !isEvent,
+      children: (
+        <LinkedList
+          items={p.going}
+          total={p.counts.attendees}
+          empty="Ninguém confirmou ainda."
+          keyOf={(g) => g.id}
+          render={(g) => ({ main: <PersonLink id={g.id} username={g.username} displayName={g.displayName} avatarUrl={g.avatarUrl} />, side: `Confirmou ${formatDateTime(g.at)}` })}
+        />
+      ),
+    },
+    {
+      title: 'Convidados que ainda não confirmaram',
+      count: p.invitedPendingCount,
+      hidden: !isEvent || p.invitedPendingCount === 0,
+      children: (
+        <LinkedList
+          items={p.invitedPending}
+          total={p.invitedPendingCount}
+          empty=""
+          keyOf={(i) => i.id}
+          render={(i) => ({
+            main: <PersonLink id={i.id} username={i.username} displayName={i.displayName} avatarUrl={i.avatarUrl} />,
+            side: `${i.invitedBy ? `Convite de @${i.invitedBy.username} · ` : ''}${formatDateTime(i.at)}`,
+          })}
+        />
+      ),
+    },
+    {
       title: 'Últimos comentários',
       count: p.counts.comments,
       children: (

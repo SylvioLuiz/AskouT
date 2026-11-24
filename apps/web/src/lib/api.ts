@@ -67,6 +67,7 @@ import type {
   EventPage,
   EventInvite,
   NotificationMute,
+  NotificationSounds,
   EventStoryGroup,
   CommentGif,
   RollingNowItem,
@@ -111,6 +112,7 @@ import type {
   Profile,
   ProfilePatch,
   ProfileView,
+  BadgeId,
   ReferralOverview,
   PublicProfile,
   SessionUser,
@@ -290,6 +292,7 @@ export function createApi(deps: ApiDeps) {
     /** Convite sugerido para quem acabou de entrar pelo app sem o convite junto (mesma rede do toque no link). */
     pendingReferral: () => request<{ inviter: PublicProfile | null }>('GET', '/me/referral/pending'),
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
+    setBadgeHidden: (badge: BadgeId, hidden: boolean) => request<{ id: BadgeId; hidden: boolean }>('PUT', `/profiles/me/badges/${id(badge)}`, { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),
@@ -480,6 +483,8 @@ export function createApi(deps: ApiDeps) {
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
+    notificationSounds: () => request<NotificationSounds>('GET', '/notifications/sounds'),
+    setNotificationSounds: (patch: Partial<NotificationSounds>) => request<NotificationSounds>('PUT', '/notifications/sounds', { body: patch }),
 
     // Explorar
     explore: (params: ExploreParams) => {
@@ -947,7 +952,7 @@ export function createApi(deps: ApiDeps) {
     /** Manda um aviso de teste para os aparelhos da própria pessoa. */
     pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
-    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean; sounds?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Álbuns dos encontros
