@@ -4068,6 +4068,11 @@ a.actlog__row:hover { background: var(--surface); }
 .placepick { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .placepick__item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
 .placepick__item img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; }
+.placepick__create { min-height: 56px; margin: 4px 0 12px; border-style: dashed; border-color: var(--brand); }
+.placepick__createicon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--brand-soft); color: var(--brand-text); }
+.placepick__createicon svg { width: 20px; height: 20px; }
+.placepick__createtext { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.placepick__createtext .muted { font-size: 13px; }
 
 /* ---------- Publicação em etapas ---------- */
 
@@ -7742,6 +7747,7 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 /* ---------- Editar evento (mesma cara da criação, por cima da tela) ---------- */
 .evedit { position: fixed; inset: 0; z-index: 65; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: var(--bg); }
 .evedit__inner { max-width: 520px; margin: 0 auto; padding: 0 16px; }
+.evcreate__hint { margin: 0 0 10px; font-size: 13px; }
 /* Na edição o "Salvar" gruda no fim da própria folha (fixo dentro de uma folha que rola pula no iPhone) e não precisa da folga da criação. */
 .evedit .compose--event { padding-bottom: 0; }
 .evedit .compose__footer { position: sticky; left: auto; right: auto; bottom: 0; margin: 8px -16px 0; }
