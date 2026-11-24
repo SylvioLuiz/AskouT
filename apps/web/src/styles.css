@@ -6737,6 +6737,9 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evwho__who { display: flex; flex-direction: column; min-width: 0; color: var(--ink); text-decoration: none; line-height: 1.25; }
 .evwho__who span { color: var(--muted); font-size: 0.8125rem; }
 .evwho__who strong, .evwho__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evwho__item .evwho__who { flex: 1; }
+.evwho__item > .btn { flex: none; }
+.evwho__adminhint { margin: 0 0 12px; font-size: 0.8125rem; }
 .evwho__more { margin: 12px 0 0; text-align: center; }
 /* "Convidar mais pessoas" no fim da lista de quem vai: com respiro do último nome. */
 .evwho__invite { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }

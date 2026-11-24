@@ -889,9 +889,9 @@ export class ConversationService {
       if (!eventCard) throw notFound('Evento não encontrado');
       eventCard.going = eventCard.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: eventCard.userEvent ? 'USER' : 'PLACE', id: eventCard.id }, actorId));
       if (eventCard.userEvent) {
-        // Evento de pessoa: o dono envia; outros só reencaminham o que receberam, e nunca um evento privado.
+        // Evento de pessoa: o dono (e os admins do evento) envia; outros só reencaminham o que receberam, e nunca um evento privado.
         if (eventCard.ownerId !== actorId) {
-          if (eventCard.private) throw forbidden('Este evento é privado: só quem criou pode enviar');
+          if (eventCard.private && !(await this.deps.posts.isEventAdmin(eventCard.id, actorId))) throw forbidden('Este evento é privado: só quem organiza pode enviar');
           if (!(await canOpenByInvite(this.deps, actorId, eventCard.id)) && !(await follows.get(actorId, eventCard.ownerId ?? ''))) throw notFound('Evento não encontrado');
         }
         postEventId = eventCard.id;

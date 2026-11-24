@@ -389,6 +389,10 @@ export function createApi(deps: ApiDeps) {
     editPost: (postId: string, patch: PostEdit) => request<PostView>('PATCH', `/posts/${id(postId)}`, { body: patch }),
     inviteToEvent: (postId: string, userIds: string[]) => request<{ invited: string[] }>('POST', `/posts/${id(postId)}/invites`, { body: { userIds } }),
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
+    /** O dono torna admin do evento quem vai ou aceitou o convite. */
+    addEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('POST', `/posts/${id(postId)}/admins`, { body: { userId } }),
+    /** O dono tira um admin; o próprio admin também pode sair. */
+    removeEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('DELETE', `/posts/${id(postId)}/admins/${id(userId)}`),
     setPostCover: (postId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/cover`, { body: { image } }),
     adjustPostImage: (postId: string, imageId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/images/${id(imageId)}`, { body: { image } }),
     archivePost: (postId: string) => request<{ archived: true }>('POST', `/posts/${id(postId)}/archive`),

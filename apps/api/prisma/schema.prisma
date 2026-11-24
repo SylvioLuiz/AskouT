@@ -266,6 +266,7 @@ model User {
   postTags          PostTag[]
   eventInvitesReceived EventInvite[] @relation("EventInvitesReceived")
   eventInvitesSent     EventInvite[] @relation("EventInvitesSent")
+  eventAdminOf         EventAdmin[]  @relation("EventAdmins")
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
   postReports       PostReport[]  @relation("PostReports")
@@ -1061,6 +1062,7 @@ model Post {
   images PostImage[]
   tags   PostTag[]
   invites EventInvite[]
+  admins  EventAdmin[]
   eventGroups Group[] @relation("EventGroups")
   likes    PostLike[]
   comments PostComment[]
@@ -1209,6 +1211,22 @@ model EventInvite {
   post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User  @relation("EventInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
   invitedBy User? @relation("EventInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+/// Admin de um evento criado por pessoa: o dono promove quem vai (ou aceitou o convite) e pode tirar depois. O dono continua dono.
+/// O admin convida (também em evento privado), cancela os convites que mandou e edita o evento; não apaga, não arquiva nem muda quem vê.
+model EventAdmin {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  /// Quem promoveu (o dono). Sem chave estrangeira: só para registro.
+  addedById String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation("EventAdmins", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([postId, userId])
   @@index([userId])

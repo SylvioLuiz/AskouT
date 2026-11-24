@@ -41,6 +41,7 @@ function categoryOf(type: NotificationType): Category {
     case 'ALBUM_SUMMARY':
     case 'VENUE_CALENDAR':
     case 'VENUE_EVENT':
+    case 'EVENT_ADMIN':
       return 'event';
     case 'FOLLOW_REQUEST':
     case 'FOLLOW_ACCEPTED':
@@ -85,6 +86,7 @@ function CategoryIcon({ type }: { type: NotificationType }) {
     case 'POST_COMMENT':
       return <CommentIcon />;
     case 'VENUE_CLAIM':
+    case 'EVENT_ADMIN':
       return <ShieldIcon />;
     default:
       return <BellIcon />;
