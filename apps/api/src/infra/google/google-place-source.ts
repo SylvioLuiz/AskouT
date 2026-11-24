@@ -105,13 +105,31 @@ export class GooglePlaceSource implements PlaceSource {
     this.cache.set(key, { at: this.now(), places });
   }
 
+  private readonly warned = new Set<string>();
+  /** Registra no log do servidor por que o Google não respondeu (a chave nunca entra na mensagem); uma vez por motivo. */
+  private warn(message: string, once: string): void {
+    if (this.warned.has(once)) return;
+    if (this.warned.size > 200) this.warned.clear();
+    this.warned.add(once);
+    console.warn(`[google] ${message}`);
+  }
+
+  private async fail(kind: GoogleCallKind, response: Response): Promise<void> {
+    let detail = '';
+    try { detail = (await response.text()).replace(/\s+/g, ' ').slice(0, 240); } catch { /* sem corpo */ }
+    this.warn(`${kind}: HTTP ${response.status} ${detail}`, `http:${kind}:${response.status}`);
+  }
+
   private spend(kind: GoogleCallKind): boolean {
     const today = new Date(this.now()).toISOString().slice(0, 10);
     if (today !== this.day) {
       this.day = today;
       this.used = { nearby: 0, search: 0, lookup: 0, photo: 0 };
     }
-    if (this.used[kind] >= this.limits[kind]) return false;
+    if (this.used[kind] >= this.limits[kind]) {
+      this.warn(`teto diário de ${kind} atingido (${this.limits[kind]})`, `cap:${kind}:${today}`);
+      return false;
+    }
     this.used[kind] += 1;
     return true;
   }
@@ -138,12 +156,16 @@ export class GooglePlaceSource implements PlaceSource {
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-      if (!response.ok) return { available: false, places: [] };
+      if (!response.ok) {
+        await this.fail('nearby', response);
+        return { available: false, places: [] };
+      }
       const json = (await response.json()) as { places?: GooglePlace[] };
       const places = parse(json.places);
       this.remember(key, places);
       return { available: true, places: places.map((p) => ({ ...p })) };
-    } catch {
+    } catch (e) {
+      this.warn(`nearby: ${e instanceof Error ? e.message : 'falha'}`, 'ex:nearby');
       return { available: false, places: [] };
     }
   }
@@ -173,12 +195,16 @@ export class GooglePlaceSource implements PlaceSource {
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-      if (!response.ok) return { available: false, places: [] };
+      if (!response.ok) {
+        await this.fail('search', response);
+        return { available: false, places: [] };
+      }
       const json = (await response.json()) as { places?: GooglePlace[] };
       const places = parse(json.places);
       this.remember(key, places);
       return { available: true, places: places.map((p) => ({ ...p })) };
-    } catch {
+    } catch (e) {
+      this.warn(`search: ${e instanceof Error ? e.message : 'falha'}`, 'ex:search');
       return { available: false, places: [] };
     }
   }
@@ -191,7 +217,10 @@ export class GooglePlaceSource implements PlaceSource {
         headers: { 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': DETAIL_FIELDS },
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-      if (!response.ok) return undefined;
+      if (!response.ok) {
+        await this.fail('lookup', response);
+        return undefined;
+      }
       return parse([(await response.json()) as GooglePlace])[0];
     } catch {
       return undefined;
@@ -230,7 +259,10 @@ export class GooglePlaceSource implements PlaceSource {
         redirect: 'follow',
       });
       const type = response.headers.get('content-type') ?? '';
-      if (!response.ok || !type.startsWith('image/')) return undefined;
+      if (!response.ok || !type.startsWith('image/')) {
+        if (!response.ok) await this.fail('photo', response);
+        return undefined;
+      }
       return { type, bytes: new Uint8Array(await response.arrayBuffer()) };
     } catch {
       return undefined;
