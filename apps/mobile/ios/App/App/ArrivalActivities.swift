@@ -13,8 +13,9 @@ import ActivityKit
 /// 2. quando o servidor abre uma atividade, manda o token dela para `<API>/notifications/push/live-activity`, com o
 ///    `registration` assinado que veio dentro da atividade (sem login: o iPhone pode abrir o app em segundo plano só
 ///    para isso). Depois disso as atualizações vão direto para a atividade;
-/// 3. quando a pessoa fecha a atividade, avisa `<API>/notifications/push/live-activity/closed`; ao voltar ao NOW, o
-///    app web pergunta se ela está na tela (`isShowing`) e, se não, pede ao servidor para abrir de novo.
+/// 3. quando a pessoa fecha a atividade, avisa `<API>/notifications/push/live-activity/closed`: o servidor abre outra
+///    na próxima posição do amigo. Ao voltar ao NOW, o app web pergunta se ela está na tela (`isShowing`) e, se não,
+///    pede ao servidor para abrir de novo na hora.
 final class ArrivalActivities {
     static let shared = ArrivalActivities()
 
@@ -96,8 +97,8 @@ final class ArrivalActivities {
                 self.post(path: "/notifications/push/live-activity", body: ["registration": registration, "token": Self.hex(data)])
             }
         }
-        // A pessoa fechou (arrastou para o lado): o servidor para de mandar para ela e não abre outra sozinha; a
-        // chegada vai como aviso comum. Abre de novo quando a pessoa volta ao NOW no app.
+        // A pessoa fechou (arrastou para o lado; o iPhone não deixa impedir): o servidor para de mandar para ela e
+        // abre outra na próxima posição do amigo, ou na hora quando a pessoa volta ao NOW no app.
         Task {
             for await state in activity.activityStateUpdates where state == .dismissed {
                 self.closed(registration: registration, token: activity.pushToken.map(Self.hex))
