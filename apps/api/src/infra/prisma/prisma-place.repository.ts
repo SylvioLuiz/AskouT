@@ -24,7 +24,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     await this.prisma.venue.create({
       data: {
         id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
-        description: v.description ?? null, hoursJson: v.hours ? JSON.stringify(v.hours) : null, coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null,
+        description: v.description ?? null, hoursJson: v.hours ? JSON.stringify(v.hours) : null, coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null, instagram: v.instagram ?? null,
         externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null, isOrganization: v.isOrganization ?? false, isUserCreated: v.isUserCreated ?? false,
       },
     });
@@ -34,7 +34,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     if (!isUuid(venueId)) return;
     await this.prisma.venue.updateMany({
       where: { id: venueId },
-      data: { name: patch.name, address: patch.address, category: patch.category, description: patch.description, hoursJson: patch.hours ? JSON.stringify(patch.hours) : null, coverUrl: patch.coverUrl, logoUrl: patch.logoUrl },
+      data: { name: patch.name, address: patch.address, category: patch.category, description: patch.description, hoursJson: patch.hours ? JSON.stringify(patch.hours) : null, coverUrl: patch.coverUrl, logoUrl: patch.logoUrl, instagram: patch.instagram },
     });
   }
 
@@ -375,7 +375,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
 }
 
 interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; ticketUrl: string | null; isSample: boolean }
-interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; logoUrl?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null; isOrganization?: boolean; isUserCreated?: boolean }
+interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; logoUrl?: string | null; instagram?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null; isOrganization?: boolean; isUserCreated?: boolean }
 
 function toEvent(r: EventRow): PlaceEventRecord {
   return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], ticketUrl: r.ticketUrl, isSample: r.isSample };
@@ -384,7 +384,7 @@ function toEvent(r: EventRow): PlaceEventRecord {
 function toVenue(v: VenueRow): VenueRecord {
   return {
     id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
-    description: v.description ?? null, hours: parseHours(v.hoursJson), coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null, externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null, isOrganization: v.isOrganization ?? false, isUserCreated: v.isUserCreated ?? false,
+    description: v.description ?? null, hours: parseHours(v.hoursJson), coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null, instagram: v.instagram ?? null, externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null, isOrganization: v.isOrganization ?? false, isUserCreated: v.isUserCreated ?? false,
   };
 }
 

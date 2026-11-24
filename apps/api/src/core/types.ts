@@ -391,6 +391,8 @@ export interface VenueRecord {
   coverUrl?: string | null;
   /** Logo (círculo da página): https ou `/venues/:id/logo?v=` quando enviada do aparelho. */
   logoUrl?: string | null;
+  /** @ do Instagram, sem "@" e em minúsculas. */
+  instagram?: string | null;
   /** Origem externa ("google:ID", "osm:ID") de um local que entrou sob demanda. */
   externalKey?: string | null;
   /** Foto do Google (referência opaca) e o crédito de quem tirou. Só para locais externos. */
@@ -418,6 +420,8 @@ export interface VenueProfilePatch {
   hours: VenueHours | null;
   coverUrl: string | null;
   logoUrl: string | null;
+  /** Ausente mantém o que está gravado. */
+  instagram?: string | null;
 }
 
 export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

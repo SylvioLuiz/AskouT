@@ -1690,7 +1690,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
     const v = this.venues.get(venueId);
-    if (v) this.venues.set(venueId, { ...v, ...patch, hours: patch.hours ? patch.hours.map((d) => (d ? { ...d } : null)) : null });
+    if (v) this.venues.set(venueId, { ...v, ...patch, instagram: patch.instagram === undefined ? v.instagram : patch.instagram, hours: patch.hours ? patch.hours.map((d) => (d ? { ...d } : null)) : null });
   }
 
   async setVenueCover(venueId: string, mime: string, data: Uint8Array) {

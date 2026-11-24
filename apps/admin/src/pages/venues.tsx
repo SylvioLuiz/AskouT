@@ -20,6 +20,7 @@ type VenueDraft = {
   description: string;
   imageUrl: string;
   logoUrl: string;
+  instagram: string;
   lat: string;
   lng: string;
   isSample: boolean;
@@ -62,7 +63,7 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
   const x = v.extra;
   const editor = useRecordEditor<VenueDraft>({
     initial: {
-      name: v.name, address: v.address ?? '', category: v.category ?? '', description: v.description ?? '', imageUrl: v.coverUrl ?? '', logoUrl: v.logoUrl ?? '',
+      name: v.name, address: v.address ?? '', category: v.category ?? '', description: v.description ?? '', imageUrl: v.coverUrl ?? '', logoUrl: v.logoUrl ?? '', instagram: v.instagram ? `@${v.instagram}` : '',
       lat: String(v.lat), lng: String(v.lng), isSample: v.isSample, feedPolicy: x?.feedPolicy ?? 'OWNER_ONLY',
     },
     check: (d) => {
@@ -81,6 +82,7 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
           ...(c.description !== undefined ? { description: c.description.trim() === '' ? null : c.description } : {}),
           ...(c.imageUrl !== undefined ? { imageUrl: opt(c.imageUrl) } : {}),
           ...(c.logoUrl !== undefined ? { logoUrl: opt(c.logoUrl) } : {}),
+          ...(c.instagram !== undefined ? { instagram: opt(c.instagram) } : {}),
           ...(c.lat !== undefined ? { lat: Number(c.lat.replace(',', '.')) } : {}),
           ...(c.lng !== undefined ? { lng: Number(c.lng.replace(',', '.')) } : {}),
           ...(c.isSample !== undefined ? { isSample: c.isSample } : {}),
@@ -115,6 +117,17 @@ function VenueRecord({ v, onClose, reload }: { v: VenueDetail; onClose: () => vo
         { label: 'Tipo', value: v.category, input: <TextInput editor={editor} k="category" maxLength={40} placeholder="bar, balada, casa de shows…" />, problem: p.category },
         { label: 'Endereço', value: v.address, input: <TextInput editor={editor} k="address" maxLength={200} />, problem: p.address, wide: true },
         { label: 'Descrição', value: v.description ? <span className="pre">{v.description}</span> : null, input: <TextArea editor={editor} k="description" maxLength={1000} rows={4} />, wide: true, problem: p.description },
+        {
+          label: 'Instagram',
+          value: v.instagram ? (
+            <a href={`https://www.instagram.com/${encodeURIComponent(v.instagram)}/`} target="_blank" rel="noopener noreferrer">
+              @{v.instagram}
+            </a>
+          ) : null,
+          input: <TextInput editor={editor} k="instagram" maxLength={120} placeholder="@bardoze ou link do perfil" />,
+          hint: 'Vazio tira o Instagram.',
+          problem: p.instagram,
+        },
         { label: 'Horários', value: hoursText(x?.hoursJson ?? null), wide: true },
         { label: 'Capa (endereço)', value: v.coverUrl ? <span className="clip mono small">{v.coverUrl}</span> : null, input: <TextInput editor={editor} k="imageUrl" type="url" placeholder="https://" />, hint: 'Vazio tira a capa.', problem: p.imageUrl, wide: true },
         { label: 'Logo (endereço)', value: v.logoUrl ? <span className="clip mono small">{v.logoUrl}</span> : null, input: <TextInput editor={editor} k="logoUrl" type="url" placeholder="https://" />, hint: 'Vazio tira a logo.', problem: p.logoUrl, wide: true },

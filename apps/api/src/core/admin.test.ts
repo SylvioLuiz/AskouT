@@ -493,6 +493,19 @@ test('editar local pela gestão: motivo obrigatório, campos de admin e auditori
   await rejectsWith(w.core.admin.editVenue(A, 'nao-existe', { name: 'X', note: 'x' }), 'NOT_FOUND');
 });
 
+test('editar local pela gestão: @ do Instagram normalizado, link aceito, vazio remove', async () => {
+  const { w, A } = await setup();
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { instagram: 'bar do zé', note: 'ig' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { instagram: '@bar..ze', note: 'ig' }), 'VALIDATION');
+  const d = await w.core.admin.editVenue(A, 'v1', { instagram: '@BarDoZe', note: 'ig' });
+  assert.equal(d.instagram, 'bardoze');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { instagram: 'https://www.instagram.com/bardoze/?hl=pt', note: 'ig' }), 'CONFLICT');
+  const log = (await w.core.admin.audit(A, {})).items[0]!;
+  assert.match(log.note ?? '', /instagram: .*→ bardoze/);
+  const vazio = await w.core.admin.editVenue(A, 'v1', { instagram: '', note: 'ig' });
+  assert.equal(vazio.instagram, null);
+});
+
 test('editar evento de local pela gestão: mesmas regras de quem administra e auditoria', async () => {
   const { w, A, U, ana } = await setup();
   const now = w.clock.now().getTime();
