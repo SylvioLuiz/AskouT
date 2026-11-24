@@ -59,6 +59,7 @@ final class WidgetTheme {
         if (layout == R.layout.widget_combo) return new int[] {R.id.widget_title, R.id.widget_action_invite, R.id.widget_count, R.id.widget_count_label};
         if (layout == R.layout.widget_agenda) return new int[] {R.id.widget_row1_title, R.id.widget_row2_title, R.id.widget_row3_title, R.id.widget_row4_title, R.id.widget_row5_title};
         if (layout == R.layout.widget_now) return new int[] {R.id.widget_count, R.id.widget_title};
+        if (layout == R.layout.widget_chats) return WidgetUpdater.CHAT_TITLES;
         return new int[0];
     }
 
@@ -69,6 +70,7 @@ final class WidgetTheme {
         if (layout == R.layout.widget_combo) return new int[] {R.id.widget_eyebrow, R.id.widget_subtitle, R.id.widget_footer, R.id.widget_friends_eyebrow, R.id.widget_names};
         if (layout == R.layout.widget_agenda) return new int[] {R.id.widget_eyebrow, R.id.widget_empty, R.id.widget_row1_sub, R.id.widget_row2_sub, R.id.widget_row3_sub, R.id.widget_row4_sub, R.id.widget_row5_sub};
         if (layout == R.layout.widget_now) return new int[] {R.id.widget_eyebrow, R.id.widget_subtitle};
+        if (layout == R.layout.widget_chats) return concat(new int[] {R.id.widget_eyebrow, R.id.widget_empty}, WidgetUpdater.CHAT_TIMES, WidgetUpdater.CHAT_PREVIEWS);
         return new int[0];
     }
 
@@ -76,6 +78,16 @@ final class WidgetTheme {
         if (layout == R.layout.widget_next) return new int[] {R.id.widget_day, R.id.widget_when};
         if (layout == R.layout.widget_combo) return new int[] {R.id.widget_invites};
         if (layout == R.layout.widget_now) return new int[] {R.id.widget_footer};
+        if (layout == R.layout.widget_chats) return concat(new int[] {R.id.widget_unread}, WidgetUpdater.CHAT_TIMES_NEW);
         return new int[0];
+    }
+
+    private static int[] concat(int[]... parts) {
+        int n = 0;
+        for (int[] p : parts) n += p.length;
+        int[] out = new int[n];
+        int i = 0;
+        for (int[] p : parts) for (int id : p) out[i++] = id;
+        return out;
     }
 }

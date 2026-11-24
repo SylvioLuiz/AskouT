@@ -18,4 +18,6 @@
     <string name="widget_agenda_description">Seus próximos planos: encontros confirmados e eventos em que você vai.</string>
     <string name="widget_now_label">Amigos no NOW</string>
     <string name="widget_now_description">Quantos amigos estão livres agora, convites do NOW e um atalho para ligar o seu.</string>
+    <string name="widget_chats_label">Conversas</string>
+    <string name="widget_chats_description">Suas últimas conversas com a prévia das mensagens. Escolha: tudo, só grupos ou só individuais.</string>
 </resources>
