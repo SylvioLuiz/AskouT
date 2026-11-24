@@ -587,6 +587,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
   const [draft, setDraft] = useState(() => readDraft(conversationId));
   const [sending, setSending] = useState(false);
+  /** Conta os envios: a cada um, a bandeja de emojis do campo fecha. */
+  const [sentCount, setSentCount] = useState(0);
   /** Gravando áudio: `hold` enquanto segura o microfone, `locked` gravando sem segurar (travou ou clicou). */
   const [recording, setRecording] = useState<false | 'hold' | 'locked'>(false);
   const voiceControl = useRef<VoiceControl | undefined>(undefined);
@@ -1155,6 +1157,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     const media = staged;
     const gif = pendingGif;
     if ((text === '' && media.length === 0 && !gif) || sending) return;
+    // Enviou: a bandeja de emojis fecha, como no Instagram.
+    setSentCount((n) => n + 1);
     // Como no Instagram: o campo esvazia na hora e o teclado continua aberto para a próxima mensagem.
     // Se o envio falhar, o texto volta para o campo.
     if (text !== '') setDraft('');
@@ -1640,7 +1644,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     }}
                   />
                   {/* Emoji e GIF sempre à mão, como a figurinha do Instagram: dá para mandar um GIF sem escrever nada. */}
-                  <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                  <CommentTools disabled={sending} closeKey={sentCount} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
                   {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
                     <>
                       {/* Escrevendo (ou com foto/GIF na fila): o canto vira o botão de enviar, como no Instagram. */}
