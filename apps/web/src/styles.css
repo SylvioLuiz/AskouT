@@ -7878,7 +7878,7 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .evshop__addbtn:disabled { opacity: 0.5; cursor: default; }
 .evshop__items, .evshop__expenses, .evshop__people, .evshop__transfers { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .evshop__item, .evshop__expense, .evshop__person { display: flex; align-items: center; gap: 10px; min-height: 44px; }
-.evshop__check { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; padding: 0; border: 2px solid var(--line-strong); border-radius: 8px; background: transparent; color: #fff; cursor: pointer; }
+.evshop__check { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; padding: 0; border: 2px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--surface); cursor: pointer; }
 .evshop__check svg { width: 16px; height: 16px; }
 .evshop__check[aria-checked='true'] { border-color: var(--ok); background: var(--ok); }
 .evshop__check:disabled { cursor: default; }
