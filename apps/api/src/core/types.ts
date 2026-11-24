@@ -956,6 +956,16 @@ export interface AdminPersonRef {
   at: Date;
 }
 
+/** Pessoa ligada a um evento na gestão (confirmou "Eu vou" ou foi convidada), com a foto de perfil. */
+export interface AdminEventPerson extends AdminPersonRef {
+  avatarUrl: string | null;
+}
+
+/** Convidado de um evento criado por pessoa que ainda não confirmou, com quem convidou. */
+export interface AdminEventInvitee extends AdminEventPerson {
+  invitedBy: { id: string; username: string } | null;
+}
+
 /**
  * Tudo o que a gestão vê de uma pessoa além da linha da lista: o cadastro inteiro (menos a senha e o hash do celular),
  * as configurações, as contagens dos vínculos e as listas ligadas (amigos, seguidores, eventos, posts, locais).
@@ -1087,6 +1097,12 @@ export interface AdminPostDetail {
   linkedEventId: string | null;
   images: { id: string; uploaded: boolean }[];
   tagged: AdminPersonRef[];
+  /** Evento: quem confirmou "Eu vou" (os primeiros 50, na ordem da confirmação; o total está em `counts.attendees`). */
+  going: AdminEventPerson[];
+  /** Evento: convidados que ainda não confirmaram (os primeiros 50, na ordem do convite). */
+  invitedPending: AdminEventInvitee[];
+  /** Quantos convidados ainda não confirmaram. */
+  invitedPendingCount: number;
   counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
   recentComments: { id: string; username: string; body: string; createdAt: Date }[];
 }

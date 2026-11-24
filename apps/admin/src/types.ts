@@ -228,6 +228,11 @@ export interface PostDetail {
   linkedEventId: string | null;
   images: { id: string; uploaded: boolean }[];
   tagged: PersonRef[];
+  /** Evento: quem confirmou "Eu vou" (os primeiros 50; o total está em `counts.attendees`). */
+  going: (PersonRef & { avatarUrl: string | null })[];
+  /** Evento: convidados que ainda não confirmaram (os primeiros 50). */
+  invitedPending: (PersonRef & { avatarUrl: string | null; invitedBy: { id: string; username: string } | null })[];
+  invitedPendingCount: number;
   counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
   recentComments: { id: string; username: string; body: string; createdAt: string }[];
 }
@@ -304,7 +309,7 @@ export interface EventDetail {
   status: 'UPCOMING' | 'LIVE' | 'PAST';
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
-  going: { id: string; username: string; displayName: string; at: string }[];
+  going: { id: string; username: string; displayName: string; avatarUrl: string | null; at: string }[];
   /** Outras datas: eventos do mesmo local com o mesmo nome (sem este). */
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com esse nome, contando este. */
