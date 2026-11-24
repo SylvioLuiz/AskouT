@@ -145,3 +145,44 @@ test('convite: quem entrou já fica amigo de quem convidou, e quem convidou rece
   assert.equal((await w.core.referrals.claim(actorOf(caio), 'ninguem')).counted, false);
   assert.deepEqual(await w.core.follows.listFriends(caio.user.id), [], 'convite inválido não cria amizade');
 });
+
+test('convite depois de instalar: o toque no link pela mesma rede vira sugestão no cadastro pelo app', async () => {
+  const w = makeWorld();
+  await w.signUp('ana');
+  await w.core.referrals.recordClick('rede-1', '@Ana');
+  w.clock.tick(3_600_000);
+  const bia = await w.signUp('bia');
+  assert.equal((await w.core.referrals.pending(actorOf(bia), 'rede-1')).inviter?.username, 'ana');
+  assert.equal((await w.core.referrals.pending(actorOf(bia), 'rede-2')).inviter, null, 'outra rede não recebe a sugestão');
+  assert.equal((await w.core.referrals.pending(actorOf(bia), '')).inviter, null);
+  // A sugestão não registra nada: só a confirmação (claim) conta.
+  assert.equal((await w.core.referrals.overview(actorOf(await asSession(w.core.auth.login({ identifier: 'ana', password: 'uma-senha-forte-123' }))))).brought, 0);
+  assert.equal((await w.core.referrals.claim(actorOf(bia), 'ana')).counted, true);
+  assert.equal((await w.core.referrals.pending(actorOf(bia), 'rede-1')).inviter, null, 'quem já tem convite não recebe sugestão');
+});
+
+test('convite depois de instalar: ignora toques velhos, de conta inexistente ou suspensa, o próprio usuário e bloqueios', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana');
+  await w.core.referrals.recordClick('rede', 'ninguem');
+  await w.core.referrals.recordClick('rede', '!!');
+  assert.equal(w.referrals.clicks.length, 0, 'conta inexistente ou texto inválido não grava');
+
+  await w.core.referrals.recordClick('rede', 'ana');
+  assert.equal((await w.core.referrals.pending(actorOf(ana), 'rede')).inviter, null, 'o próprio usuário');
+
+  const bia = await w.signUp('bia');
+  setStatus(w, ana.user.id, 'SUSPENDED');
+  assert.equal((await w.core.referrals.pending(actorOf(bia), 'rede')).inviter, null, 'convidante suspenso');
+  setStatus(w, ana.user.id, 'ACTIVE');
+  await w.core.blocks.block(bia.user.id, ana.user.id);
+  assert.equal((await w.core.referrals.pending(actorOf(bia), 'rede')).inviter, null, 'bloqueio');
+
+  w.clock.tick(25 * 3_600_000);
+  const caio = await w.signUp('caio');
+  assert.equal((await w.core.referrals.pending(actorOf(caio), 'rede')).inviter, null, 'toque de mais de 24 h');
+
+  w.clock.tick(3 * DAY);
+  await w.core.referrals.recordClick('outra', 'ana');
+  assert.equal(w.referrals.clicks.length, 1, 'toques velhos são apagados');
+});

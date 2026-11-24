@@ -30,6 +30,9 @@ export interface DeliveredLike {
  * montados pelo app, em `data["askout.url"]`. Os montados pelo Firebase não guardam o caminho: aí vale título e texto.
  */
 export function deliveredMatches(n: DeliveredLike, match: { url: string; texts: { title: string; body: string }[] }): boolean {
+  // Chegada ao vivo do amigo: fica na bandeja enquanto ele vem, mesmo com a tela do encontro aberta (o servidor tira
+  // quando ele chega ou para). Android: `tag` arrival:… / `askout.live`; iPhone: `live` no push.
+  if ((typeof n.tag === 'string' && n.tag.startsWith('arrival:')) || n.data?.['askout.live'] !== undefined || n.data?.['live'] !== undefined) return false;
   const screen = (v: unknown) => (typeof v === 'string' ? v.split(/[?#]/)[0] : undefined);
   if (screen(n.data?.['url']) === match.url || screen(n.data?.['askout.url']) === match.url) return true;
   return match.texts.some((t) => n.title === t.title && (n.body ?? '') === t.body);

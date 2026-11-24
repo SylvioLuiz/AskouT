@@ -124,6 +124,59 @@
             android:name=".ArrivalDismissReceiver"
             android:exported="false" />
 
+        <!--
+          Widgets da tela inicial: próximo encontro, encontro ativo, agenda e amigos no NOW (br.com.askout.widgets).
+          Buscam GET /me/widgets com a sessão que o app grava (WidgetsPlugin); o alarme redesenha quando um plano começa
+          ou termina.
+        -->
+        <receiver
+            android:name=".widgets.NextMeetupWidget"
+            android:label="@string/widget_next_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.ActiveMeetupWidget"
+            android:label="@string/widget_active_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_active_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.AgendaWidget"
+            android:label="@string/widget_agenda_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_agenda_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.NowFriendsWidget"
+            android:label="@string/widget_now_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.WidgetUpdater$TickReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

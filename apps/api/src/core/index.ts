@@ -7,6 +7,7 @@ import { ConversationService } from './conversation-service.ts';
 import { StoryReactionService } from './story-reaction-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
+import { WidgetService } from './widget-service.ts';
 import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
@@ -84,6 +85,7 @@ export function createCore(input: CoreInput) {
     paymentsSwitch,
   );
   const explore = new ExploreService(deps, profiles, boosts);
+  const meetups = new MeetupService(deps);
   return {
     boosts,
     boostStats: new BoostStatsService(deps),
@@ -108,7 +110,9 @@ export function createCore(input: CoreInput) {
     calendarImport: new CalendarImportService(deps, venues),
     calendarSync: new CalendarSyncService(deps),
     admin: new AdminService(deps, venues, auth, paymentsSwitch, recoExperiment),
-    meetups: new MeetupService(deps),
+    meetups,
+    /** Widgets da tela inicial e da tela bloqueada (iPhone e Android). */
+    widgets: new WidgetService(deps, { flash, meetups, eventPages }),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,

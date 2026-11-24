@@ -23,7 +23,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   const boosts = useAsync(() => api.venueBoosts(venueId), [venueId]);
 
   const [target, setTarget] = useState<string>('VENUE'); // 'VENUE' ou id do evento
-  const [days, setDays] = useState<number>(3);
+  const [pickedDays, setDays] = useState<number>(3);
   const [audience, setAudience] = useState<'ALL' | 'MATCH'>('ALL');
   const [radiusKm, setRadiusKm] = useState<number>(5);
   const [tags, setTags] = useState<string[]>([]);
@@ -73,11 +73,16 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   }
   const price = pricing.data;
   const items = sortBoosts(boosts.data.items);
+  // A gestão escolhe quais pacotes ficam à venda: se o de 3 dias saiu, começa pelo primeiro que sobrou.
+  const days = price.dayOptions.includes(pickedDays) ? pickedDays : (price.dayOptions[0] ?? pickedDays);
   const onStore = channel !== 'WEB';
   const storeName = onStore ? STORE_LABEL[channel] : '';
   const { total, perDay, discountPct } = packageSummary(price, channel, days);
-  // Na loja a compra precisa da casca nativa do aplicativo; sem ela o botão fica desligado e explicado.
-  const storeReady = !onStore || (price.store.available && storeBridge() !== undefined);
+  // Na loja a compra precisa da casca nativa do aplicativo e do conferente daquela loja no servidor; sem eles o botão fica desligado e explicado.
+  const storeOk = channel === 'APPLE' ? price.store.apple !== false : channel === 'GOOGLE' ? price.store.google !== false : true;
+  // No site, sem provedor de pagamento, a venda é só pelo app.
+  const webReady = price.web?.available !== false;
+  const storeReady = onStore ? price.store.available && storeOk && storeBridge() !== undefined : webReady;
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -188,6 +193,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
         {returned === 'cancelado' ? <Notice tone="info">{t('O pagamento foi cancelado e nada foi cobrado. Você pode tentar de novo quando quiser.')}</Notice> : null}
         {price.sandbox && !onStore ? <Notice tone="info">{t('Modo de teste: nenhum valor é cobrado de verdade. Depois de criar o pedido, use “Simular pagamento”.')}</Notice> : null}
         {onStore && !storeReady ? <Notice tone="info">{t('A compra pelo aplicativo ainda não está disponível nesta versão.')}</Notice> : null}
+        {!onStore && !webReady ? <Notice tone="info">{t('Pelo site ainda não dá para pagar. Abra o app AskouT no iPhone ou no Android para comprar o impulsionamento.')}</Notice> : null}
         {error ? <Notice tone="error">{error}</Notice> : null}
 
         <section className="boost__block" aria-labelledby="boost-what">

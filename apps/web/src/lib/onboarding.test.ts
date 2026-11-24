@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { followProgressLabel, markOnboardingDone, onboardingDone, ONBOARDING_SLIDES, placesFromEvents, shouldShowOnboarding } from './onboarding.ts';
+import { followProgressLabel, markOnboardingDone, onboardingDone, placesFromEvents, shouldShowOnboarding, TOUR_STEPS, tourPlacement, tourProgressLabel } from './onboarding.ts';
 import type { ExploreEvent } from './types.ts';
 
 function memory() {
@@ -9,8 +9,17 @@ function memory() {
 }
 
 describe('onboarding', () => {
-  it('tem as 3 telas combinadas', () => {
-    assert.deepEqual(ONBOARDING_SLIDES.map((s) => s.title), ['Siga bares e baladas, veja eventos', 'Amigo é quem se segue', 'NOW: encontre quem quer sair agora']);
+  it('o tour passa pelos botões principais, na ordem do menu', () => {
+    assert.deepEqual(TOUR_STEPS.map((s) => s.target), ['home', 'explore', 'create', 'now', 'agenda', 'chats', 'profile']);
+    assert.equal(TOUR_STEPS.find((s) => s.target === 'create')?.to, undefined, 'Criar só explica: o toque abriria uma janela');
+    assert.equal(tourProgressLabel(1), '2 de 7');
+  });
+  it('balão ao lado no menu lateral, acima na barra de baixo, abaixo na barra de cima', () => {
+    const desk = { width: 1280, height: 800 };
+    const phone = { width: 390, height: 844 };
+    assert.equal(tourPlacement({ left: 12, right: 220, top: 100, bottom: 140 }, desk), 'right');
+    assert.equal(tourPlacement({ left: 0, right: 78, top: 780, bottom: 844 }, phone), 'above');
+    assert.equal(tourPlacement({ left: 300, right: 340, top: 10, bottom: 50 }, phone), 'below');
   });
   it('lembra por usuário', () => {
     const s = memory();

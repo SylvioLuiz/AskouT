@@ -84,6 +84,8 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(ShareSessionPlugin())
         // Token da Live Activity da chegada ao vivo (ver ArrivalActivities.swift).
         bridge?.registerPluginInstance(LiveActivityPlugin())
+        // Widgets da tela inicial e da tela bloqueada: recarregar quando algo muda no app (ver WidgetsPlugin.swift).
+        bridge?.registerPluginInstance(WidgetsPlugin())
     }
 
     override func viewDidLoad() {

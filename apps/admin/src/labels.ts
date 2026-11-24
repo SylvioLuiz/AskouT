@@ -48,6 +48,7 @@ export const ACTION_LABEL: Record<string, string> = {
   HUNTER_EVENTS_REMOVED_ALL: 'Removeu todos os eventos do Hunter',
   PAYMENTS_ENABLED: 'Ligou o pagamento do impulsionamento',
   PAYMENTS_DISABLED: 'Desligou o pagamento do impulsionamento',
+  BOOST_PACKAGES_UPDATED: 'Mudou os pacotes de impulsionamento à venda',
   EVENT_EXTRA_CREATED: 'Cadastrou configuração de evento',
   EVENT_EXTRA_UPDATED: 'Editou configuração de evento',
   EVENT_EXTRA_REMOVED: 'Apagou configuração de evento',
@@ -123,5 +124,5 @@ export const MIN_DESKTOP_WIDTH = 1024;
 export const PAYMENT_PROVIDER_LABEL: Record<'sandbox' | 'stripe' | 'none', string> = {
   sandbox: 'Teste (não cobra de verdade)',
   stripe: 'Stripe (Pix e cartão)',
-  none: 'Nenhum configurado',
+  none: 'Nenhum (a venda é só pelo app)',
 };

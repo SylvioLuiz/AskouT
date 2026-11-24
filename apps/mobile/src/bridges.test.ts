@@ -548,6 +548,15 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
   assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
 });
 
+it('widgets abrem o NOW, a conversa do encontro e a página do evento', async () => {
+  const { deepLinkPath } = await import('./deep-link.ts');
+  assert.equal(deepLinkPath('br.com.askout://now'), '/now');
+  assert.equal(deepLinkPath('br.com.askout://conversas/7c1e-99'), '/conversas/7c1e-99');
+  assert.equal(deepLinkPath('br.com.askout://eventos/place:abc_1'), '/eventos/place:abc_1');
+  assert.equal(deepLinkPath('br.com.askout://eventos/../configuracoes'), undefined);
+  assert.equal(deepLinkPath('br.com.askout://conversas/<x>'), undefined);
+});
+
 it('link do convite abre o app pelo site (Universal Link / App Link) ou pelo intent do Android', async () => {
   const { deepLinkPath } = await import('./deep-link.ts');
   assert.equal(deepLinkPath('https://askout.com.br/convite/ana.s'), '/convite/ana.s');
@@ -662,6 +671,9 @@ test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Andr
     { id: 2, tag: 'msg:2', data: { 'askout.url': '/conversas/2' } },
     { id: 3, title: 'ana ligou o NOW', body: 'Bora?', data: {} },
     { id: 4, data: { url: '/conversas/9' } },
+    // Chegada ao vivo do amigo: fica, mesmo com a tela do encontro aberta.
+    { id: 5, data: { url: '/now/encontro/7', live: '{"state":"moving"}' } },
+    { id: 6, tag: 'arrival:7:ana', data: { 'askout.url': '/now/encontro/7', 'askout.live': '1' } },
   ];
   let removed: unknown[] = [];
   const push = {
@@ -677,6 +689,7 @@ test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Andr
   assert.deepEqual(removed.map((n) => (n as { id: number }).id), [2]);
   assert.equal(await bridge.clearDelivered({ url: '/now', texts: [{ title: 'ana ligou o NOW', body: 'Bora?' }] }), 1);
   assert.deepEqual(removed.map((n) => (n as { id: number }).id), [3]);
+  assert.equal(await bridge.clearDelivered({ url: '/now/encontro/7', texts: [] }), 0);
 });
 
 test('localização nativa: erros do plugin viram os códigos do navegador', async () => {

@@ -49,11 +49,14 @@ public class ShareSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let status = SecItemAdd(add as CFDictionary, nil)
+        // Os widgets (AskouTWidgets) leem a mesma sessão: entrou ou trocou de conta, eles buscam de novo.
+        WidgetsPlugin.reloadAll()
         if status == errSecSuccess { call.resolve() } else { call.reject("Keychain \(status)") }
     }
 
     @objc func clear(_ call: CAPPluginCall) {
         SecItemDelete(baseQuery() as CFDictionary)
+        WidgetsPlugin.reloadAll()
         call.resolve()
     }
 }
