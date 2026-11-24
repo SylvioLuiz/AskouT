@@ -163,7 +163,7 @@ export class PostsController {
     return this.core.posts.inviteToEvent(actor.userId, id, asBody(body).userIds);
   }
 
-  /** Cancela um convite ainda não aceito do próprio evento. */
+  /** Cancela um convite ainda não aceito: quem organiza o evento (qualquer um) ou quem mandou aquele convite. */
   @Delete('posts/:id/invites/:userId')
   cancelInvite(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
     return this.core.posts.cancelInvite(actor.userId, id, userId);

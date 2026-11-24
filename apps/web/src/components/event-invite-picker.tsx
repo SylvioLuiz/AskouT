@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { EventInvite } from '../lib/types.ts';
 import { Sheet } from './agenda.tsx';
 import { FriendPicker } from './meetup.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
@@ -18,18 +19,14 @@ import { t } from '../lib/i18n/index.ts';
 export function EventInviteSheet({ eventId, groupId, picked: initial = [], onDone, onInvite, onClose }: { eventId: string; groupId?: string; picked?: readonly string[]; onDone?: (userIds: string[]) => void; onInvite?: (invited: number) => void; onClose: () => void }) {
   const invites = useAsync(() => api.eventInvites(eventId).then((r) => r.invites), [eventId]);
   const exclude = useMemo(() => (invites.data ?? []).filter((i) => i.status !== 'DECLINED').map((i) => i.user.userId), [invites.data]);
-  const pending = (invites.data ?? []).filter((i) => i.status === 'PENDING');
   const [picked, setPicked] = useState<string[]>([...initial]);
   const [busy, setBusy] = useState(false);
-  const [cancelling, setCancelling] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const chosen = picked.filter((id) => !exclude.includes(id));
   const group = useAsync(() => (groupId ? api.group(groupId).then((g) => g.members.map((m) => m.profile.userId)) : Promise.resolve([] as string[])), [groupId]);
   const inGroup = group.data ?? [];
   // Quem for convidado entra também no grupo do evento (e na votação dele): ligado por padrão, dá para desligar.
   const [alsoGroup, setAlsoGroup] = useState(true);
-  // Convite cancelado de alguém que está no grupo: pergunta se tira do grupo também.
-  const [askRemove, setAskRemove] = useState<string | undefined>();
   const toGroup = groupId && alsoGroup ? chosen.filter((id) => !inGroup.includes(id)) : [];
 
   async function done() {
@@ -64,75 +61,11 @@ export function EventInviteSheet({ eventId, groupId, picked: initial = [], onDon
     }
   }
 
-  async function cancel(userId: string, leaveGroup = false) {
-    setMessage(undefined);
-    setAskRemove(undefined);
-    setCancelling(userId);
-    try {
-      await api.cancelEventInvite(eventId, userId);
-      if (leaveGroup && groupId) {
-        await api.removeMember(groupId, userId);
-        group.reload();
-      }
-      setPicked((c) => c.filter((id) => id !== userId));
-      invites.reload();
-    } catch (failure) {
-      setMessage(toApiError(failure).message);
-    } finally {
-      setCancelling(undefined);
-    }
-  }
-
   return (
     <Sheet title={t('Convidar pessoas')} onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
       <p className="muted">{t('Só amigos. Quem já tem convite não aparece aqui até recusar. Cada pessoa recebe o convite e aceita para o evento ir para o perfil dela.')}</p>
-      {pending.length > 0 ? (
-        <section className="evinvites" aria-labelledby="evinvites-title">
-          <h3 id="evinvites-title" className="results__h">
-            {t('Convites pendentes')} <span className="evwho__count">{pending.length}</span>
-          </h3>
-          <ul className="evwho__list">
-            {pending.map((i) => (
-              <li key={i.user.userId} className="evwho__item">
-                <Avatar profile={i.user} size={40} />
-                <span className="evwho__who">
-                  <strong>{i.user.displayName}</strong>
-                  <span>@{i.user.username}</span>
-                </span>
-                {askRemove === i.user.userId ? null : (
-                  <Button
-                    small
-                    variant="quiet"
-                    loading={cancelling === i.user.userId}
-                    disabled={cancelling !== undefined}
-                    onClick={() => (inGroup.includes(i.user.userId) ? setAskRemove(i.user.userId) : void cancel(i.user.userId))}
-                    aria-label={t('Cancelar o convite de {name}', { name: i.user.displayName })}
-                  >
-                    {t('Cancelar')}
-                  </Button>
-                )}
-                {askRemove === i.user.userId ? (
-                  <div className="evinvites__ask" role="group" aria-label={t('Tirar {name} do grupo do evento também?', { name: i.user.displayName })}>
-                    <p>{t('Tirar {name} do grupo do evento também? Sai da votação da data junto.', { name: i.user.displayName })}</p>
-                    <div className="evinvites__askbtns">
-                      <Button small variant="danger" onClick={() => void cancel(i.user.userId, true)}>
-                        {t('Tirar do grupo')}
-                      </Button>
-                      <Button small variant="secondary" onClick={() => void cancel(i.user.userId)}>
-                        {t('Só o convite')}
-                      </Button>
-                      <Button small variant="quiet" onClick={() => setAskRemove(undefined)}>
-                        {t('Voltar')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <PendingInvites invites={invites.data} eventId={eventId} {...(groupId ? { groupId } : {})} onCancelled={(userId) => { setPicked((c) => c.filter((id) => id !== userId)); invites.reload(); }} />
       {/* Esperar a lista de convidados para não oferecer quem já foi convidado. */}
       {invites.data === undefined && invites.loading ? null : <FriendPicker picked={picked} exclude={exclude} onToggle={(id) => setPicked((c) => toggleId(c, id))} />}
       {groupId && onInvite && chosen.some((id) => !inGroup.includes(id)) ? (
@@ -145,5 +78,87 @@ export function EventInviteSheet({ eventId, groupId, picked: initial = [], onDon
         {onInvite ? (chosen.length === 0 ? t('Concluir') : chosen.length === 1 ? t('Convidar 1 pessoa') : t('Convidar {n} pessoas', { n: chosen.length })) : t('Concluir')}
       </Button>
     </Sheet>
+  );
+}
+
+/**
+ * Convites ainda sem resposta, com "Cancelar" em cada um. Quem organiza vê todos; quem não organiza vê só os que mandou
+ * (a API já filtra). Cancelar tira o convite, a marcação e o aviso de quem foi convidado. Com `groupId` (só quem organiza),
+ * se a pessoa está no grupo do evento, pergunta se ela sai dele também. `ownerId` esconde
+ * "convidado por" nos convites que a própria pessoa que organiza mandou.
+ */
+export function PendingInvites({ invites, eventId, groupId, ownerId, onCancelled }: { invites: readonly EventInvite[] | undefined; eventId: string; groupId?: string; ownerId?: string; onCancelled: (userId: string) => void }) {
+  const pending = (invites ?? []).filter((i) => i.status === 'PENDING');
+  const group = useAsync(() => (groupId ? api.group(groupId).then((g) => g.members.map((m) => m.profile.userId)) : Promise.resolve([] as string[])), [groupId]);
+  const inGroup = group.data ?? [];
+  const [cancelling, setCancelling] = useState<string | undefined>();
+  const [askRemove, setAskRemove] = useState<string | undefined>();
+  const [message, setMessage] = useState<string | undefined>();
+
+  async function cancel(userId: string, leaveGroup = false) {
+    setMessage(undefined);
+    setAskRemove(undefined);
+    setCancelling(userId);
+    try {
+      await api.cancelEventInvite(eventId, userId);
+      if (leaveGroup && groupId) {
+        await api.removeMember(groupId, userId);
+        group.reload();
+      }
+      onCancelled(userId);
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+    } finally {
+      setCancelling(undefined);
+    }
+  }
+
+  if (pending.length === 0) return message ? <Notice tone="error">{message}</Notice> : null;
+  return (
+    <section className="evinvites" aria-labelledby={`evinvites-title-${eventId}`}>
+      <h3 id={`evinvites-title-${eventId}`} className="results__h">
+        {t('Convites pendentes')} <span className="evwho__count">{pending.length}</span>
+      </h3>
+      {message ? <Notice tone="error">{message}</Notice> : null}
+      <ul className="evwho__list">
+        {pending.map((i) => (
+          <li key={i.user.userId} className="evwho__item">
+            <Avatar profile={i.user} size={40} />
+            <span className="evwho__who">
+              <strong>{i.user.displayName}</strong>
+              <span>{ownerId && i.invitedBy && i.invitedBy.userId !== ownerId ? t('@{user} · convidado por {name}', { user: i.user.username, name: i.invitedBy.displayName || i.invitedBy.username }) : `@${i.user.username}`}</span>
+            </span>
+            {askRemove === i.user.userId ? null : (
+              <Button
+                small
+                variant="quiet"
+                loading={cancelling === i.user.userId}
+                disabled={cancelling !== undefined}
+                onClick={() => (inGroup.includes(i.user.userId) ? setAskRemove(i.user.userId) : void cancel(i.user.userId))}
+                aria-label={t('Cancelar o convite de {name}', { name: i.user.displayName })}
+              >
+                {t('Cancelar')}
+              </Button>
+            )}
+            {askRemove === i.user.userId ? (
+              <div className="evinvites__ask" role="group" aria-label={t('Tirar {name} do grupo do evento também?', { name: i.user.displayName })}>
+                <p>{t('Tirar {name} do grupo do evento também? Sai da votação da data junto.', { name: i.user.displayName })}</p>
+                <div className="evinvites__askbtns">
+                  <Button small variant="danger" onClick={() => void cancel(i.user.userId, true)}>
+                    {t('Tirar do grupo')}
+                  </Button>
+                  <Button small variant="secondary" onClick={() => void cancel(i.user.userId)}>
+                    {t('Só o convite')}
+                  </Button>
+                  <Button small variant="quiet" onClick={() => setAskRemove(undefined)}>
+                    {t('Voltar')}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

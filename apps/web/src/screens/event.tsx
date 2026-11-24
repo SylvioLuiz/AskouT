@@ -9,7 +9,7 @@ import { StoryViewer } from '../components/event-story.tsx';
 import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
-import { EventInviteSheet } from '../components/event-invite-picker.tsx';
+import { EventInviteSheet, PendingInvites } from '../components/event-invite-picker.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -196,6 +196,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
       live = false;
     };
   }, [eventId, storyIds, storiesKey]);
+  /** Convites ainda sem resposta (quem organiza vê todos; quem convidou, os seus), para cancelar direto na página. */
+  const invitesFor = !visitor && (fresh ?? loaded.data ?? undefined)?.source === 'USER';
+  const pendingInvites = useAsync(() => (invitesFor ? api.eventInvites(eventId).then((r) => r.invites) : Promise.resolve([])), [eventId, invitesFor]);
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [choosing, setChoosing] = useState(false);
@@ -652,6 +655,18 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <p className="evwho__empty">{e.isOwner ? t('Ninguém confirmou ainda.') : t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
           ) : null}
           {inviteNote ? <Notice tone="ok">{inviteNote}</Notice> : null}
+          {!visitor && e.source === 'USER' && !ended ? (
+            <PendingInvites
+              invites={pendingInvites.data}
+              eventId={e.id}
+              {...(e.isOwner && e.group ? { groupId: e.group.conversationId } : {})}
+              {...(e.isOwner && e.owner ? { ownerId: e.owner.userId } : {})}
+              onCancelled={() => {
+                setInviteNote(undefined);
+                pendingInvites.reload();
+              }}
+            />
+          ) : null}
 
           {whoOpen ? (
             <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => setWhoOpen(false)}>
@@ -684,6 +699,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 setInvitingFriends(false);
                 setInviteNote(n === 0 ? t('Essas pessoas já estavam convidadas.') : n === 1 ? t('1 pessoa convidada.') : t('{n} pessoas convidadas.', { n }));
                 loaded.reload();
+                pendingInvites.reload();
               }}
               onClose={() => setInvitingFriends(false)}
             />
@@ -811,7 +827,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
           outside={!e.isPrivate}
           sheetTitle={t('Convidar pessoas')}
           invite
-          onClose={() => setInviting(false)}
+          onClose={() => {
+            setInviting(false);
+            pendingInvites.reload();
+          }}
         />
       ) : null}
       {sharing && e ? (
@@ -823,7 +842,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
           onPostedChange={setPosted}
           profile={e.source === 'PLACE' ? 'toggle' : e.isPrivate ? 'private' : e.isOwner ? 'owner' : 'toggle'}
           outside={!e.isPrivate}
-          onClose={() => setSharing(false)}
+          onClose={() => {
+            setSharing(false);
+            pendingInvites.reload();
+          }}
         />
       ) : null}
       {menu && e ? (
