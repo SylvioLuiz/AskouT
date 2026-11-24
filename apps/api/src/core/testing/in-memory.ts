@@ -112,6 +112,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   readonly photos = new Map<string, ProfilePhotoRecord>();
+  readonly phonePrompts = new Map<string, { count: number; lastAt: Date | null }>();
 
   async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
     if (photo) this.photos.set(userId, { ...photo, data: new Uint8Array(photo.data) });
@@ -214,6 +215,15 @@ export class InMemoryUserRepository implements UserRepository {
   async markOnboarded(userId: string, at: Date): Promise<void> {
     const u = this.users.get(userId);
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
+  }
+
+  async getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }> {
+    return { ...(this.phonePrompts.get(userId) ?? { count: 0, lastAt: null }) };
+  }
+
+  async markPhonePrompted(userId: string, at: Date): Promise<void> {
+    const now = this.phonePrompts.get(userId) ?? { count: 0, lastAt: null };
+    this.phonePrompts.set(userId, { count: now.count + 1, lastAt: at });
   }
 
   async setTastes(userId: string, tastes: string[]): Promise<void> {

@@ -287,6 +287,8 @@ export function createApi(deps: ApiDeps) {
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),
     setPhone: (phone: string | null) => request<{ phone: string | null; verified?: boolean }>('PUT', '/profiles/me/phone', { body: { phone } }),
+    phonePrompt: () => request<{ show: boolean }>('GET', '/profiles/me/phone/prompt'),
+    markPhonePrompted: () => request<{ ok: true }>('POST', '/profiles/me/phone/prompt'),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
     shownGoingEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/going${pageQuery(page)}`),
