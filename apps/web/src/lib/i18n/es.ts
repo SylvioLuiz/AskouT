@@ -3046,6 +3046,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Criar grupo do evento": "Crear grupo del evento",
   "Entram seus amigos que foram convidados ou confirmaram. Depois dá para adicionar mais gente pelo grupo.": "Entran tus amigos que fueron invitados o confirmaron. Luego puedes agregar más gente desde el grupo.",
   "Organizado por": "Organizado por",
+  "Entre para ver o perfil de quem organiza o evento.": "Entra para ver el perfil de quien organiza el evento.",
   "Até {max} itens, com no máximo 1 vídeo. Ou toque em Avançar para escrever só um texto.": "Hasta {max} elementos, con como máximo 1 video. O toca Siguiente para escribir solo un texto.",
   "Escolha um evento ou um local para publicar.": "Elige un evento o un lugar para publicar.",
   "Escolha uma capa para o evento.": "Elige una portada para el evento.",

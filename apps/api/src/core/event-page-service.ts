@@ -361,22 +361,32 @@ export class EventPageService {
   }
 
   /**
-   * Página do evento para quem não entrou: só evento de local, sem ninguém (nem dono, nem quem vai, nem stories), só o número de confirmados.
-   * Evento criado por uma pessoa não abre sem conta.
+   * Página do evento para quem não entrou: sem quem vai e sem stories, só o número de confirmados.
+   * Evento de local sempre abre. Evento criado por uma pessoa abre só se for público (não privado, não arquivado) e o perfil
+   * de quem criou for público e ativo; aí o dono aparece (o perfil dele já é aberto a qualquer um). Senão, "não encontrado".
    */
   async publicGet(rawId: unknown, input: { lat?: number; lng?: number } = {}): Promise<EventPageView> {
     const id = parseId(rawId);
-    if (!(await this.deps.places.findEvent(id))) throw notFound('Evento não encontrado');
-    const ref: EventRef = { source: 'PLACE', id };
+    let ref: EventRef;
+    let owner: PublicProfile | null = null;
+    if (await this.deps.places.findEvent(id)) {
+      ref = { source: 'PLACE', id };
+    } else {
+      owner = await this.publicUserEventOwner(id);
+      ref = { source: 'USER', id };
+    }
     const base = await this.base(VISITOR_ID, ref, input);
     const counts = await this.deps.eventRoom.countGoing([ref]);
+    const going = counts.get(id) ?? 0;
+    // Em evento de pessoa o dono conta como confirmado (como na página de quem entrou), mesmo sem presença gravada.
+    const ownerGoing = owner ? (await this.deps.eventRoom.listGoing(ref)).some((g) => g.userId === owner.userId) : false;
     return {
       ...base.view,
       postedByMe: false,
-      confirmedCount: counts.get(id) ?? 0,
+      confirmedCount: owner && !ownerGoing ? going + 1 : going,
       going: false,
       attendees: [],
-      owner: null,
+      owner,
       isOwner: false,
       storyUserIds: [],
       canStory: false,
@@ -385,6 +395,23 @@ export class EventPageService {
       group: null,
       canCreateGroup: false,
     };
+  }
+
+  /** Evento de pessoa que o visitante pode abrir: público, não arquivado, de perfil público e conta ativa. Devolve o dono. */
+  private async publicUserEventOwner(id: string): Promise<PublicProfile> {
+    const post = (await this.deps.posts.findById(id))?.post;
+    if (!post || post.eventTitle === null || post.archivedAt !== null || post.eventPrivate) throw notFound('Evento não encontrado');
+    const author = await this.deps.users.findProfileById(post.authorId);
+    if (!author) throw notFound('Evento não encontrado');
+    let canSee = false;
+    try {
+      // Mesma regra do perfil: conta suspensa some, perfil privado só abre para quem segue (o visitante não segue ninguém).
+      canSee = (await this.profiles.getByUsername(VISITOR_ID, author.username)).canViewContent;
+    } catch (failure) {
+      if (!(failure instanceof DomainError)) throw failure;
+    }
+    if (!canSee) throw notFound('Evento não encontrado');
+    return toPublicProfile(author);
   }
 
   private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup'> }> {

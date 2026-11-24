@@ -138,7 +138,8 @@ const GUEST_ROUTES: RouteDef[] = [
 ];
 
 /**
- * Modo visitante (sem conta): só a Home com os eventos dos locais da cidade escolhida, a página do evento de local e a do local.
+ * Modo visitante (sem conta): só a Home com os eventos dos locais da cidade escolhida, a página do evento (de local, ou de pessoa
+ * quando é público e o perfil dela também) e a do local.
  * Sem cidade escolhida à mão, nada carrega (pede a cidade ou o login). Qualquer outra tela leva ao login.
  */
 const VISITOR_ROUTES: RouteDef[] = [

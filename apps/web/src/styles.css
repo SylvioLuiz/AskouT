@@ -6675,6 +6675,7 @@ div.optrow__main { cursor: default; }
 .evhost { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-decoration: none; -webkit-tap-highlight-color: transparent; }
 .evhost:visited { color: var(--ink); }
 .evhost:hover, .evhost:focus-visible { border-color: var(--brand); }
+button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evhost > .icon, .evhost > svg { flex: none; width: 20px; height: 20px; margin-left: auto; color: var(--muted); }
 .evhost__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .evhost__label { color: var(--muted); font-size: 0.8125rem; }
