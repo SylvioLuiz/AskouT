@@ -6,7 +6,7 @@ import { intlLocale, t } from '../lib/i18n/index.ts';
 function line(p: PollSummary): string {
   if (p.status === 'FINALIZED') return p.finalDate ? t('Data definida: {finalDate}', { finalDate: longDay(p.finalDate) }) : t('Data definida');
   if (p.status === 'CONFIRMING') return p.proposedDate ? t('Confirmando {proposedDate}', { proposedDate: longDay(p.proposedDate) }) : t('Data em confirmação');
-  if (p.best) return t('Melhor até agora: {date} ({compatibility} de compatibilidade, {coverage} votaram)', { date: longDay(p.best.date), compatibility: percent(p.best.compatibility), coverage: percent(p.best.coverage) });
+  if (p.best) return t('Melhor até agora: {date} ({compatibility} de compatibilidade, {coverage} votaram)', { date: p.best.time ? `${longDay(p.best.date)}, ${p.best.time}` : longDay(p.best.date), compatibility: percent(p.best.compatibility), coverage: percent(p.best.coverage) });
   return t('Faltam votos para sugerir uma data');
 }
 
