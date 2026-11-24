@@ -104,13 +104,19 @@ test('editar o evento privado convida gente nova: convite, marcação e aviso, s
   assert.ok((await w.core.eventPages.invites(ana, post.id)).invites.every((i) => i.invitedBy?.username === 'ana'));
 });
 
-test('convidar mais pela lista do evento: só a dona, só amigos, e quem recusou não é remarcado', async () => {
+test('convidar mais pela lista do evento: só a dona, só amigos; quem tem convite pendente não é reconvidado, quem recusou é', async () => {
   const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
   const post = await make(true, [bia]);
+  // Pendente: não é convidado de novo.
+  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia])).invited, []);
   await w.core.posts.respondTag(bia, post.id, 'decline');
-  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia, caio])).invited, [caio]);
+  const status = async () => Object.fromEntries((await w.core.eventPages.invites(ana, post.id)).invites.map((i) => [i.user.username, i.status]));
+  assert.deepEqual(await status(), { bia: 'DECLINED' });
+  // Recusou: pode ser convidada de novo e o convite volta a ficar pendente.
+  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia, caio])).invited, [caio, bia]);
   assert.deepEqual(await invitedIds(ana, post.id), ['bia', 'caio']);
-  assert.equal((await w.core.posts.get(bia, post.id)).myTag, 'DECLINED');
+  assert.equal((await w.core.posts.get(bia, post.id)).myTag, 'PENDING');
+  assert.deepEqual(await status(), { bia: 'PENDING', caio: 'PENDING' });
   assert.equal((await w.core.posts.get(ana, post.id)).edited, false, 'convidar não marca o evento como editado');
   // De novo: ninguém novo.
   assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [caio])).invited, []);
@@ -120,4 +126,18 @@ test('convidar mais pela lista do evento: só a dona, só amigos, e quem recusou
   await rejectsWith(w.core.posts.inviteToEvent(ana, post.id, [eva]), 'VALIDATION');
   await rejectsWith(w.core.posts.update(ana, post.id, { inviteUserIds: [eva] }), 'VALIDATION');
   assert.deepEqual(await invitedIds(ana, post.id), ['bia', 'caio']);
+});
+
+test('cancelar convite pendente: só a dona, e quem já aceitou não sai', async () => {
+  const { w, ana, bia, caio, make, invitedIds } = await setup();
+  const post = await make(true, [bia, caio]);
+  await w.core.posts.respondTag(caio, post.id, 'accept');
+  await rejectsWith(w.core.posts.cancelInvite(bia, post.id, caio), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.cancelInvite(ana, post.id, caio), 'CONFLICT');
+  assert.deepEqual(await w.core.posts.cancelInvite(ana, post.id, bia), { cancelled: true });
+  assert.deepEqual(await invitedIds(ana, post.id), ['caio']);
+  assert.equal((await w.core.posts.get(ana, post.id)).tags.some((t) => t.user.username === 'bia'), false);
+  await rejectsWith(w.core.posts.cancelInvite(ana, post.id, bia), 'NOT_FOUND');
+  // Cancelado, pode ser convidada de novo.
+  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia])).invited, [bia]);
 });

@@ -2465,6 +2465,12 @@ export class InMemoryPostRepository implements PostRepository {
     return this.invites.has(`${postId}|${userId}`);
   }
 
+  async removeInvite(postId: string, userId: string): Promise<boolean> {
+    const key = `${postId}|${userId}`;
+    this.tags.delete(key);
+    return this.invites.delete(key);
+  }
+
   async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {
     const ids = new Set([...this.tags.values()].filter((t) => t.userId === userId && t.status === 'PENDING').map((t) => t.postId));
     return this.newestFirst([...this.posts.values()].filter((p) => ids.has(p.id)))

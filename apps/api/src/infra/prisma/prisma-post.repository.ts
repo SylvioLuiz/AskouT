@@ -190,6 +190,12 @@ export class PrismaPostRepository implements PostRepository {
     return (await this.prisma.eventInvite.count({ where: { postId, userId } })) > 0;
   }
 
+  async removeInvite(postId: string, userId: string): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    const [removed] = await this.prisma.$transaction([this.prisma.eventInvite.deleteMany({ where: { postId, userId } }), this.prisma.postTag.deleteMany({ where: { postId, userId } })]);
+    return removed.count > 0;
+  }
+
   async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.post.findMany({

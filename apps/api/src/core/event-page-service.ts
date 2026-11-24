@@ -167,6 +167,8 @@ export interface EventInviteView {
   invitedAt: string;
   /** Também está marcada no evento (e não recusou a marcação). */
   tagged: boolean;
+  /** PENDING: ainda não respondeu (dá para cancelar); ACCEPTED: aceitou; DECLINED: recusou (dá para convidar de novo). */
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
 }
 
 /** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
@@ -346,7 +348,7 @@ export class EventPageService {
       invites: rows.flatMap((r): EventInviteView[] => {
         const user = byId.get(r.userId);
         if (!user) return [];
-        return [{ user, invitedBy: r.invitedById ? (byId.get(r.invitedById) ?? null) : null, invitedAt: r.createdAt.toISOString(), tagged: tagged.has(r.userId) && tagged.get(r.userId) !== 'DECLINED' }];
+        return [{ user, invitedBy: r.invitedById ? (byId.get(r.invitedById) ?? null) : null, invitedAt: r.createdAt.toISOString(), tagged: tagged.has(r.userId) && tagged.get(r.userId) !== 'DECLINED', status: tagged.get(r.userId) ?? 'PENDING' }];
       }),
     };
   }

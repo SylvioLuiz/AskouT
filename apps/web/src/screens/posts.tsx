@@ -391,6 +391,8 @@ export function CreatePostScreen() {
     const finish = () => navigate(created.private ? eventPath : '/perfil?aba=eventos');
     // Quem foi marcado já conta como convidado: o botão já é "Convidar mais pessoas" e a votação já pode abrir.
     const hasInvites = sharedOnce || created.taggedCount > 0;
+    // Marcou gente na criação: o convite já saiu, então não pede de novo aqui (dá para convidar mais pela página do evento).
+    const tagged = created.taggedCount > 0;
     const inviteLabel = hasInvites ? t('Convidar mais pessoas') : t('Convidar pessoas');
     return (
       <div className="compose compose--created">
@@ -420,16 +422,18 @@ export function CreatePostScreen() {
           {created.dateByPoll ? (
             <>
               <p className="muted">{t('A data vai ser decidida numa votação com todos os convidados. Quem você convidar depois entra na votação também.')}</p>
-              <Button full onClick={() => setSharing(true)}>
-                <UsersIcon /> {inviteLabel}
-              </Button>
+              {tagged ? null : (
+                <Button full onClick={() => setSharing(true)}>
+                  <UsersIcon /> {inviteLabel}
+                </Button>
+              )}
               {hasInvites ? (
-                <Button full variant="secondary" onClick={() => navigate(pollPath)}>
+                <Button full variant={tagged ? 'primary' : 'secondary'} onClick={() => navigate(pollPath)}>
                   <CalendarIcon /> {t('Abrir a votação da data')}
                 </Button>
               ) : null}
             </>
-          ) : (
+          ) : tagged ? null : (
             <Button full onClick={() => setSharing(true)}>
               <UsersIcon /> {inviteLabel}
             </Button>
