@@ -7,14 +7,17 @@ import './desktop.css';
 import { installChunkReload } from './lib/chunk-reload.ts';
 
 import { getLocale, loadLocale } from './lib/i18n/index.ts';
-import { applyTheme, readTheme } from './lib/theme.ts';
+import { applyTheme, readTheme, syncWidgetTheme } from './lib/theme.ts';
 
 installChunkReload();
 
 document.documentElement.lang = getLocale();
 
 try {
-  applyTheme(readTheme(window.localStorage), document.documentElement);
+  const theme = readTheme(window.localStorage);
+  applyTheme(theme, document.documentElement);
+  // Os widgets do celular ficam no mesmo tema (também para quem escolheu antes de os widgets saberem do tema).
+  syncWidgetTheme(theme);
 } catch {
   // sem armazenamento: fica no automático
 }

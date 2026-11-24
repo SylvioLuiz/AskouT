@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 
 /// Widgets do AskouT para a tela inicial e a tela bloqueada do iPhone.
@@ -62,26 +63,72 @@ struct Provider: TimelineProvider {
 
 // MARK: - Marca
 
+/// Cores da marca nos dois temas. Cada cor segue o `colorScheme` do ambiente, que `brandBackground()` fixa no tema
+/// escolhido no app (ou deixa o do iPhone, no "Automático").
 enum Brand {
-    static let ink = Color(red: 0.969, green: 0.953, blue: 1.0)
-    static let muted = Color(red: 0.710, green: 0.678, blue: 0.812)
-    static let card = Color(red: 20 / 255, green: 16 / 255, blue: 34 / 255)
-    static let cardTop = Color(red: 38 / 255, green: 24 / 255, blue: 62 / 255)
-    static let track = Color.white.opacity(0.12)
-    static let pink = Color(red: 1.0, green: 0.310, blue: 0.690)
-    static let violet = Color(red: 0.639, green: 0.361, blue: 1.0)
+    private static func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> UIColor {
+        UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+    }
+
+    private static func pair(light: UIColor, dark: UIColor) -> Color {
+        Color(UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+
+    static let ink = pair(light: rgb(0x1C1C1E), dark: rgb(0xF7F3FF))
+    static let muted = pair(light: rgb(0x5C5C60), dark: rgb(0xB5ADCF))
+    /// Contorno dos rostinhos: a cor do fundo.
+    static let card = pair(light: rgb(0xFFFFFF), dark: rgb(0x141022))
+    static let track = pair(light: rgb(0x000000, 0.10), dark: rgb(0xFFFFFF, 0.12))
+    /// Fundo dos blocos e botões contornados.
+    static let wash = pair(light: rgb(0x000000, 0.05), dark: rgb(0xFFFFFF, 0.06))
+    static let pink = pair(light: rgb(0xD6248F), dark: rgb(0xFF4FB0))
+    static let violet = pair(light: rgb(0x8A3FFC), dark: rgb(0xA35CFF))
     static let gradient = LinearGradient(
         stops: [
-            .init(color: Color(red: 1.0, green: 0.769, blue: 0.541), location: 0),
-            .init(color: Color(red: 1.0, green: 0.435, blue: 0.569), location: 0.30),
+            .init(color: pair(light: rgb(0xE8590C), dark: rgb(0xFFC48A)), location: 0),
+            .init(color: pair(light: rgb(0xE0336A), dark: rgb(0xFF6F91)), location: 0.30),
             .init(color: pink, location: 0.55),
             .init(color: violet, location: 0.80),
-            .init(color: Color(red: 0.353, green: 0.784, blue: 1.0), location: 1),
+            .init(color: pair(light: rgb(0x1D8FD6), dark: rgb(0x5AC8FF)), location: 1),
         ],
         startPoint: .leading,
         endPoint: .trailing
     )
-    static let background = LinearGradient(colors: [cardTop, card], startPoint: .topLeading, endPoint: .bottomTrailing)
+
+    static func background(for scheme: ColorScheme) -> LinearGradient {
+        let colors: [Color] = scheme == .dark
+            ? [Color(rgb(0x26183E)), Color(rgb(0x141022))]
+            : [Color(rgb(0xFBEFF8)), Color(rgb(0xFFFFFF))]
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+/// Tema escolhido no app (Configuração › Tema e idioma), gravado no Keychain compartilhado pelo WidgetsPlugin.
+enum WidgetTheme {
+    /// `nil` no "Automático" (ou se o app ainda não gravou): segue o iPhone.
+    static func forced() -> ColorScheme? {
+        switch WidgetSession.theme() {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+}
+
+/// Fixa o tema do app no widget inteiro: nas cores do conteúdo (pelo ambiente) e no fundo.
+struct BrandBackground: ViewModifier {
+    let forced: ColorScheme?
+    @Environment(\.colorScheme) private var system
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let scheme = forced ?? system
+        if #available(iOSApplicationExtension 17.0, *) {
+            content.environment(\.colorScheme, scheme).containerBackground(for: .widget) { Brand.background(for: scheme) }
+        } else {
+            content.environment(\.colorScheme, scheme).padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Brand.background(for: scheme))
+        }
+    }
 }
 
 func appLink(_ path: String) -> URL? {
@@ -89,14 +136,10 @@ func appLink(_ path: String) -> URL? {
 }
 
 extension View {
-    /// Fundo escuro da marca; no iOS 17+ pelo `containerBackground` (obrigatório), antes com a margem feita aqui.
-    @ViewBuilder
+    /// Fundo da marca no tema do app (claro, escuro ou o do iPhone); no iOS 17+ pelo `containerBackground` (obrigatório),
+    /// antes com a margem feita aqui.
     func brandBackground() -> some View {
-        if #available(iOSApplicationExtension 17.0, *) {
-            containerBackground(for: .widget) { Brand.background }
-        } else {
-            padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(Brand.background)
-        }
+        modifier(BrandBackground(forced: WidgetTheme.forced()))
     }
 
     /// Tela bloqueada: o iPhone pinta sozinho; só precisa declarar o fundo no iOS 17+.
@@ -268,7 +311,7 @@ struct NextPlanView: View {
             }
             .frame(width: 64)
             .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.06)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Brand.wash))
 
             VStack(alignment: .leading, spacing: 4) {
                 Eyebrow(text: "Próximo encontro")
@@ -468,7 +511,7 @@ struct WidgetButton: View {
                 if primary {
                     Capsule().fill(LinearGradient(colors: [Brand.pink, Brand.violet], startPoint: .leading, endPoint: .trailing))
                 } else {
-                    Capsule().stroke(Brand.track, lineWidth: 1).background(Capsule().fill(Color.white.opacity(0.06)))
+                    Capsule().stroke(Brand.track, lineWidth: 1).background(Capsule().fill(Brand.wash))
                 }
             }
     }

@@ -32,6 +32,7 @@ public final class WidgetData {
     private static final String KEY_BASE = "apiBase";
     private static final String KEY_SNAPSHOT = "snapshot";
     private static final String KEY_FETCHED = "fetchedAt";
+    private static final String KEY_THEME = "theme";
 
     private WidgetData() {}
 
@@ -51,8 +52,18 @@ public final class WidgetData {
         e.apply();
     }
 
+    /** Sai da conta: apaga a sessão e o resultado guardado (o tema escolhido no app fica). */
     public static void clearSession(Context context) {
-        prefs(context).edit().clear().apply();
+        prefs(context).edit().remove(KEY_TOKEN).remove(KEY_BASE).remove(KEY_SNAPSHOT).remove(KEY_FETCHED).apply();
+    }
+
+    /** Tema do app ("system", "light" ou "dark"; ver WidgetTheme). */
+    public static void setTheme(Context context, String theme) {
+        prefs(context).edit().putString(KEY_THEME, theme).apply();
+    }
+
+    static String theme(Context context) {
+        return prefs(context).getString(KEY_THEME, WidgetTheme.SYSTEM);
     }
 
     static boolean loggedIn(Context context) {

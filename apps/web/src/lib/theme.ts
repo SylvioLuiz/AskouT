@@ -36,3 +36,17 @@ export function saveTheme(choice: ThemeChoice, storage: Pick<Storage, 'setItem' 
     // sem armazenamento: o tema vale só até fechar a página
   }
 }
+
+/**
+ * Widgets do celular (iPhone e Android) no mesmo tema do app: a ponte `window.AskouTWidgetTheme` (apps/mobile/src/main.ts)
+ * grava a escolha onde o widget lê e pede para redesenhar. Sem a ponte (navegador, build antigo), nada acontece.
+ */
+export function syncWidgetTheme(choice: ThemeChoice, host: unknown = typeof window === 'undefined' ? undefined : window): void {
+  const bridge = (host as { AskouTWidgetTheme?: { set?: (theme: ThemeChoice) => Promise<void> } } | undefined)?.AskouTWidgetTheme;
+  if (typeof bridge?.set !== 'function') return;
+  try {
+    void bridge.set(choice).catch(() => undefined);
+  } catch {
+    // ponte quebrada: o widget segue como estava
+  }
+}

@@ -2,4 +2,12 @@
 <resources>
     <!-- Cor de destaque do ícone pequeno dos avisos (rosa do logo). -->
     <color name="notification_accent">#FF4FD0</color>
+
+    <!-- Widgets no tema claro. Com o tema "Automático" do app, valem estas e as de values-night (o Android troca
+         sozinho); com "Claro" ou "Escuro", o WidgetTheme.java pinta por cima (as mesmas cores, fixas). -->
+    <color name="widget_ink">#FF1C1C1E</color>
+    <color name="widget_muted">#FF5C5C60</color>
+    <color name="widget_pink">#FFD6248F</color>
+    <color name="widget_bg_start">#FFFBEFF8</color>
+    <color name="widget_bg_end">#FFFFFFFF</color>
 </resources>

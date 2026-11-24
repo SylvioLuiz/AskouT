@@ -13,7 +13,7 @@ import { roundCoordinate } from '../lib/boost.ts';
 import { pluralize } from '../lib/format.ts';
 import { statusLabel } from '../lib/meetup.ts';
 import type { RegionView } from '../lib/types.ts';
-import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
+import { applyTheme, readTheme, saveTheme, syncWidgetTheme, THEME_LABELS } from '../lib/theme.ts';
 import { saveThemes, themeLabel, THEMES, userThemes } from '../lib/themes.ts';
 import { useThemes } from '../lib/use-themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
@@ -955,6 +955,7 @@ export function ThemeScreen() {
     setChoice(next);
     applyTheme(next, document.documentElement);
     saveTheme(next, window.localStorage);
+    syncWidgetTheme(next);
   }
   return (
     <>

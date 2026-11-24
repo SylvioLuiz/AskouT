@@ -24,7 +24,7 @@
                 android:layout_height="wrap_content"
                 android:letterSpacing="0.08"
                 android:text="ASKOUT"
-                android:textColor="#FFB5ADCF"
+                android:textColor="@color/widget_muted"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -39,7 +39,7 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:text="Entre no AskouT"
-        android:textColor="#FFF7F3FF"
+        android:textColor="@color/widget_ink"
         android:textSize="16sp"
         android:textStyle="bold" />
     <TextView
@@ -49,6 +49,6 @@
         android:maxLines="2"
         android:ellipsize="end"
         android:text="para ver seus planos aqui"
-        android:textColor="#FFB5ADCF"
+        android:textColor="@color/widget_muted"
         android:textSize="12sp" />
 </LinearLayout>

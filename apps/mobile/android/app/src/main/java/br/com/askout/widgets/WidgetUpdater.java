@@ -64,7 +64,7 @@ public final class WidgetUpdater {
 
     private static void render(Context context, AppWidgetManager manager, Class<?> provider, RemoteViews views) {
         int[] ids = manager.getAppWidgetIds(new ComponentName(context, provider));
-        if (ids.length > 0) manager.updateAppWidget(ids, views);
+        if (ids.length > 0) manager.updateAppWidget(ids, WidgetTheme.paint(context, views));
     }
 
     /** Próximo redesenho: na próxima troca, a cada 10 min com algo rolando, ou para buscar de novo. */

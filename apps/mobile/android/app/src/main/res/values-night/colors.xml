@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widgets no tema escuro (o visual noturno da marca, o mesmo da Live Activity do iPhone). -->
+    <color name="widget_ink">#FFF7F3FF</color>
+    <color name="widget_muted">#FFB5ADCF</color>
+    <color name="widget_pink">#FFFF4FB0</color>
+    <color name="widget_bg_start">#FF26183E</color>
+    <color name="widget_bg_end">#FF141022</color>
+</resources>

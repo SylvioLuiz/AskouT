@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { applyTheme, isThemeChoice, readTheme, saveTheme, THEME_KEY } from './theme.ts';
+import { applyTheme, isThemeChoice, readTheme, saveTheme, syncWidgetTheme, THEME_KEY } from './theme.ts';
 
 describe('tema', () => {
   it('lê só valores válidos e nunca lança', () => {
@@ -26,5 +26,14 @@ describe('tema', () => {
     saveTheme('system', storage);
     assert.equal(store.has(THEME_KEY), false);
     assert.doesNotThrow(() => saveTheme('dark', { setItem: () => { throw new Error('x'); }, removeItem: () => undefined }));
+  });
+  it('avisa os widgets do celular quando há ponte', async () => {
+    const sent: string[] = [];
+    syncWidgetTheme('dark', { AskouTWidgetTheme: { set: async (theme: string) => void sent.push(theme) } });
+    assert.deepEqual(sent, ['dark']);
+    assert.doesNotThrow(() => syncWidgetTheme('light', {}));
+    assert.doesNotThrow(() => syncWidgetTheme('light', undefined));
+    assert.doesNotThrow(() => syncWidgetTheme('light', { AskouTWidgetTheme: { set: () => Promise.reject(new Error('sem setTheme')) } }));
+    assert.doesNotThrow(() => syncWidgetTheme('light', { AskouTWidgetTheme: { set: () => { throw new Error('x'); } } }));
   });
 });

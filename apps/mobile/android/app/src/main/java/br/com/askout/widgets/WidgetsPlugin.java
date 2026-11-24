@@ -11,6 +11,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * `set({ token, apiBase })` / `clear()`: o app chama ao entrar e ao sair (o mesmo contrato da sessão da folha de
  * compartilhar do iPhone, apps/web/src/lib/share-session.ts); o widget usa o token para buscar GET /me/widgets.
  * `reload()`: o app chama ao ir para o segundo plano, para o widget mostrar o que acabou de mudar.
+ * `setTheme({ theme })`: o tema escolhido no app ("system", "light" ou "dark"); os widgets se redesenham com ele.
  */
 @CapacitorPlugin(name = "AskouTWidgets")
 public class WidgetsPlugin extends Plugin {
@@ -32,6 +33,18 @@ public class WidgetsPlugin extends Plugin {
     public void clear(PluginCall call) {
         WidgetData.clearSession(getContext());
         WidgetUpdater.refresh(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setTheme(PluginCall call) {
+        String theme = call.getString("theme");
+        if (!WidgetTheme.valid(theme)) {
+            call.reject("Tema inválido");
+            return;
+        }
+        WidgetData.setTheme(getContext(), theme);
+        WidgetUpdater.renderAll(getContext().getApplicationContext());
         call.resolve();
     }
 
