@@ -20,6 +20,7 @@ import { PublicController } from './controllers/public.controller.ts';
 import { GifsController } from './controllers/gifs.controller.ts';
 import { FeedController } from './controllers/feed.controller.ts';
 import { GuestListController } from './controllers/guest-list.controller.ts';
+import { EventShoppingController } from './controllers/event-shopping.controller.ts';
 import { AdminController } from './controllers/admin.controller.ts';
 import { VenuesController } from './controllers/venues.controller.ts';
 import { RecommendationsController } from './controllers/recommendations.controller.ts';
@@ -51,7 +52,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, PublicController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController, HunterServiceController, HunterAdminController, WidgetsController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, PublicController, GifsController, FeedController, GuestListController, EventShoppingController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController, HunterServiceController, HunterAdminController, WidgetsController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,

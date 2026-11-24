@@ -1056,6 +1056,7 @@ model Post {
   repostedBy PostedUserEvent[]
   datePolls  DatePoll[] @relation("PollEventPost")
   meetings   Meeting[]  @relation("MeetingEventPost")
+  shopping   EventShopping?
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])
@@ -2099,4 +2100,57 @@ model HunterEventLink {
 
   @@index([createdAt])
   @@index([venueId])
+}
+
+/// Lista de compras e divisão de gastos de um evento criado por uma pessoa (nunca de local). Quem criou o evento liga;
+/// quem está no grupo do evento participa. Apagar o evento apaga tudo.
+model EventShopping {
+  eventPostId      String   @id @db.Uuid
+  /// Quem participa (sem administrar) pode criar e acrescentar itens.
+  membersCanAdd    Boolean  @default(true)
+  /// Quem participa (sem administrar) pode marcar item como comprado.
+  membersCanCheck  Boolean  @default(true)
+  /// Ids de quem fica fora da divisão dos gastos (por padrão todo mundo do grupo entra).
+  splitExcludedIds Json     @default("[]")
+  createdAt        DateTime @default(now())
+
+  eventPost Post                @relation(fields: [eventPostId], references: [id], onDelete: Cascade)
+  items     EventShoppingItem[]
+  expenses  EventExpense[]
+}
+
+/// Item da lista de compras. Pessoas ligadas só pelo id: quem apaga a conta some do nome, o item fica.
+model EventShoppingItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventPostId String    @db.Uuid
+  title       String
+  quantity    String?
+  createdById String    @db.Uuid
+  boughtById  String?   @db.Uuid
+  boughtAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  shopping EventShopping @relation(fields: [eventPostId], references: [eventPostId], onDelete: Cascade)
+
+  @@index([eventPostId, createdAt])
+}
+
+/// Gasto da divisão: anexo (nota fiscal, recibo) enviado por quem participa, ou lançado sem anexo por quem administra.
+/// Quem administra informa o valor (centavos) e quem pagou. Pessoas ligadas só pelo id: a conta do grupo não muda se alguém apagar a conta.
+model EventExpense {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventPostId String   @db.Uuid
+  uploaderId  String   @db.Uuid
+  fileName    String?
+  mime        String?
+  size        Int      @default(0)
+  data        Bytes?
+  amountCents Int?
+  payerId     String?  @db.Uuid
+  note        String?
+  createdAt   DateTime @default(now())
+
+  shopping EventShopping @relation(fields: [eventPostId], references: [eventPostId], onDelete: Cascade)
+
+  @@index([eventPostId, createdAt])
 }

@@ -14,6 +14,7 @@ import type {
   EventRoomRepository,
   FeedRepository,
   GuestListRepository,
+  EventShoppingRepository,
   ConversationRepository,
   MeetupRepository,
   SchedulingRepository,
@@ -73,7 +74,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
 } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -4003,5 +4004,98 @@ export class InMemoryGuestListRepository implements GuestListRepository {
     if (!e) return false;
     this.entries.set(key, { ...e, checkedInAt: at });
     return true;
+  }
+}
+
+/** Lista de compras e divisão em memória. Quem confere se o evento existe é o repositório de posts. */
+export class InMemoryEventShoppingRepository implements EventShoppingRepository {
+  private readonly posts: InMemoryPostRepository;
+  readonly records = new Map<string, EventShoppingRecord>();
+  readonly items = new Map<string, ShoppingItemRecord>();
+  readonly expenses = new Map<string, EventExpenseRecord>();
+  readonly files = new Map<string, Uint8Array>();
+
+  constructor(posts: InMemoryPostRepository) {
+    this.posts = posts;
+  }
+
+  async get(eventPostId: string): Promise<EventShoppingRecord | undefined> {
+    const r = this.posts.posts.has(eventPostId) ? this.records.get(eventPostId) : undefined;
+    return r ? { ...r, splitExcludedIds: [...r.splitExcludedIds] } : undefined;
+  }
+
+  async upsert(record: EventShoppingRecord): Promise<boolean> {
+    const post = this.posts.posts.get(record.eventPostId);
+    if (!post || post.eventTitle === null) return false;
+    const before = this.records.get(record.eventPostId);
+    this.records.set(record.eventPostId, { ...record, splitExcludedIds: [...record.splitExcludedIds], createdAt: before?.createdAt ?? record.createdAt });
+    return true;
+  }
+
+  async remove(eventPostId: string): Promise<boolean> {
+    for (const [id, i] of this.items) if (i.eventPostId === eventPostId) this.items.delete(id);
+    for (const [id, e] of this.expenses) {
+      if (e.eventPostId !== eventPostId) continue;
+      this.expenses.delete(id);
+      this.files.delete(id);
+    }
+    return this.records.delete(eventPostId);
+  }
+
+  async listItems(eventPostId: string): Promise<ShoppingItemRecord[]> {
+    return [...this.items.values()].filter((i) => i.eventPostId === eventPostId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map((i) => ({ ...i }));
+  }
+
+  async findItem(id: string): Promise<ShoppingItemRecord | undefined> {
+    const i = this.items.get(id);
+    return i ? { ...i } : undefined;
+  }
+
+  async addItem(item: ShoppingItemRecord): Promise<void> {
+    this.items.set(item.id, { ...item });
+  }
+
+  async updateItem(id: string, patch: Partial<Pick<ShoppingItemRecord, 'title' | 'quantity' | 'boughtById' | 'boughtAt'>>): Promise<boolean> {
+    const i = this.items.get(id);
+    if (!i) return false;
+    this.items.set(id, { ...i, ...patch });
+    return true;
+  }
+
+  async deleteItem(id: string): Promise<boolean> {
+    return this.items.delete(id);
+  }
+
+  async listExpenses(eventPostId: string): Promise<EventExpenseRecord[]> {
+    return [...this.expenses.values()].filter((e) => e.eventPostId === eventPostId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map((e) => ({ ...e }));
+  }
+
+  async findExpense(id: string): Promise<EventExpenseRecord | undefined> {
+    const e = this.expenses.get(id);
+    return e ? { ...e } : undefined;
+  }
+
+  async addExpense(expense: EventExpenseRecord, data: Uint8Array | null): Promise<void> {
+    this.expenses.set(expense.id, { ...expense });
+    if (data) this.files.set(expense.id, new Uint8Array(data));
+  }
+
+  async updateExpense(id: string, patch: Partial<Pick<EventExpenseRecord, 'amountCents' | 'payerId' | 'note'>>): Promise<boolean> {
+    const e = this.expenses.get(id);
+    if (!e) return false;
+    this.expenses.set(id, { ...e, ...patch });
+    return true;
+  }
+
+  async deleteExpense(id: string): Promise<boolean> {
+    this.files.delete(id);
+    return this.expenses.delete(id);
+  }
+
+  async expenseFile(id: string): Promise<{ mime: string; name: string; data: Uint8Array } | undefined> {
+    const e = this.expenses.get(id);
+    const data = this.files.get(id);
+    if (!e || !data || e.mime === null || e.fileName === null) return undefined;
+    return { mime: e.mime, name: e.fileName, data: new Uint8Array(data) };
   }
 }

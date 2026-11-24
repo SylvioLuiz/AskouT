@@ -34,6 +34,7 @@ import { timeAgo } from '../lib/format.ts';
 import type { EventPage, FeedSettings, PostView } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
 import { GuestListCard } from '../components/guest-list.tsx';
+import { EventShoppingCard } from '../components/event-shopping.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -690,6 +691,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
           ) : null}
 
           {e.source === 'PLACE' && !visitor ? <GuestListCard eventId={e.id} ended={ended} /> : null}
+          {/* Lista de compras e divisão: só em evento de pessoa, para quem está no grupo do evento. */}
+          {e.source === 'USER' && !visitor ? <EventShoppingCard eventId={e.id} ended={ended} /> : null}
 
           {visitor ? null : (
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>

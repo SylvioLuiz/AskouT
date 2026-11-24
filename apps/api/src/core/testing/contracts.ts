@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, EventShoppingRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -42,6 +42,7 @@ export interface RepoHarness {
   venueStories: VenueStoryRepository;
   feed: FeedRepository;
   guestLists: GuestListRepository;
+  eventShopping: EventShoppingRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -2461,6 +2462,32 @@ export function defineRepositoryContract(
         await h.guestLists.join({ eventId: e.id, userId: ana, companions: 0, at: at(10) }, null);
         await h.places.deleteEvent(e.venueId, e.id);
         assert.equal(await h.guestLists.get(e.id), undefined);
+      });
+
+      it('lista de compras: liga, itens, gastos com anexo, permissões e cascata ao apagar o evento', async () => {
+        const { ana, bia } = await setup();
+        const postId = randomUUID();
+        await h.posts.create({ id: postId, authorId: ana, caption: null, placeName: 'Casa', placeAddress: null, eventTitle: 'Churras', eventStartsAt: at(5), eventEndsAt: at(9), eventKind: 'OTHER' as const, archivedAt: null, editedAt: null, createdAt: at(1) }, []);
+        assert.equal(await h.eventShopping.get(postId), undefined);
+        assert.equal(await h.eventShopping.upsert({ eventPostId: randomUUID(), membersCanAdd: true, membersCanCheck: true, splitExcludedIds: [], createdAt: at(1) }), false, 'evento inexistente');
+        assert.equal(await h.eventShopping.upsert({ eventPostId: postId, membersCanAdd: false, membersCanCheck: true, splitExcludedIds: [bia], createdAt: at(2) }), true);
+        assert.deepEqual(await h.eventShopping.get(postId), { eventPostId: postId, membersCanAdd: false, membersCanCheck: true, splitExcludedIds: [bia], createdAt: at(2) });
+        const item = { id: randomUUID(), eventPostId: postId, title: 'Carvão', quantity: '2 sacos', createdById: ana, boughtById: null, boughtAt: null, createdAt: at(3) };
+        await h.eventShopping.addItem(item);
+        assert.equal(await h.eventShopping.updateItem(item.id, { boughtById: bia, boughtAt: at(4) }), true);
+        assert.deepEqual(await h.eventShopping.listItems(postId), [{ ...item, boughtById: bia, boughtAt: at(4) }]);
+        const expense = { id: randomUUID(), eventPostId: postId, uploaderId: bia, fileName: 'nota.pdf', mime: 'application/pdf', size: 5, amountCents: null, payerId: null, note: null, createdAt: at(5) };
+        await h.eventShopping.addExpense(expense, new Uint8Array([37, 80, 68, 70, 45]));
+        assert.equal(await h.eventShopping.updateExpense(expense.id, { amountCents: 12345, payerId: bia }), true);
+        assert.deepEqual(await h.eventShopping.findExpense(expense.id), { ...expense, amountCents: 12345, payerId: bia });
+        assert.deepEqual(await h.eventShopping.expenseFile(expense.id), { mime: 'application/pdf', name: 'nota.pdf', data: new Uint8Array([37, 80, 68, 70, 45]) });
+        assert.equal(await h.eventShopping.deleteItem(item.id), true);
+        assert.equal(await h.eventShopping.deleteItem(item.id), false);
+        assert.equal(await h.eventShopping.remove(postId), true, 'desligar apaga itens e gastos');
+        assert.deepEqual([await h.eventShopping.get(postId), await h.eventShopping.listExpenses(postId), await h.eventShopping.findExpense(expense.id)], [undefined, [], undefined]);
+        await h.eventShopping.upsert({ eventPostId: postId, membersCanAdd: true, membersCanCheck: true, splitExcludedIds: [], createdAt: at(6) });
+        assert.equal(await h.posts.delete(postId, ana), true);
+        assert.equal(await h.eventShopping.get(postId), undefined, 'apagar o evento leva a lista junto');
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

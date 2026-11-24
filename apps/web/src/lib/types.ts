@@ -1644,3 +1644,57 @@ export interface MessageStory {
   eventId: string;
   author: PublicProfile;
 }
+
+/** Lista de compras e divisão de gastos de um evento criado por uma pessoa (ver EventShoppingService na API). */
+export interface ShoppingItem {
+  id: string;
+  title: string;
+  quantity: string | null;
+  createdBy: PublicProfile | null;
+  boughtBy: PublicProfile | null;
+  boughtAt: string | null;
+  canEdit: boolean;
+}
+
+export interface EventExpense {
+  id: string;
+  uploader: PublicProfile | null;
+  fileName: string | null;
+  mime: string | null;
+  size: number;
+  amountCents: number | null;
+  payer: PublicProfile | null;
+  note: string | null;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+export interface SplitPerson {
+  user: PublicProfile;
+  included: boolean;
+  paidCents: number;
+  shareCents: number;
+  balanceCents: number;
+}
+
+export interface SplitView {
+  totalCents: number;
+  pendingCount: number;
+  people: SplitPerson[];
+  transfers: { from: PublicProfile; to: PublicProfile; amountCents: number }[];
+}
+
+export interface EventShoppingView {
+  supported: boolean;
+  enabled: boolean;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isMember: boolean;
+  hasGroup: boolean;
+  settings: { membersCanAdd: boolean; membersCanCheck: boolean } | null;
+  canAdd: boolean;
+  canCheck: boolean;
+  items: ShoppingItem[];
+  expenses: EventExpense[];
+  split: SplitView | null;
+}
