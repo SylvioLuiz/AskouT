@@ -93,3 +93,17 @@ test('com resultados gratuitos, o Google continua só no botão', async () => {
   assert.equal(r.canSearchGoogle, true);
   assert.equal(w.placeSource.premiumCalls, 0);
 });
+
+test('homônimo longe não esconde o lugar daqui: o Google entra mesmo com resultado gratuito', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  const SP = { lat: -23.55, lng: -46.63 };
+  w.placeSource.searchable = [{ externalId: 'osmRJ', source: 'OSM' as const, name: 'Buxixo', category: 'bar', lat: -22.9, lng: -43.2 }];
+  w.placeSource.premiumOnly = [{ externalId: 'ChIJMogi', source: 'GOOGLE' as const, name: 'Buxixo Rock Bar', category: 'bar', lat: -23.52, lng: -46.19 }];
+  w.placeSource.premiumSearch = true;
+  const r = await w.core.explore.searchPlaces(ana!, { q: 'buxixo', ...SP });
+  assert.deepEqual(r.places.map((p) => p.key), ['google:ChIJMogi', 'osm:osmRJ']);
+  // Sem posição não dá para saber o que é longe: segue só no botão.
+  const noPos = await w.core.explore.searchPlaces(ana!, { q: 'buxixo' });
+  assert.deepEqual(noPos.places.map((p) => p.key), ['osm:osmRJ']);
+});

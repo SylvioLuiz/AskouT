@@ -19,6 +19,8 @@ export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;
 /** Mínimo de letras para gastar uma busca paga no Google. */
 const GOOGLE_SEARCH_MIN_CHARS = 3;
+/** Resultado gratuito a mais que isto da pessoa não conta como "achou": um homônimo em outra cidade não esconde o lugar daqui. */
+const NEAR_ENOUGH_M = 30_000;
 /** "Bombando": mínimo de pessoas com presença confirmada num evento que está acontecendo agora. */
 export const EXPLORE_HOT_MIN_GOING = 5;
 /** Raio máximo para a busca de lugares em fontes externas (OpenStreetMap/Google). */
@@ -438,7 +440,8 @@ export class ExploreService {
         const matches = (list: ExternalPlace[]) => list.filter((p) => fold(p.name).includes(needle));
         let byName = await placeSource.search(typed, center, 10);
         let hits = matches(byName.places);
-        if (hits.length === 0 && extra.length === 0 && placeSource.premiumSearch === true) {
+        const nearby = placeItems.some((i) => i.distanceM !== null && i.distanceM <= NEAR_ENOUGH_M) || [...extra.map((e) => e.d), ...hits.map((h) => distanceMeters(center, { lat: h.lat, lng: h.lng }))].some((d) => d <= NEAR_ENOUGH_M);
+        if (!nearby && placeSource.premiumSearch === true) {
           byName = await placeSource.search(typed, center, 10, { premium: true });
           hits = matches(byName.places);
         }
@@ -520,9 +523,16 @@ export class ExploreService {
     // Sem nada no AskouT nem no OpenStreetMap, a pessoa cairia num beco sem saída (um bar pequeno quase nunca está no OSM):
     // o Google entra sozinho. Continua barrado pelo teto diário e pela memória de 10 minutos; com resultados, segue só no botão.
     let autoGoogle = false;
-    if (!premium && source.premiumSearch === true && text.length >= GOOGLE_SEARCH_MIN_CHARS && placeItems.length === 0 && ext.places.length === 0) {
-      ext = await source.search(text, center, 10, { premium: true });
-      autoGoogle = ext.places.length > 0;
+    // Também entra quando só há homônimos longe da pessoa (um "Buxixo" do Rio não pode esconder o de Mogi).
+    const close = (d: number | null): boolean => d !== null && d <= NEAR_ENOUGH_M;
+    const freeNear = placeItems.some((i) => close(i.distanceM)) || ext.places.some((p) => (center ? close(distanceMeters(center, p)) : true));
+    if (!premium && source.premiumSearch === true && text.length >= GOOGLE_SEARCH_MIN_CHARS && !freeNear && (center !== undefined || (placeItems.length === 0 && ext.places.length === 0))) {
+      const paid = await source.search(text, center, 10, { premium: true });
+      if (paid.available) {
+        const keys = new Set(ext.places.map((p) => `${p.source}:${p.externalId}`));
+        ext = { available: true, places: [...paid.places.filter((p) => !keys.has(`${p.source}:${p.externalId}`)), ...ext.places] };
+        autoGoogle = paid.places.length > 0;
+      }
     }
     const seen = new Set(placeItems.map((p) => fold(p.name)));
     const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
