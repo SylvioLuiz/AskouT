@@ -111,6 +111,7 @@ import type {
   Profile,
   ProfilePatch,
   ProfileView,
+  BadgeId,
   ReferralOverview,
   PublicProfile,
   SessionUser,
@@ -283,6 +284,7 @@ export function createApi(deps: ApiDeps) {
     /** Convite sugerido para quem acabou de entrar pelo app sem o convite junto (mesma rede do toque no link). */
     pendingReferral: () => request<{ inviter: PublicProfile | null }>('GET', '/me/referral/pending'),
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
+    setBadgeHidden: (badge: BadgeId, hidden: boolean) => request<{ id: BadgeId; hidden: boolean }>('PUT', `/profiles/me/badges/${id(badge)}`, { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),

@@ -1,4 +1,5 @@
 import type { ReferralService } from './referral-service.ts';
+import type { BadgeService, ProfileBadgeView } from './badge-service.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { normalizePhone } from './phone.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
@@ -43,6 +44,8 @@ export interface ProfileView {
   canViewContent: boolean;
   /** Selo de quem trouxe amigos: quantos amigos confirmados, ou null sem selo (não alcançou ou escondeu). */
   referralBadge: number | null;
+  /** Selos do perfil (Trouxe a galera, Organizador, Figurinha carimbada, Topa tudo). No próprio perfil vêm também os escondidos. */
+  badges: ProfileBadgeView[];
 }
 
 export interface ProfilePatch {
@@ -57,10 +60,12 @@ export const SEARCH_MAX_LIMIT = 50;
 export class ProfileService {
   private readonly deps: CoreDeps;
   private readonly referrals: ReferralService;
+  private readonly badges: BadgeService;
 
-  constructor(deps: CoreDeps, referrals: ReferralService) {
+  constructor(deps: CoreDeps, referrals: ReferralService, badges: BadgeService) {
     this.deps = deps;
     this.referrals = referrals;
+    this.badges = badges;
   }
 
   async getByUsername(viewerId: string, rawUsername: unknown): Promise<ProfileView> {
@@ -78,12 +83,14 @@ export class ProfileService {
     const referralBadge = await this.referrals.badgeFor(profile.userId);
 
     if (viewerId === profile.userId) {
+      const badges = await this.badges.forProfile(profile.userId, viewerId);
       return {
         profile,
         counts,
         relationship: { isSelf: true, following: 'NONE', followsYou: 'NONE', isFriend: false, blockedByViewer: false, message: 'NONE' },
         canViewContent: true,
         referralBadge,
+        badges,
       };
     }
 
@@ -109,6 +116,7 @@ export class ProfileService {
       },
       canViewContent: !blockedByViewer && (!profile.isPrivate || viewerFollows?.status === 'ACCEPTED'),
       referralBadge,
+      badges: await this.badges.forProfile(profile.userId, viewerId),
     };
   }
 

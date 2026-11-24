@@ -32,6 +32,12 @@ export class ProfilesController {
     return this.core.profiles.setPrivacy(actor.userId, asBody(body).isPrivate);
   }
 
+  /** Esconde (`{hidden: true}`) ou mostra um selo no próprio perfil. */
+  @Put('me/badges/:id')
+  setBadgeHidden(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.badges.setHidden(actor, id, asBody(body).hidden);
+  }
+
   /** `{image: "data:image/jpeg;base64,..."}` (até 60 KB, já reduzida pelo app) ou `{image: null}` para remover. */
   @Put('me/photo')
   setPhoto(@CurrentActor() actor: Actor, @Body() body: unknown) {
