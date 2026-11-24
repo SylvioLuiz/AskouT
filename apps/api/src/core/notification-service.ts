@@ -22,14 +22,17 @@ export const FCM_ENDPOINT_PREFIX = 'fcm:';
 export const LIVE_START_PREFIX = 'apnsls:';
 export const LIVE_ACTIVITY_PREFIX = 'apnsla:';
 /**
- * `apnsld:<pessoa>:<tag>`: a pessoa fechou a Live Activity dessa chegada no iPhone. Não abre outra sozinha (só quando
- * ela volta ao NOW, ver `reopen`), e a chegada em si vai como aviso comum.
+ * `apnsld:<pessoa>:<tag>`: a pessoa fechou a Live Activity dessa chegada no iPhone. O iPhone não deixa impedir o
+ * fechar, então ela volta sozinha na próxima posição do amigo (passado `LIVE_REOPEN_AFTER_CLOSE_MS`), ou na hora ao
+ * voltar ao NOW (ver `reopen`). Só para de voltar quando a chegada termina.
  */
 export const LIVE_DISMISSED_PREFIX = 'apnsld:';
 const dismissedEndpoint = (userId: string, tag: string): string => `${LIVE_DISMISSED_PREFIX}${userId}:${tag}`;
 const isLiveActivityEndpoint = (endpoint: string): boolean => endpoint.startsWith(LIVE_START_PREFIX) || endpoint.startsWith(LIVE_ACTIVITY_PREFIX) || endpoint.startsWith(LIVE_DISMISSED_PREFIX);
 /** Sem o token da atividade (o app ainda não registrou), não abre outra igual por este tempo. */
 const LIVE_START_RETRY_MS = 10 * 60_000;
+/** Fechou a Live Activity: ela volta na próxima posição do amigo que chegar depois disto. */
+export const LIVE_REOPEN_AFTER_CLOSE_MS = 10_000;
 const NATIVE_TOKEN = /^[0-9a-f]{32,200}$/i;
 const FCM_TOKEN = /^[A-Za-z0-9:_-]{50,400}$/;
 
@@ -177,8 +180,10 @@ export class StoredNotifier implements Notifier {
     const nowMs = clock.now().getTime();
     const key = `${input.userId}|${input.tag}`;
     const dismissed = all.find((s) => s.endpoint === dismissedEndpoint(input.userId, input.tag));
-    if (input.reopen) {
-      // Voltou ao NOW e a atividade não está na tela: esquece o "fechou" e as atividades antigas, e abre outra.
+    // Fechou, mas o amigo segue a caminho: o iPhone não deixa impedir o fechar, então volta na próxima posição.
+    const reopenAfterClose = dismissed !== undefined && live.state !== 'stopped' && nowMs - dismissed.createdAt.getTime() >= LIVE_REOPEN_AFTER_CLOSE_MS;
+    if (input.reopen || reopenAfterClose) {
+      // Voltou ao NOW (ou fechou há pouco e o amigo segue a caminho): esquece o "fechou" e as atividades antigas, e abre outra.
       for (const s of all) if (s === dismissed || (s.endpoint.startsWith(LIVE_ACTIVITY_PREFIX) && s.auth === input.tag)) await pushSubscriptions.remove(s.endpoint);
       all = all.filter((s) => s !== dismissed && !(s.endpoint.startsWith(LIVE_ACTIVITY_PREFIX) && s.auth === input.tag));
       this.activityStarts.delete(key);
@@ -465,7 +470,7 @@ export class NotificationService {
 
   /**
    * A pessoa fechou a Live Activity da chegada no iPhone (o app avisa, sem login, com o `registration` da atividade):
-   * para de mandar para ela e não abre outra sozinha até a pessoa voltar ao NOW. A chegada vai como aviso comum.
+   * para de mandar para ela; outra abre na próxima posição do amigo (ou ao voltar ao NOW).
    */
   async closeLiveActivity(registration: unknown, activityToken: unknown): Promise<{ ok: true }> {
     const claims = this.deps.liveActivityTokens?.verify(registration);

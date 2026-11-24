@@ -6734,8 +6734,8 @@ div.optrow__main { cursor: default; }
 .evpage .quickacts .quickacts__btn { flex: 1 1 0; max-width: 84px; min-width: 0; }
 
 /* Agenda ligada com sucesso (volta do Google/Outlook): check redondo no aviso da folha de agendas. */
-.calsync__check { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; vertical-align: -5px; border-radius: 50%; background: var(--ok, #1f9d55); color: #fff; }
-.calsync__check svg { width: 14px; height: 14px; }
+.calsync__done { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; vertical-align: -5px; border-radius: 50%; background: var(--ok, #1f9d55); color: #fff; }
+.calsync__done svg { width: 14px; height: 14px; }
 
 /* ---------- Criar evento: tela única (capa no topo, nome grande, linhas Quando/Onde/Tipo/Quem vê) ---------- */
 .evcover { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }

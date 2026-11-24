@@ -204,7 +204,7 @@ test('chegada no iPhone com Live Activity: abre pelo push-to-start, atualiza pel
   assert.ok(!w.push.sent.some((s) => s.subscription.endpoint.startsWith('apnsl')));
 });
 
-test('Live Activity fechada no iPhone: não reabre sozinha, a chegada vai como aviso comum, e reabre ao voltar ao NOW', async () => {
+test('Live Activity fechada no iPhone: volta sozinha na próxima posição do amigo, e na hora ao voltar ao NOW', async () => {
   const { w, ana, bia, inviteId } = await matched();
   w.push.liveActivities = true;
   await w.core.notifications.subscribe(bia, { endpoint: `apnsls:${'cd'.repeat(32)}`, keys: {} });
@@ -215,31 +215,35 @@ test('Live Activity fechada no iPhone: não reabre sozinha, a chegada vai como a
   const registration = w.push.activities[0]!.attributes!.registration;
   const activity = 'ef'.repeat(32);
   await w.core.notifications.registerLiveActivity(registration, activity);
-
-  // Bia fecha a atividade.
-  await w.core.notifications.closeLiveActivity(registration, activity);
   const apnsAlerts = () => liveSent(w).filter((s) => s.subscription.endpoint.startsWith('apns:'));
+
+  // Bia fecha a atividade; na próxima posição da Ana ela volta, em silêncio, com o progresso de agora.
+  await w.core.notifications.closeLiveActivity(registration, activity);
   w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
   await w.core.flash.shareLocation(ana, inviteId, north(700));
   await w.core.flushNotifications();
-  assert.equal(w.push.activities.length, 1, 'não reabre sozinha');
-  assert.equal(apnsAlerts().length, 0, 'nem vira aviso comum a cada atualização');
+  const back = w.push.activities[1]!;
+  assert.equal(back.event, 'start', 'volta sozinha');
+  assert.equal(back.alert, undefined);
+  assert.ok(back.state.progress > 0.4);
+  assert.equal(apnsAlerts().length, 0, 'sem aviso comum junto');
 
-  // Volta ao NOW: reabre em silêncio, com o progresso de agora.
+  // Fecha e volta ao NOW logo em seguida: reabre na hora, sem esperar a próxima posição.
+  await w.core.notifications.closeLiveActivity(back.attributes!.registration, undefined);
   assert.deepEqual(await w.core.flash.reopenArrival(bia, inviteId), { reopened: true });
   await w.core.flushNotifications();
-  const reopened = w.push.activities[1]!;
-  assert.equal(reopened.event, 'start');
-  assert.equal(reopened.alert, undefined);
-  assert.ok(reopened.state.progress > 0.4);
+  assert.equal(w.push.activities[2]!.event, 'start');
 
-  // Fecha de novo; a chegada ainda avisa, como aviso comum.
-  await w.core.notifications.closeLiveActivity(reopened.attributes!.registration, undefined);
+  // Fecha de novo e a Ana chega: a atividade volta já com "chegou", tocando.
+  await w.core.notifications.closeLiveActivity(w.push.activities[2]!.attributes!.registration, undefined);
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
   await w.core.flash.shareLocation(ana, inviteId, north(30));
   await w.core.flushNotifications();
-  assert.equal(w.push.activities.length, 2);
-  assert.equal(apnsAlerts().at(-1)?.message.title, 'ana chegou');
-  assert.deepEqual(await w.core.flash.reopenArrival(bia, inviteId), { reopened: false }, 'já chegou: não reabre');
+  const arrived = w.push.activities[3]!;
+  assert.equal(arrived.event, 'start');
+  assert.equal(arrived.state.arrived, true);
+  assert.equal(arrived.alert?.title, 'ana chegou');
+  assert.deepEqual(await w.core.flash.reopenArrival(bia, inviteId), { reopened: false }, 'já chegou: não reabre de novo');
 });
 
 test('chegada: exige posição exata, só quem está no encontro, e "aproximada" desliga', async () => {
