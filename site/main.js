@@ -235,8 +235,10 @@
       introTop.style.opacity = introBottom.style.opacity = fade;
       introBottom.style.transform = `translateY(${z * 80}px)`;
       introTop.style.transform = `translateY(${-z * 80}px)`;
-      hero.style.opacity = clamp((p - 0.58) / 0.12);
-      hero.classList.toggle("is-on", p > 0.62);
+      // No celular o título entra enquanto o logo ainda some (sem intervalo de tela vazia entre os dois)
+      const [h0, hOn] = W < 900 ? [0.34, 0.36] : [0.58, 0.62];
+      hero.style.opacity = clamp((p - h0) / 0.12);
+      hero.classList.toggle("is-on", p > hOn);
     }
 
     // Manifesto
@@ -341,7 +343,7 @@
   /* ---------------- Revelação ---------------- */
   const revObs = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) { e.target.classList.add("is-in"); revObs.unobserve(e.target); }
-  }, { threshold: 0.15 });
+  }, innerWidth < 900 ? { rootMargin: "0px 0px 10% 0px" } : { threshold: 0.15 }); // no celular revela antes de entrar na tela
   $$(".reveal").forEach((el, i) => { if (el.classList.contains("card")) el.style.transitionDelay = `${(i % 5) * 0.07}s`; revObs.observe(el); });
 
   /* ---------------- Menu ---------------- */
