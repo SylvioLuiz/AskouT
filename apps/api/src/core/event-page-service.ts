@@ -5,7 +5,7 @@ import { parseStoryOverlays } from './story-overlays.ts';
 import type { StoryOverlay } from './story-overlays.ts';
 import { distanceMeters } from './geo.ts';
 import { DomainError, conflict, forbidden, notFound, validationError } from './errors.ts';
-import { buildEventCards } from './event-card.ts';
+import { buildEventCards, eventOrigin } from './event-card.ts';
 import { loadEventExtras, resolveEventExtras } from './event-extras.ts';
 import type { EventExtraView } from './event-extras.ts';
 import type { EventCardView } from './event-card.ts';
@@ -571,7 +571,7 @@ export class EventPageService {
             return undefined;
           }
         }
-        return { ...card, attendedAt: row.createdAt.toISOString() };
+        return { ...card, origin: await eventOrigin(this.deps, ownerId, card), attendedAt: row.createdAt.toISOString() };
       }),
     );
     const all = checked.filter((v): v is AttendedEventView => v !== undefined).sort((a, b) => (b.startsAt ?? '9999').localeCompare(a.startsAt ?? '9999')); // sem data (em votação) vem primeiro

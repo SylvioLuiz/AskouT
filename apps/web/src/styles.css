@@ -3802,6 +3802,12 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .ptile__info { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; background: rgb(27 31 74 / 0.62); }
 .ptile__title { font-weight: 700; font-size: 0.875rem; overflow-wrap: anywhere; }
 .ptile__when { font-size: 0.75rem; opacity: 0.9; }
+.ptile__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.ptile__tags:empty { display: none; }
+/* Marcador de origem do evento no perfil: criou, convite ou público. */
+.tag--origin-created { background: var(--brand); color: var(--brand-ink); }
+.tag--origin-invited { background: var(--surface); color: var(--brand-text); }
+.tag--origin-public { background: var(--surface); color: var(--ok-ink); }
 .ptile__remove { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--danger); font-size: 0.8125rem; cursor: pointer; }
 .attinfo { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin: -4px 0 12px; }
 .attinfo__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }

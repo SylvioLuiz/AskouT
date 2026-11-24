@@ -3721,4 +3721,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Online": "En línea",
   "Mostrar quando estou online": "Mostrar cuando estoy en línea",
   "Amigos e pessoas com quem você conversa veem uma bolinha verde na sua foto enquanto você está com o app aberto. Desligado, você também não vê quem está online.": "Tus amigos y las personas con quienes conversas ven un punto verde en tu foto mientras tienes la app abierta. Si lo desactivas, tampoco verás quién está en línea.",
+  "Criado": "Creado",
+  "Evento criado por quem é dono deste perfil": "Evento creado por el dueño de este perfil",
+  "Foi a convite: marcação, cartão numa conversa ou evento privado": "Por invitación: etiqueta, tarjeta en un chat o evento privado",
+  "Evento aberto, sem convite": "Evento abierto, sin invitación",
 };
