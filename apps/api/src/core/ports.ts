@@ -1097,6 +1097,8 @@ export interface PushLive {
   quiet: boolean;
   /** Até quando o aviso vale (fim do encontro), em milissegundos desde 1970. */
   untilMs: number;
+  /** A pessoa pediu para ver de novo ("Mostrar a chegada" no NOW): o Android mostra mesmo se ela tinha ocultado. */
+  reopen?: boolean;
 }
 
 /**

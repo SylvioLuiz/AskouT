@@ -69,6 +69,7 @@ export class FcmSender implements PushSender {
               body: message.body,
               tag: message.tag.slice(0, 64),
               ...(message.image ? { image: message.image } : {}),
+              ...(message.live.reopen ? { reopen: '1' } : {}),
             },
             android: { priority: 'HIGH', ttl: '60s' },
           },

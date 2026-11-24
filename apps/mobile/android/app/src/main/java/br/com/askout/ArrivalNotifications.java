@@ -47,6 +47,8 @@ final class ArrivalNotifications {
             return;
         }
         boolean arrived = "arrived".equals(state);
+        // "Mostrar a chegada" na tela do NOW: volta a mostrar mesmo depois de "Ocultar".
+        if ("1".equals(data.get("reopen"))) prefs(context).edit().remove(tag).apply();
         // Ocultou pelo botão: só a chegada avisa de novo.
         if (!arrived && prefs(context).getBoolean(tag, false)) return;
         if (arrived) prefs(context).edit().remove(tag).apply();
@@ -68,6 +70,10 @@ final class ArrivalNotifications {
             // Hora da última atualização: o Android mostra "agora" e vai contando ("1 min"...).
             .setShowWhen(true)
             .setWhen(System.currentTimeMillis());
+        // Marca de "ao vivo": o app não tira da bandeja ao abrir a tela do encontro (push-bridge.ts, deliveredMatches).
+        android.os.Bundle live = new android.os.Bundle();
+        live.putString("askout.live", "1");
+        builder.addExtras(live);
         Bitmap photo = photo(data.get("image"));
         if (photo != null) builder.setLargeIcon(photo);
         if (arrived) {
@@ -75,12 +81,11 @@ final class ArrivalNotifications {
             builder.setOngoing(false).setAutoCancel(true).setProgress(100, 100, false);
         } else {
             // Fixo enquanto o amigo vem, como o carro chegando no Uber: some sozinho na chegada ou quando ele para.
-            // "Ocultar" tira antes disso (no Android 14+ também dá para arrastar para o lado).
+            // "Ocultar" tira antes disso. Arrastar para o lado (Android 14+) só tira até a próxima atualização.
             Intent hide = new Intent(context, ArrivalDismissReceiver.class).putExtra(EXTRA_TAG, tag);
             PendingIntent hideIntent = PendingIntent.getBroadcast(context, ("hide:" + tag).hashCode(), hide, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             builder.setOngoing(true).setAutoCancel(false).setProgress(100, progress, false)
-                .addAction(0, "Ocultar", hideIntent)
-                .setDeleteIntent(hideIntent);
+                .addAction(0, "Ocultar", hideIntent);
         }
         // Some sozinha quando o encontro acaba (mesmo se o aviso de "encerrado" não chegar).
         long left = until - System.currentTimeMillis();
@@ -138,7 +143,7 @@ final class ArrivalNotifications {
         return out;
     }
 
-    /** Botão "Ocultar" (ou arrastou o aviso para o lado): tira e não mostra as próximas atualizações dessa chegada. */
+    /** Botão "Ocultar": tira e não mostra as próximas atualizações dessa chegada (até "Mostrar a chegada" no NOW). */
     static void hide(Context context, String tag) {
         prefs(context).edit().putBoolean(tag, true).apply();
         NotificationManagerCompat.from(context).cancel(tag, NOTIFICATION_ID);
