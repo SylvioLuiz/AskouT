@@ -43,6 +43,32 @@
   --radius-panel: 20px;
   --rail: 264px;
   --column: 640px;
+  /* Capas por tipo de evento (sem foto): mesmas cores nos dois temas, texto branco por cima. */
+  --cover-show-a: #d6336c;
+  --cover-show-b: #7a1d4a;
+  --cover-cinema-a: #364fc7;
+  --cover-cinema-b: #1b1f4a;
+  --cover-theater-a: #9c36b5;
+  --cover-theater-b: #4a1f66;
+  --cover-exhibition-a: #0c8599;
+  --cover-exhibition-b: #0b4f5c;
+  --cover-gastronomy-a: #e8590c;
+  --cover-gastronomy-a-deep: #d9480f;
+  --cover-gastronomy-b: #8f3406;
+  --cover-night-a: #4c3fd1;
+  --cover-night-b: #14123f;
+  --cover-green-a: #2f9e44;
+  --cover-green-a-deep: #2b8a3e;
+  --cover-digital-b: #0f5a24;
+  --cover-outdoor-b: #12522b;
+  --cover-outdoor-blue-a: #1971c2;
+  --cover-outdoor-blue-b: #0b3d6b;
+  --cover-sport-a: #f08c00;
+  --cover-sport-b: #8a4b00;
+  --cover-sport-red-a: #c92a2a;
+  --cover-sport-red-b: #6b1515;
+  --cover-other-a: #5f3dc4;
+  --cover-other-b: #2b1a63;
 }
 
 *,
@@ -3350,13 +3376,13 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   gap: 4px;
 }
 
-.evcover--show { background: linear-gradient(150deg, #d6336c, #7a1d4a); }
-.evcover--cinema { background: linear-gradient(150deg, #364fc7, #1b1f4a); }
-.evcover--theater { background: linear-gradient(150deg, #9c36b5, #4a1f66); }
-.evcover--exhibition { background: linear-gradient(150deg, #0c8599, #0b4f5c); }
-.evcover--gastronomy { background: linear-gradient(150deg, #e8590c, #8f3406); }
-.evcover--night { background: linear-gradient(150deg, #4c3fd1, #14123f); }
-.evcover--digital { background: linear-gradient(150deg, #2f9e44, #0f5a24); }
+.evcover--show { background: linear-gradient(150deg, var(--cover-show-a), var(--cover-show-b)); }
+.evcover--cinema { background: linear-gradient(150deg, var(--cover-cinema-a), var(--cover-cinema-b)); }
+.evcover--theater { background: linear-gradient(150deg, var(--cover-theater-a), var(--cover-theater-b)); }
+.evcover--exhibition { background: linear-gradient(150deg, var(--cover-exhibition-a), var(--cover-exhibition-b)); }
+.evcover--gastronomy { background: linear-gradient(150deg, var(--cover-gastronomy-a), var(--cover-gastronomy-b)); }
+.evcover--night { background: linear-gradient(150deg, var(--cover-night-a), var(--cover-night-b)); }
+.evcover--digital { background: linear-gradient(150deg, var(--cover-green-a), var(--cover-digital-b)); }
 
 .tag--free {
   background: #e3f3ea;
@@ -4256,15 +4282,15 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* ---------- Página do evento ---------- */
 .evpage { display: flex; flex-direction: column; gap: 16px; }
 .evhero { position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 300px; margin: -20px -16px 0; overflow: hidden; border-radius: 0 0 28px 28px; color: #fff; background: linear-gradient(150deg, #4da3ff, #0058b8); }
-.evhero--show { background: linear-gradient(150deg, #d6336c, #7a1d4a); }
-.evhero--cinema { background: linear-gradient(150deg, #364fc7, #1b1f4a); }
-.evhero--theater { background: linear-gradient(150deg, #9c36b5, #4a1f66); }
-.evhero--exhibition { background: linear-gradient(150deg, #0c8599, #0b4f5c); }
-.evhero--gastronomy { background: linear-gradient(150deg, #e8590c, #8f3406); }
-.evhero--night { background: linear-gradient(150deg, #4c3fd1, #14123f); }
-.evhero--digital { background: linear-gradient(150deg, #2f9e44, #0f5a24); }
-.evhero--outdoor { background: linear-gradient(150deg, #2f9e44, #12522b); }
-.evhero--sport { background: linear-gradient(150deg, #f08c00, #8a4b00); }
+.evhero--show { background: linear-gradient(150deg, var(--cover-show-a), var(--cover-show-b)); }
+.evhero--cinema { background: linear-gradient(150deg, var(--cover-cinema-a), var(--cover-cinema-b)); }
+.evhero--theater { background: linear-gradient(150deg, var(--cover-theater-a), var(--cover-theater-b)); }
+.evhero--exhibition { background: linear-gradient(150deg, var(--cover-exhibition-a), var(--cover-exhibition-b)); }
+.evhero--gastronomy { background: linear-gradient(150deg, var(--cover-gastronomy-a), var(--cover-gastronomy-b)); }
+.evhero--night { background: linear-gradient(150deg, var(--cover-night-a), var(--cover-night-b)); }
+.evhero--digital { background: linear-gradient(150deg, var(--cover-green-a), var(--cover-digital-b)); }
+.evhero--outdoor { background: linear-gradient(150deg, var(--cover-green-a), var(--cover-outdoor-b)); }
+.evhero--sport { background: linear-gradient(150deg, var(--cover-sport-a), var(--cover-sport-b)); }
 .evhero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .evhero__shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(10 12 40 / 0.45) 0%, rgb(10 12 40 / 0.15) 35%, rgb(10 12 40 / 0.78) 100%); }
 /* z-index acima do corpo da capa (z-index 1, vem depois no HTML): com título e endereço longos o corpo cobre o topo e engole o toque. */
@@ -7943,14 +7969,14 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 /* Cor de cada tipo de evento nas capas sem foto (home, chat, rolês): vale nos dois temas.
    Sem isto o tema escuro pintava todas de rosa e Ar livre/Esporte/Outros ficavam cinza no claro.
    Capas com .evtone (explorar/home) já têm a cor própria e ficam de fora. Texto branco em todas: contraste >= 4.5:1. */
-:root .evcover.evcover--show:not(.evtone) { background: linear-gradient(150deg, #d6336c, #7a1d4a); }
-:root .evcover.evcover--cinema:not(.evtone) { background: linear-gradient(150deg, #364fc7, #1b1f4a); }
-:root .evcover.evcover--theater:not(.evtone) { background: linear-gradient(150deg, #9c36b5, #4a1f66); }
-:root .evcover.evcover--exhibition:not(.evtone) { background: linear-gradient(150deg, #0c8599, #0b4f5c); }
-:root .evcover.evcover--gastronomy:not(.evtone) { background: linear-gradient(150deg, #d9480f, #8f3406); }
-:root .evcover.evcover--night:not(.evtone) { background: linear-gradient(150deg, #4c3fd1, #14123f); }
-:root .evcover.evcover--digital:not(.evtone) { background: linear-gradient(150deg, #2b8a3e, #0f5a24); }
-:root .evcover.evcover--outdoor:not(.evtone) { background: linear-gradient(150deg, #1971c2, #0b3d6b); }
-:root .evcover.evcover--sport:not(.evtone) { background: linear-gradient(150deg, #c92a2a, #6b1515); }
-:root .evcover.evcover--other:not(.evtone) { background: linear-gradient(150deg, #5f3dc4, #2b1a63); }
+:root .evcover.evcover--show:not(.evtone) { background: linear-gradient(150deg, var(--cover-show-a), var(--cover-show-b)); }
+:root .evcover.evcover--cinema:not(.evtone) { background: linear-gradient(150deg, var(--cover-cinema-a), var(--cover-cinema-b)); }
+:root .evcover.evcover--theater:not(.evtone) { background: linear-gradient(150deg, var(--cover-theater-a), var(--cover-theater-b)); }
+:root .evcover.evcover--exhibition:not(.evtone) { background: linear-gradient(150deg, var(--cover-exhibition-a), var(--cover-exhibition-b)); }
+:root .evcover.evcover--gastronomy:not(.evtone) { background: linear-gradient(150deg, var(--cover-gastronomy-a-deep), var(--cover-gastronomy-b)); }
+:root .evcover.evcover--night:not(.evtone) { background: linear-gradient(150deg, var(--cover-night-a), var(--cover-night-b)); }
+:root .evcover.evcover--digital:not(.evtone) { background: linear-gradient(150deg, var(--cover-green-a-deep), var(--cover-digital-b)); }
+:root .evcover.evcover--outdoor:not(.evtone) { background: linear-gradient(150deg, var(--cover-outdoor-blue-a), var(--cover-outdoor-blue-b)); }
+:root .evcover.evcover--sport:not(.evtone) { background: linear-gradient(150deg, var(--cover-sport-red-a), var(--cover-sport-red-b)); }
+:root .evcover.evcover--other:not(.evtone) { background: linear-gradient(150deg, var(--cover-other-a), var(--cover-other-b)); }
 .evcover:not(.evcover--compose) .evcover__kind { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
