@@ -17,6 +17,7 @@ import { VenueStoryService } from './venue-story-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { FeedService } from './feed-service.ts';
 import { GuestListService } from './guest-list-service.ts';
+import { EventShoppingService } from './event-shopping-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { PublicService } from './public-service.ts';
@@ -107,6 +108,8 @@ export function createCore(input: CoreInput) {
     eventPages,
     feed: new FeedService(deps, eventPages),
     guestList: new GuestListService(deps, eventPages),
+    /** Lista de compras e divisão de gastos dos eventos criados por pessoas. */
+    eventShopping: new EventShoppingService(deps, eventPages),
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
@@ -209,6 +212,8 @@ export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, sugges
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { GuestListService, GUEST_LIST_COMPANIONS_MAX, GUEST_LIST_LIMIT_MAX } from './guest-list-service.ts';
 export type { GuestListView, GuestListOwnerView, GuestListEntryView, GuestListConfigView } from './guest-list-service.ts';
+export { EventShoppingService, computeSplit, SHOPPING_ITEMS_MAX, EXPENSES_MAX } from './event-shopping-service.ts';
+export type { EventShoppingView, ShoppingItemView, ExpenseView, SplitView } from './event-shopping-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventCoverView } from './event-page-service.ts';

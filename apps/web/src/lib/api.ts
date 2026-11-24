@@ -78,6 +78,7 @@ import type {
   GifResults,
   GuestListOwnerView,
   GuestListView,
+  EventShoppingView,
   FeedPage,
   FeedPolicy,
   FeedPost,
@@ -684,6 +685,51 @@ export function createApi(deps: ApiDeps) {
     guestListEntries: (eventId: string) => request<GuestListOwnerView>('GET', `/events/${id(eventId)}/guest-list/entries`),
     checkInGuest: (eventId: string, userId: string, checkedIn: boolean) => request<GuestListOwnerView>('PUT', `/events/${id(eventId)}/guest-list/entries/${id(userId)}/check-in`, { body: { checkedIn } }),
     exportGuestList: (eventId: string) => request<{ filename: string; csv: string }>('GET', `/events/${id(eventId)}/guest-list/export`),
+    /** Lista de compras e divisão de gastos (evento criado por uma pessoa; só quem está no grupo do evento usa). */
+    eventShopping: (eventId: string) => request<EventShoppingView>('GET', `/events/${id(eventId)}/shopping`),
+    configureShopping: (eventId: string, input: { enabled?: boolean; membersCanAdd?: boolean; membersCanCheck?: boolean }) => request<EventShoppingView>('PUT', `/events/${id(eventId)}/shopping`, { body: input }),
+    addShoppingItem: (eventId: string, input: { title: string; quantity?: string | null }) => request<EventShoppingView>('POST', `/events/${id(eventId)}/shopping/items`, { body: input }),
+    updateShoppingItem: (eventId: string, itemId: string, input: { title?: string; quantity?: string | null; bought?: boolean }) => request<EventShoppingView>('PATCH', `/events/${id(eventId)}/shopping/items/${id(itemId)}`, { body: input }),
+    deleteShoppingItem: (eventId: string, itemId: string) => request<EventShoppingView>('DELETE', `/events/${id(eventId)}/shopping/items/${id(itemId)}`),
+    addExpense: (eventId: string, input: { amountCents: number; payerId: string; note?: string | null }) => request<EventShoppingView>('POST', `/events/${id(eventId)}/shopping/expenses`, { body: input }),
+    updateExpense: (eventId: string, expenseId: string, input: { amountCents?: number | null; payerId?: string | null; note?: string | null }) => request<EventShoppingView>('PATCH', `/events/${id(eventId)}/shopping/expenses/${id(expenseId)}`, { body: input }),
+    deleteExpense: (eventId: string, expenseId: string) => request<EventShoppingView>('DELETE', `/events/${id(eventId)}/shopping/expenses/${id(expenseId)}`),
+    setSplitMember: (eventId: string, userId: string, included: boolean) => request<EventShoppingView>('PUT', `/events/${id(eventId)}/shopping/split/${id(userId)}`, { body: { included } }),
+    /** Anexo da divisão (nota fiscal, recibo): o arquivo vai cru no corpo, com o tipo no Content-Type e o nome em `?nome=`. */
+    attachExpense: async (eventId: string, file: Blob, name: string, type: string, note?: string): Promise<EventShoppingView> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      const query = new URLSearchParams({ nome: name, ...(note ? { nota: note } : {}) });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/shopping/expenses/file?${query.toString()}`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as EventShoppingView;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
+      throw error;
+    },
+    /** Baixa o anexo de um gasto (a rota exige o token). */
+    expenseFile: async (eventId: string, expenseId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/shopping/expenses/${id(expenseId)}/file`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),

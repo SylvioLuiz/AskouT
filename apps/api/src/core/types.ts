@@ -1570,3 +1570,43 @@ export interface GuestListEntryRecord {
   checkedInAt: Date | null;
   createdAt: Date;
 }
+
+/** Lista de compras e divisão de gastos de um evento criado por uma pessoa. Existe só quando quem criou o evento liga. */
+export interface EventShoppingRecord {
+  eventPostId: string;
+  /** Quem participa (sem administrar) pode criar e acrescentar itens na lista. */
+  membersCanAdd: boolean;
+  /** Quem participa (sem administrar) pode marcar um item como comprado. */
+  membersCanCheck: boolean;
+  /** Quem fica fora da divisão dos gastos (por padrão todo mundo do grupo entra). */
+  splitExcludedIds: string[];
+  createdAt: Date;
+}
+
+export interface ShoppingItemRecord {
+  id: string;
+  eventPostId: string;
+  title: string;
+  /** Texto livre: "2 kg", "3 pacotes". */
+  quantity: string | null;
+  createdById: string;
+  boughtById: string | null;
+  boughtAt: Date | null;
+  createdAt: Date;
+}
+
+/** Um gasto da divisão: normalmente um anexo (nota fiscal, recibo); quem administra informa o valor e quem pagou. */
+export interface EventExpenseRecord {
+  id: string;
+  eventPostId: string;
+  uploaderId: string;
+  /** Nome do anexo. Nulo: gasto lançado sem anexo. */
+  fileName: string | null;
+  mime: string | null;
+  size: number;
+  /** Valor em centavos. Nulo: ainda sem valor (não entra na conta). */
+  amountCents: number | null;
+  payerId: string | null;
+  note: string | null;
+  createdAt: Date;
+}

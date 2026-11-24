@@ -7854,6 +7854,56 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .tour__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .tour__hint { font-size: 0.875rem; font-weight: 700; color: var(--brand-text); }
 
+/* Lista de compras e divisão de gastos (evento de pessoa) */
+.evshop { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.evshop .evinfo__title { margin: 0; }
+.evshop__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.evshop__gear, .evshop__icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.evshop__gear svg, .evshop__icon svg { width: 18px; height: 18px; }
+.evshop__gear:hover, .evshop__icon:hover { background: var(--line); color: inherit; }
+.evshop__hint { margin: 0; font-size: 0.8125rem; }
+.evshop__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.evshop__card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 12px; border: 0; border-radius: 12px; background: var(--bg); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.evshop__card span { font-size: 0.875rem; }
+.evshop__tabs { margin-bottom: 12px; }
+.evshop__body, .evshop__manage { display: flex; flex-direction: column; gap: 12px; padding-bottom: 16px; }
+.evshop__setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.evshop__settingtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.evshop__settingtext .muted { font-size: 0.875rem; }
+.evshop__add { display: flex; align-items: center; gap: 8px; }
+.evshop__add--edit { flex-wrap: wrap; width: 100%; }
+.evshop__input { flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; }
+.evshop__input--qty { flex: 0 0 84px; }
+.evshop__addbtn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border: 0; border-radius: 12px; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+.evshop__addbtn:disabled { opacity: 0.5; cursor: default; }
+.evshop__items, .evshop__expenses, .evshop__people, .evshop__transfers { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.evshop__item, .evshop__expense, .evshop__person { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.evshop__check { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; padding: 0; border: 2px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--surface); cursor: pointer; }
+.evshop__check svg { width: 16px; height: 16px; }
+.evshop__check[aria-checked='true'] { border-color: var(--ok); background: var(--ok); }
+.evshop__check:disabled { cursor: default; }
+.evshop__itemtext { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.evshop__itemtitle { overflow-wrap: anywhere; }
+.evshop__itemmeta { font-size: 0.8125rem; }
+.evshop__item--done .evshop__itemtitle { text-decoration: line-through; color: var(--muted); }
+.evshop__total { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 20px; padding: 12px; border-radius: 12px; background: var(--brand-soft); }
+.evshop__total > span:not(.evshop__mine) { display: flex; flex-direction: column; }
+.evshop__total .muted { font-size: 0.8125rem; }
+.evshop__total strong { font-size: 1.125rem; }
+.evshop__mine { margin-left: auto; font-weight: 700; color: var(--ok-ink); }
+.evshop__mine--owe { color: var(--danger); }
+.evshop__attach { display: flex; flex-direction: column; gap: 8px; }
+.evshop__subtitle { margin: 6px 0 0; font-size: 0.9375rem; }
+.evshop__file { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--brand-text); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.evshop__file svg { width: 18px; height: 18px; flex: none; }
+.evshop__balance { flex: none; font-weight: 700; color: var(--ok-ink); font-variant-numeric: tabular-nums; }
+.evshop__balance--owe { color: var(--danger); }
+.evshop__in input { width: 20px; height: 20px; accent-color: var(--brand); }
+.evshop__transfers li { padding: 10px 12px; border-radius: 10px; background: var(--surface); font-weight: 600; }
+.evshop__editor { display: flex; flex-direction: column; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.evshop__label { display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; font-weight: 600; }
+.evshop__label .evshop__input { font-weight: 400; }
+.evshop__editoractions { display: flex; gap: 8px; }
 /* Cor de cada tipo de evento nas capas sem foto (home, chat, rolês): vale nos dois temas.
    Sem isto o tema escuro pintava todas de rosa e Ar livre/Esporte/Outros ficavam cinza no claro.
    Capas com .evtone (explorar/home) já têm a cor própria e ficam de fora. Texto branco em todas: contraste >= 4.5:1. */
