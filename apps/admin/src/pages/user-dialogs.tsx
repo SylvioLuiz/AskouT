@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError, api } from '../api.ts';
+import { ApiError, api, avatarSrc } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { CLAIM_LABEL, STATUS_LABEL, formatBirthDate, formatDate, formatDateTime, plural } from '../labels.ts';
 import type { PersonRef, UserActivityItem, UserDetail as UserDetailData, UserRow } from '../types.ts';
@@ -115,7 +115,7 @@ function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => 
         { label: 'Nome', value: <strong>{u.displayName}</strong>, input: <TextInput editor={editor} k="displayName" maxLength={60} />, problem: editor.problems.displayName },
         { label: '@usuário', value: <span className="handle">@{u.username}</span>, input: <TextInput editor={editor} k="username" maxLength={30} />, problem: editor.problems.username, hint: usernameHint },
         { label: 'Biografia', value: u.bio ? <span className="pre">{u.bio}</span> : null, input: <TextArea editor={editor} k="bio" maxLength={160} />, wide: true, problem: editor.problems.bio },
-        { label: 'Foto', value: x?.avatarUrl ? <img className="record__avatar" src={x.avatarUrl} alt="" referrerPolicy="no-referrer" /> : null },
+        { label: 'Foto', value: x?.avatarUrl ? <img className="record__avatar" src={avatarSrc(x.avatarUrl)} alt="" referrerPolicy="no-referrer" /> : null },
         { label: 'Perfil privado', value: <YesNo value={x?.isPrivate} /> },
         { label: 'Gostos de rolê', value: x && x.tastes.length > 0 ? x.tastes.join(', ') : x ? 'Gosta de tudo' : null, wide: true },
       ],

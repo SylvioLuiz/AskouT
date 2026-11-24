@@ -223,4 +223,6 @@ const APP_SITE = ((import.meta.env.VITE_APP_URL as string | undefined) ?? 'https
 export const appUrl = (path: string) => `${APP_SITE}${path}`;
 
 /** Endereço público da foto de um post (o id é aleatório, como no app). */
+/** Foto de perfil: a enviada pela pessoa vem como caminho da API (`/users/:id/avatar`); as externas já vêm com o endereço inteiro. */
+export const avatarSrc = (url: string) => (url.startsWith('/') ? `${API_BASE}${url}` : url);
 export const postImageUrl = (imageId: string) => `${API_BASE}/posts/images/${encodeURIComponent(imageId)}`;

@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
 import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
-  AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
+  AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminEventPerson, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
   AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
@@ -13,6 +13,10 @@ const LINKED = 50;
 const PERSON = { id: true, profile: { select: { username: true, displayName: true } } } as const;
 function person(u: { id: string; profile: { username: string; displayName: string } | null }, at: Date): AdminPersonRef {
   return { id: u.id, username: u.profile?.username ?? MISSING, displayName: u.profile?.displayName ?? '', at };
+}
+const PERSON_PHOTO = { id: true, profile: { select: { username: true, displayName: true, avatarUrl: true } } } as const;
+function personWithPhoto(u: { id: string; profile: { username: string; displayName: string; avatarUrl: string | null } | null }, at: Date): AdminEventPerson {
+  return { ...person(u, at), avatarUrl: u.profile?.avatarUrl ?? null };
 }
 
 /** Nunca traz os bytes das fotos: só `data` nulo ou não (via filtro) e o id. */
@@ -455,11 +459,21 @@ export class PrismaAdminRepository implements AdminRepository {
         venue: { select: { id: true, name: true } },
         images: { orderBy: { position: 'asc' }, select: { id: true, mime: true, placePhotoRef: true } },
         tags: { orderBy: { createdAt: 'asc' }, select: { createdAt: true, user: { select: PERSON } } },
+        attendees: { orderBy: { createdAt: 'asc' }, take: LINKED, select: { createdAt: true, user: { select: PERSON_PHOTO } } },
         comments: { orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, body: true, createdAt: true, author: { select: { profile: { select: { username: true } } } } } },
         _count: { select: { likes: true, comments: true, reports: true, attendees: true, invites: true, stories: true, feedPosts: true, repostedBy: true } },
       },
     });
     if (!x) return undefined;
+    // Convidados que ainda não deram "Eu vou" neste evento.
+    const pendingWhere = { postId, user: { eventAttendances: { none: { postId } } } };
+    const [pending, pendingCount] = await Promise.all([
+      p.eventInvite.findMany({
+        where: pendingWhere, orderBy: { createdAt: 'asc' }, take: LINKED,
+        select: { createdAt: true, user: { select: PERSON_PHOTO }, invitedBy: { select: { id: true, profile: { select: { username: true } } } } },
+      }),
+      p.eventInvite.count({ where: pendingWhere }),
+    ]);
     const placeVenue = x.placeVenueId && isUuid(x.placeVenueId) ? await p.venue.findUnique({ where: { id: x.placeVenueId }, select: { id: true, name: true } }) : null;
     const c = x._count;
     return {
@@ -469,6 +483,9 @@ export class PrismaAdminRepository implements AdminRepository {
       linkedEventId: x.linkedEventId,
       images: x.images.map((i) => ({ id: i.id, uploaded: i.mime !== null && i.placePhotoRef === null })),
       tagged: x.tags.map((t) => person(t.user, t.createdAt)),
+      going: x.attendees.map((a) => personWithPhoto(a.user, a.createdAt)),
+      invitedPending: pending.map((i) => ({ ...personWithPhoto(i.user, i.createdAt), invitedBy: i.invitedBy ? { id: i.invitedBy.id, username: i.invitedBy.profile?.username ?? MISSING } : null })),
+      invitedPendingCount: pendingCount,
       counts: { likes: c.likes, comments: c.comments, reports: c.reports, attendees: c.attendees, invites: c.invites, stories: c.stories, feedPosts: c.feedPosts, reposts: c.repostedBy },
       recentComments: x.comments.map((m) => ({ id: m.id, username: m.author.profile?.username ?? MISSING, body: m.body, createdAt: m.createdAt })),
     };
