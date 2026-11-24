@@ -2045,6 +2045,15 @@ export function defineRepositoryContract(
         await h.notifications.setMuteSettings(ana, { all: false, chats: true, events: true }, at(9));
         assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: true, events: true });
         assert.deepEqual(await h.notifications.getMuteSettings(bia), { all: false, chats: false, events: false }, 'é de cada pessoa');
+        assert.equal((await h.notifications.getEventReminderSettings([ana, bia])).size, 0, 'lembretes: quem nunca mexeu segue o padrão');
+        await h.notifications.setEventReminderSettings(ana, { reminders: ['1d', '30m'], timeZone: 'America/Manaus' }, at(9));
+        await h.notifications.setEventReminderSettings(bia, { reminders: [], timeZone: null }, at(9));
+        const reminderSettings = await h.notifications.getEventReminderSettings([ana, bia]);
+        assert.deepEqual(reminderSettings.get(ana), { reminders: ['1d', '30m'], timeZone: 'America/Manaus' });
+        assert.deepEqual(reminderSettings.get(bia), { reminders: [], timeZone: null }, 'lista vazia: nenhum lembrete');
+        await h.notifications.setEventReminderSettings(ana, { reminders: null, timeZone: 'America/Manaus' }, at(9));
+        assert.deepEqual((await h.notifications.getEventReminderSettings([ana])).get(ana), { reminders: null, timeZone: 'America/Manaus' }, 'volta ao padrão e guarda o fuso');
+        assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: true, events: true }, 'não mexe no silenciar');
         assert.equal(await h.notifications.markRead(ana, at(10), [ids[0]!, ids[3]!]), 1, 'só marca o que é da pessoa');
         assert.equal(await h.notifications.hasUnread(ana, 'k1'), false, 'lido não segura novos avisos');
         assert.equal(await h.notifications.hasUnread(bia, 'k1'), true);
@@ -2303,9 +2312,27 @@ export function defineRepositoryContract(
         assert.equal(perUser.find((r) => r.userId === bia)?.count, 2);
         assert.deepEqual(await h.eventRoom.countGoingByUser([place]), [{ userId: bia, count: 1 }]);
         assert.deepEqual(await h.eventRoom.countGoingByUser([]), []);
-        assert.equal(await h.eventRoom.markReminded(place, ana, at(1)), true, 'primeiro lembrete marca');
-        assert.equal(await h.eventRoom.markReminded(place, ana, at(2)), false, 'o segundo não repete');
-        assert.equal(await h.eventRoom.markReminded(user, ana, at(1)), true, 'outro evento, outro lembrete');
+        assert.equal(await h.eventRoom.markReminded(place, ana, '30m', at(1)), true, 'primeiro lembrete marca');
+        assert.equal(await h.eventRoom.markReminded(place, ana, '30m', at(2)), false, 'o segundo não repete');
+        assert.equal(await h.eventRoom.markReminded(place, ana, 'manha', at(2)), true, 'outro tipo de lembrete, outra marca');
+        assert.equal(await h.eventRoom.markReminded(user, ana, '30m', at(1)), true, 'outro evento, outro lembrete');
+        // presenças de eventos que começam na janela, com o começo do evento
+        const soon = (await h.eventRoom.listGoingStartingBetween(at(0), at(10), 10)).map((g) => [g.ref.source, g.userId, g.startsAt.getTime()]).sort();
+        assert.deepEqual(soon, [['USER', ana, at(5).getTime()], ['USER', bia, at(5).getTime()]].sort(), 'só o evento de pessoa começa nos primeiros 10 s');
+        const later = await h.eventRoom.listGoingStartingBetween(at(10), at(3 * H), 10);
+        assert.deepEqual(later.map((g) => [g.ref.id, g.userId, g.createdAt.getTime(), g.startsAt.getTime()]), [[e.id, bia, at(5).getTime(), at(2 * H).getTime()]]);
+        // lembretes escolhidos só para um evento
+        assert.equal(await h.eventRoom.getReminderChoice(user, bia), undefined, 'sem escolha: segue a geral');
+        await h.eventRoom.setReminderChoice(user, bia, ['1h', '15m'], at(6));
+        await h.eventRoom.setReminderChoice(user, ana, [], at(6));
+        await h.eventRoom.setReminderChoice(place, bia, ['1d'], at(6));
+        assert.deepEqual(await h.eventRoom.getReminderChoice(user, bia), ['1h', '15m']);
+        assert.deepEqual(await h.eventRoom.getReminderChoice(user, ana), [], 'lista vazia: nenhum lembrete');
+        const choices = (await h.eventRoom.listReminderChoices([user])).map((c) => [c.userId, c.reminders.join()]).sort();
+        assert.deepEqual(choices, [[ana, ''], [bia, '1h,15m']].sort(), 'só os do evento pedido');
+        await h.eventRoom.setReminderChoice(user, bia, null, at(7));
+        assert.equal(await h.eventRoom.getReminderChoice(user, bia), undefined, 'null volta a seguir a geral');
+        assert.deepEqual((await h.eventRoom.listReminderChoices([place])).map((c) => c.reminders), [['1d']]);
         // stories: só os que ainda estão no ar, do mais antigo ao mais novo; a mídia vem à parte
         const storyA = { id: randomUUID(), ref: user, userId: bia, mime: 'image/jpeg', video: false, data: new Uint8Array([1, 2, 3]), createdAt: at(1), expiresAt: at(30) };
         const storyB = { id: randomUUID(), ref: user, userId: ana, mime: 'video/mp4', video: true, data: new Uint8Array([4, 5]), createdAt: at(2), expiresAt: at(3) };

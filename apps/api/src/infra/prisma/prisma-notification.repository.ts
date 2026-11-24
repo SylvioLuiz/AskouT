@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { NotificationFilter } from '../../core/notification-categories.ts';
-import type { NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
+import type { EventReminderSettings, NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
+import { decodeReminders, encodeReminders } from '../../core/event-reminders.ts';
 import { DEFAULT_SOUNDS, soundOrDefault } from '../../core/notification-sounds.ts';
 import type { NotificationSoundSettings } from '../../core/notification-sounds.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
@@ -84,6 +85,21 @@ export class PrismaNotificationRepository implements NotificationRepository {
   async setSoundSettings(userId: string, settings: NotificationSoundSettings, at: Date): Promise<void> {
     if (!isUuid(userId)) return;
     const data = { soundChats: settings.chats, soundInvites: settings.invites, soundArrival: settings.arrival, soundOther: settings.other, updatedAt: at };
+    await this.prisma.notificationSetting.upsert({ where: { userId }, create: { userId, ...data }, update: data });
+  }
+
+  async getEventReminderSettings(userIds: string[]): Promise<Map<string, EventReminderSettings>> {
+    const ids = [...new Set(userIds.filter(isUuid))];
+    const out = new Map<string, EventReminderSettings>();
+    if (ids.length === 0) return out;
+    const rows = await this.prisma.notificationSetting.findMany({ where: { userId: { in: ids }, OR: [{ eventReminders: { not: null } }, { reminderTimeZone: { not: null } }] }, select: { userId: true, eventReminders: true, reminderTimeZone: true } });
+    for (const r of rows) out.set(r.userId, { reminders: r.eventReminders === null ? null : decodeReminders(r.eventReminders), timeZone: r.reminderTimeZone });
+    return out;
+  }
+
+  async setEventReminderSettings(userId: string, settings: EventReminderSettings, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    const data = { eventReminders: settings.reminders === null ? null : encodeReminders(settings.reminders), reminderTimeZone: settings.timeZone, updatedAt: at };
     await this.prisma.notificationSetting.upsert({ where: { userId }, create: { userId, ...data }, update: data });
   }
 
