@@ -11,7 +11,9 @@
     <string name="widget_next_label">Próximo encontro</string>
     <string name="widget_next_description">O próximo plano da sua agenda: quando, o quê e onde.</string>
     <string name="widget_active_label">Encontro ativo</string>
-    <string name="widget_active_description">O encontro do NOW ou o plano que está rolando agora, até quando vai.</string>
+    <string name="widget_active_description">O encontro do NOW ou o plano que está rolando agora. Sem encontro, atalhos para ligar o NOW e convidar alguém.</string>
+    <string name="widget_combo_label">NOW</string>
+    <string name="widget_combo_description">O encontro do NOW e quem está livre agora, juntos.</string>
     <string name="widget_agenda_label">Agenda</string>
     <string name="widget_agenda_description">Seus próximos planos: encontros confirmados e eventos em que você vai.</string>
     <string name="widget_now_label">Amigos no NOW</string>

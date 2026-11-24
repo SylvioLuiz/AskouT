@@ -14,6 +14,7 @@ struct AskouTWidgetBundle: WidgetBundle {
         ActivePlanWidget()
         AgendaWidget()
         NowFriendsWidget()
+        NowComboWidget()
     }
 }
 
@@ -631,6 +632,199 @@ struct NowFriendsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .brandBackground()
+        }
+    }
+}
+
+// MARK: - 5. NOW completo (encontro + quem está livre)
+
+struct NowComboWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "askout.nowcombo", provider: Provider(sampleActive: true)) { entry in
+            NowComboView(entry: entry)
+        }
+        .configurationDisplayName("NOW")
+        .description("O encontro do NOW e quem está livre agora, juntos. Sem encontro, atalhos para ligar o NOW e convidar alguém.")
+        .supportedFamilies([.systemMedium, .systemLarge, .accessoryRectangular])
+    }
+}
+
+struct NowComboView: View {
+    let entry: WidgetEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        switch entry.state {
+        case .loggedOut:
+            if family == .accessoryRectangular { Text("Entre no AskouT").font(.caption).accessoryBackground() } else { LoggedOutView().brandBackground() }
+        case .ready(let s):
+            let active = s.active(at: entry.date)
+            Group {
+                switch family {
+                case .accessoryRectangular: rectangular(s, active: active).accessoryBackground()
+                case .systemLarge: large(s, active: active).brandBackground()
+                default: medium(s, active: active).brandBackground()
+                }
+            }
+            .widgetURL(appLink(active?.url ?? (s.flashOn(at: entry.date) ? "/now" : NowIntent.turnOn)))
+        }
+    }
+
+    private static let nowURL = URL(string: "br.com.askout://now")!
+
+    private func freeText(_ count: Int) -> String {
+        count == 0 ? "Ninguém livre" : count == 1 ? "1 amigo livre" : "\(count) amigos livres"
+    }
+
+    /// Tela bloqueada: a linha do encontro (ou "nada rolando") e a de quem está livre.
+    private func rectangular(_ s: WidgetSnapshot, active: ActiveThing?) -> some View {
+        let count = s.friendsOnNow.count
+        return VStack(alignment: .leading, spacing: 1) {
+            switch active {
+            case .now(let m):
+                Label("NOW com \(m.withName)", systemImage: "bolt.fill").font(.system(size: 13, weight: .bold)).widgetAccentable().lineLimit(1)
+                TimeBar(start: m.startedAt, end: m.expiresAt)
+            case .plan(let p):
+                Label(p.title, systemImage: "sparkles").font(.system(size: 13, weight: .bold)).widgetAccentable().lineLimit(1)
+                TimeBar(start: p.startsAt, end: p.endsAt)
+            case nil:
+                Label(s.flashOn(at: entry.date) ? "NOW ligado" : "Nada rolando agora", systemImage: "bolt.fill").font(.system(size: 13, weight: .bold)).widgetAccentable().lineLimit(1)
+            }
+            Text(count > 0 ? "\(freeText(count)): \(Words.names(s.friendsOnNow.people, total: count))" : "Ninguém livre agora")
+                .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Lado do encontro: NOW ao vivo, plano rolando ou o atalho para ligar.
+    @ViewBuilder
+    private func meetup(_ s: WidgetSnapshot, active: ActiveThing?, big: Bool) -> some View {
+        let mineOn = s.flashOn(at: entry.date)
+        switch active {
+        case .now(let m):
+            VStack(alignment: .leading, spacing: 5) {
+                Eyebrow(text: "NOW ao vivo", color: Brand.pink, live: true)
+                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    Initial(name: m.withName, size: big ? 40 : 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Com \(m.withName)").font(.system(size: big ? 17 : 14, weight: .bold)).foregroundStyle(Brand.ink).lineLimit(1)
+                        Text(m.placeName ?? "Escolham o lugar").font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(1)
+                    }
+                }
+                TimeBar(start: m.startedAt, end: m.expiresAt)
+                HStack(spacing: 4) {
+                    Text("acaba em").foregroundStyle(Brand.muted)
+                    Text(timerInterval: entry.date...max(m.expiresAt, entry.date), countsDown: true).foregroundStyle(Brand.ink).monospacedDigit()
+                }
+                .font(.system(size: 12, weight: .semibold))
+            }
+        case .plan(let p):
+            VStack(alignment: .leading, spacing: 5) {
+                Eyebrow(text: "Rolando agora", color: Brand.pink, live: true)
+                Spacer(minLength: 0)
+                Text(p.title).font(.system(size: big ? 17 : 14, weight: .bold)).foregroundStyle(Brand.ink).lineLimit(2)
+                if let venue = p.venueName { Text(venue).font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(1) }
+                TimeBar(start: p.startsAt, end: p.endsAt)
+                Text("até \(Words.hour(p.endsAt))").font(.system(size: 12, weight: .semibold)).foregroundStyle(Brand.muted)
+            }
+        case nil:
+            VStack(alignment: .leading, spacing: 5) {
+                Eyebrow(text: mineOn ? "NOW ligado" : "Agora", color: mineOn ? Brand.pink : Brand.muted, live: mineOn)
+                Spacer(minLength: 0)
+                Text("Nada rolando agora").font(.system(size: big ? 17 : 14, weight: .bold)).foregroundStyle(Brand.ink).lineLimit(2)
+                Text(mineOn ? "Seu NOW até \(Words.hour(s.flash.expiresAt ?? entry.date))" : (s.next(at: entry.date).map { "Próximo: \(Words.when($0.startsAt, now: entry.date))" } ?? "Ligue o NOW e veja quem está livre"))
+                    .font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(1)
+                HStack(spacing: 8) {
+                    Link(destination: appLink(mineOn ? "/now" : NowIntent.turnOn) ?? Self.nowURL) {
+                        WidgetButton(title: mineOn ? (big ? "Quem está livre" : "Ver o NOW") : "Ligar o NOW", icon: "bolt.fill", primary: true)
+                    }
+                    if big {
+                        Link(destination: appLink(NowIntent.invite) ?? Self.nowURL) {
+                            WidgetButton(title: "Convidar alguém", icon: "person.badge.plus", primary: false)
+                        }
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    /// Lado de quem está livre: rostinhos, quantos e os nomes.
+    private func friends(_ s: WidgetSnapshot) -> some View {
+        let count = s.friendsOnNow.count
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Eyebrow(text: "Livres")
+                Spacer(minLength: 0)
+                if s.pendingInvites > 0 {
+                    Text("\(s.pendingInvites)").font(.system(size: 11, weight: .heavy)).foregroundStyle(.white).frame(minWidth: 18, minHeight: 18).background(Circle().fill(Brand.pink))
+                }
+            }
+            Spacer(minLength: 0)
+            if count > 0 {
+                HStack(spacing: -8) {
+                    ForEach(s.friendsOnNow.people.prefix(3), id: \.username) { f in
+                        Initial(name: f.name, size: 26).overlay(Circle().stroke(Brand.card, lineWidth: 2))
+                    }
+                }
+            }
+            Text(freeText(count)).font(.system(size: 14, weight: .heavy)).foregroundStyle(Brand.ink).lineLimit(1).minimumScaleFactor(0.8)
+            Text(count > 0 ? Words.names(s.friendsOnNow.people, total: count) : "Chame alguém pelo NOW")
+                .font(.system(size: 11)).foregroundStyle(Brand.muted).lineLimit(2)
+            if s.pendingInvites > 0 {
+                Text(s.pendingInvites == 1 ? "1 convite" : "\(s.pendingInvites) convites").font(.system(size: 11, weight: .bold)).foregroundStyle(Brand.pink).lineLimit(1)
+            }
+        }
+    }
+
+    /// Médio: o encontro à esquerda, quem está livre à direita.
+    private func medium(_ s: WidgetSnapshot, active: ActiveThing?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            meetup(s, active: active, big: false).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            Rectangle().fill(Brand.track).frame(width: 1)
+            Link(destination: appLink("/now") ?? Self.nowURL) {
+                friends(s).frame(maxHeight: .infinity, alignment: .leading)
+            }
+            .frame(width: 104)
+        }
+    }
+
+    /// Grande: o encontro em cima (com os dois botões quando não há nada) e a lista de quem está livre embaixo.
+    private func large(_ s: WidgetSnapshot, active: ActiveThing?) -> some View {
+        let count = s.friendsOnNow.count
+        return VStack(alignment: .leading, spacing: 10) {
+            meetup(s, active: active, big: true).frame(maxWidth: .infinity, alignment: .leading).frame(height: 150)
+            Rectangle().fill(Brand.track).frame(height: 1)
+            HStack {
+                Eyebrow(text: "Livres agora")
+                Spacer(minLength: 0)
+                if s.pendingInvites > 0 {
+                    Text(s.pendingInvites == 1 ? "1 convite" : "\(s.pendingInvites) convites").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Brand.pink))
+                }
+            }
+            if count == 0 {
+                Text("Ninguém livre agora").font(.system(size: 15, weight: .bold)).foregroundStyle(Brand.ink)
+                Text("Ligue o seu NOW: quem estiver livre aparece aqui").font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(2)
+            } else {
+                Link(destination: appLink("/now") ?? Self.nowURL) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(s.friendsOnNow.people.prefix(4), id: \.username) { f in
+                            HStack(spacing: 10) {
+                                Initial(name: f.name, size: 26)
+                                Text(f.name).font(.system(size: 14, weight: .bold)).foregroundStyle(Brand.ink).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Circle().fill(Brand.pink).frame(width: 6, height: 6)
+                            }
+                        }
+                        if count > 4 {
+                            Text("e mais \(count - 4)").font(.system(size: 12, weight: .semibold)).foregroundStyle(Brand.muted)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
         }
     }
 }

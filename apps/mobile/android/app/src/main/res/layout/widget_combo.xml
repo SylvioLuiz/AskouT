@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NOW completo: o encontro (ou o atalho para ligar o NOW) à esquerda e quem está livre à direita. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="horizontal"
+    android:padding="14dp">
+
+    <!-- Encontro -->
+    <LinearLayout
+        android:id="@+id/widget_meetup"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ImageView
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/widget_dot"
+                android:importantForAccessibility="no" />
+            <TextView
+                android:id="@+id/widget_eyebrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.08"
+                android:maxLines="1"
+                android:text="AGORA"
+                android:textColor="#FFB5ADCF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/widget_initial"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/widget_initial"
+                android:gravity="center"
+                android:text="A"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:text="Carregando…"
+                    android:textColor="#FFF7F3FF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textColor="#FFB5ADCF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <ProgressBar
+            android:id="@+id/widget_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="6dp"
+            android:max="100"
+            android:progress="10"
+            android:progressDrawable="@drawable/widget_progress"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/widget_footer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#FFB5ADCF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/widget_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/widget_action_primary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/widget_button_primary"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:paddingTop="7dp"
+                android:paddingBottom="7dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:text="⚡ Ligar o NOW"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_action_invite"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_button_secondary"
+                android:gravity="center"
+                android:maxLines="1"
+                android:paddingTop="7dp"
+                android:paddingBottom="7dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="+ Convidar"
+                android:textColor="#FFF7F3FF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:src="@drawable/widget_divider"
+        android:scaleType="fitXY"
+        android:importantForAccessibility="no" />
+
+    <!-- Quem está livre -->
+    <LinearLayout
+        android:id="@+id/widget_friends"
+        android:layout_width="104dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ImageView
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:layout_marginEnd="6dp"
+                android:src="@drawable/widget_dot"
+                android:importantForAccessibility="no" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:letterSpacing="0.08"
+                android:text="LIVRES"
+                android:textColor="#FFB5ADCF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="18dp"
+                android:background="@drawable/widget_badge"
+                android:gravity="center"
+                android:paddingStart="5dp"
+                android:paddingEnd="5dp"
+                android:text="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+        <TextView
+            android:id="@+id/widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="#FFF7F3FF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_count_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="amigos livres"
+            android:textColor="#FFF7F3FF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_names"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="#FFB5ADCF"
+            android:textSize="11sp" />
+        <TextView
+            android:id="@+id/widget_invites"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#FFFF4FB0"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>
