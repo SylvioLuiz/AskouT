@@ -422,15 +422,29 @@ export function EventScreen({ eventId }: { eventId: string }) {
           ) : null}
 
           {e.owner ? (
-            <Link to={`/u/${encodeURIComponent(e.owner.username)}`} className="evhost">
-              <Avatar profile={e.owner} size={44} />
-              <span className="evhost__text">
-                <span className="evhost__label">{t('Organizado por')}</span>
-                <strong className="evhost__name">{e.owner.displayName || e.owner.username}</strong>
-                {e.owner.displayName && e.owner.displayName !== e.owner.username ? <span className="evhost__user">@{e.owner.username}</span> : null}
-              </span>
-              <ChevronRightIcon />
-            </Link>
+            (() => {
+              const host = (
+                <>
+                  <Avatar profile={e.owner} size={44} />
+                  <span className="evhost__text">
+                    <span className="evhost__label">{t('Organizado por')}</span>
+                    <strong className="evhost__name">{e.owner.displayName || e.owner.username}</strong>
+                    {e.owner.displayName && e.owner.displayName !== e.owner.username ? <span className="evhost__user">@{e.owner.username}</span> : null}
+                  </span>
+                  <ChevronRightIcon />
+                </>
+              );
+              // Sem conta o perfil não abre (só chega aqui evento de quem tem perfil público): pede para entrar.
+              return visitor ? (
+                <button type="button" className="evhost" onClick={() => askLogin(t('Entre para ver o perfil de quem organiza o evento.'))}>
+                  {host}
+                </button>
+              ) : (
+                <Link to={`/u/${encodeURIComponent(e.owner.username)}`} className="evhost">
+                  {host}
+                </Link>
+              );
+            })()
           ) : null}
           {/* Grupo do evento: aparece só para quem está nele; quem criou o evento e ainda não tem grupo pode criar. */}
           {!visitor && e.group ? (
@@ -788,7 +802,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       {menu && e ? (
         <EventMenuSheet
           page={e}
-          onShare={() => { setMenu(false); setSharing(true); }}
+          onShare={() => { setMenu(false); if (visitor) askLogin(t('Entre para mandar o evento para seus amigos.')); else setSharing(true); }}
           onEdit={(post) => { setMenu(false); setEditing(post); }}
           onClose={() => setMenu(false)}
         />

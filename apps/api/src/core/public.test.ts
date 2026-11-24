@@ -33,11 +33,48 @@ test('visitante: Explorar traz só eventos de local, sem pessoas nem eventos cri
 });
 
 test('visitante: página do evento de local sem ninguém, só o número de confirmados', async () => {
-  const { w, ev } = await setup();
+  const { w } = await setup();
   const page = await w.core.publicReads.event('e1');
   assert.deepEqual([page.title, page.confirmedCount, page.attendees, page.owner, page.going, page.storyUserIds, page.canStory, page.postedByMe], ['Roda de Samba', 1, [], null, false, [], false, false]);
-  await rejectsWith(w.core.publicReads.event(ev.id), 'NOT_FOUND');
   await rejectsWith(w.core.publicReads.event('nao-existe'), 'NOT_FOUND');
+});
+
+test('visitante: evento público de pessoa abre na visão reduzida, com o dono (perfil público) e sem quem vai', async () => {
+  const { w, ana, bia, ev } = await setup();
+  await w.core.eventPages.go(bia, ev.id);
+  const page = await w.core.publicReads.event(ev.id);
+  assert.deepEqual(
+    [page.source, page.title, page.isPrivate, page.confirmedCount, page.attendees, page.owner?.username, page.isOwner, page.going, page.storyUserIds, page.canStory, page.postedByMe, page.datePollId, page.group, page.canCreateGroup],
+    ['USER', 'Samba na casa da Ana', false, 2, [], 'ana', false, false, [], false, false, null, null, false],
+  );
+  assert.equal(page.venue.id, 'v1', 'o rolê ligado a um local leva para a página do local');
+  // O dono com presença gravada (escolheu a aba do perfil) não conta duas vezes.
+  await w.core.eventPages.setGoingOnProfile(ana, ev.id, false);
+  assert.equal((await w.core.publicReads.event(ev.id)).confirmedCount, 2);
+});
+
+test('visitante: evento de pessoa não abre se privado, arquivado, de perfil privado ou de conta suspensa', async () => {
+  const { w, ana } = await setup();
+  const start = new Date(w.clock.now().getTime() + 3 * H).toISOString();
+  const secreto = await w.core.posts.create(ana, { images: [JPEG], placeName: 'Casa', event: { title: 'Festa secreta', startsAt: start, private: true } });
+  await rejectsWith(w.core.publicReads.event(secreto.id), 'NOT_FOUND');
+
+  const arquivado = await w.core.posts.create(ana, { images: [JPEG], placeName: 'Casa', event: { title: 'Velho', startsAt: start } });
+  await w.core.posts.archive(ana, arquivado.id);
+  await rejectsWith(w.core.publicReads.event(arquivado.id), 'NOT_FOUND');
+
+  // Post comum (sem evento) não vira página de evento.
+  const comum = await w.core.posts.create(ana, { images: [JPEG], caption: 'oi', placeName: 'Casa' });
+  await rejectsWith(w.core.publicReads.event(comum.id), 'NOT_FOUND');
+
+  const aberto = await w.core.posts.create(ana, { images: [JPEG], placeName: 'Casa', event: { title: 'Aberto', startsAt: start } });
+  await w.core.publicReads.event(aberto.id);
+  await w.core.profiles.setPrivacy(ana, true);
+  await rejectsWith(w.core.publicReads.event(aberto.id), 'NOT_FOUND');
+  await w.core.profiles.setPrivacy(ana, false);
+  w.users.users.set(ana, { ...w.users.users.get(ana)!, status: 'SUSPENDED' });
+  await rejectsWith(w.core.publicReads.event(aberto.id), 'NOT_FOUND');
+
 });
 
 test('visitante: página do local sem frequentadores, amigos nem papel', async () => {

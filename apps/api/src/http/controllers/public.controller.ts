@@ -7,7 +7,8 @@ import { Public } from '../decorators.ts';
 import { CORE, PLACE_PHOTOS } from '../tokens.ts';
 
 /**
- * Modo visitante: leituras sem login, só de locais e dos eventos deles (nada de pessoas).
+ * Modo visitante: leituras sem login, de locais, dos eventos deles e da página de evento público de pessoa
+ * com perfil público (sem quem vai).
  * Limite próprio por endereço (ver rate-limit-policy). Qualquer ação continua exigindo conta.
  */
 @Public()

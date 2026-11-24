@@ -9,8 +9,9 @@ function anonymousPlace(p: ExplorePlaceItem): ExplorePlaceItem {
 }
 
 /**
- * Leituras para quem não entrou (modo visitante): Explorar, mapa, página do evento de local e página do local.
- * Nada de pessoas: sem perfis na busca, sem eventos criados por pessoas, sem quem vai, sem frequentadores nem amigos.
+ * Leituras para quem não entrou (modo visitante): Explorar, mapa, página do evento e página do local.
+ * Nada de pessoas: sem perfis na busca, sem eventos criados por pessoas no Explorar, sem quem vai, sem frequentadores nem amigos.
+ * A página de um evento criado por uma pessoa abre só se ele for público e o perfil de quem criou também (ver EventPageService.publicGet).
  * A posição enviada vale só para a consulta (a cidade escolhida à mão), nada é guardado.
  */
 export class PublicService {
