@@ -7466,15 +7466,16 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 }
 
 /* Conversa no celular: o topo (nome do amigo) e a caixa de mensagem ficam presos na tela enquanto as mensagens rolam.
-   O espaço que eles ocupam vem medido do JS (--chat-top e --chat-bottom, em screens/conversations.tsx). */
+   O espaço que eles ocupam vem medido do JS (--chat-top e --chat-bottom, em screens/conversations.tsx). Com o teclado aberto
+   no iPhone, o topo segue a parte visível da tela (--chat-vv-top) e a caixa fica logo acima do teclado (--chat-kb). */
 @media (max-width: 899px) {
   .shell--chat .chat--pinned { box-sizing: border-box; padding-top: var(--chat-top, 64px); padding-bottom: var(--chat-bottom, 72px); }
   .shell--chat .chat--pinned > .chathead,
-  .shell--chat .chat--pinned > .selectbar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; max-width: var(--column); margin: 0 auto; box-sizing: border-box; }
+  .shell--chat .chat--pinned > .selectbar { position: fixed; top: var(--chat-vv-top, 0px); left: 0; right: 0; z-index: 30; max-width: var(--column); margin: 0 auto; box-sizing: border-box; }
   .shell--chat .chat--pinned > .selectbar { padding-top: calc(8px + var(--sa-top)); }
   .shell--chat .chat--pinned > .chat__dock,
-  .shell--chat .chat--pinned > .selectactions { position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; max-width: var(--column); margin: 0 auto; box-sizing: border-box; }
-  .shell--chat .chat--pinned > .chat__newbtn { position: fixed; left: 50%; bottom: calc(var(--chat-bottom, 72px) + 8px); z-index: 31; margin: 0; translate: -50% 0; }
+  .shell--chat .chat--pinned > .selectactions { position: fixed; bottom: var(--chat-kb, 0px); left: 0; right: 0; z-index: 30; max-width: var(--column); margin: 0 auto; box-sizing: border-box; }
+  .shell--chat .chat--pinned > .chat__newbtn { position: fixed; left: 50%; bottom: calc(var(--chat-kb, 0px) + var(--chat-bottom, 72px) + 8px); z-index: 31; margin: 0; translate: -50% 0; }
   .shell--chat .chat--pinned > .chat__thread { padding-bottom: 12px; }
   /* Com o topo e a caixa presos, a entrada desliza os pedaços, não a conversa inteira (um transform no pai soltaria os fixos). */
   .shell--chat .chat--pinned.chat--enter { animation: none; }

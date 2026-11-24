@@ -931,6 +931,33 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     };
   }, [hasThread]);
 
+  // Teclado aberto (iPhone): o sistema não encolhe a página, só a parte visível, e empurra a página para cima para
+  // mostrar a caixa de texto; o topo preso (position: fixed) sumia acima da tela. Como no WhatsApp, o topo acompanha
+  // a parte visível (--chat-vv-top) e a caixa de mensagem fica logo acima do teclado (--chat-kb). Sem teclado, os dois são 0.
+  useEffect(() => {
+    const root = chatRef.current;
+    const vv = window.visualViewport;
+    if (!root || !vv) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const top = Math.max(0, vv.offsetTop);
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        root.style.setProperty('--chat-vv-top', `${Math.round(top)}px`);
+        root.style.setProperty('--chat-kb', `${Math.round(kb)}px`);
+      });
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [hasThread]);
+
   if (view.loading && !view.data && !view.error) return <ChatSkeleton />;
   if (view.error && !view.data) {
     if (view.error.code === 'NOT_FOUND') {
