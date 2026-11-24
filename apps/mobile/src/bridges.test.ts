@@ -548,6 +548,15 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
   assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
 });
 
+it('widgets abrem o NOW, a conversa do encontro e a página do evento', async () => {
+  const { deepLinkPath } = await import('./deep-link.ts');
+  assert.equal(deepLinkPath('br.com.askout://now'), '/now');
+  assert.equal(deepLinkPath('br.com.askout://conversas/7c1e-99'), '/conversas/7c1e-99');
+  assert.equal(deepLinkPath('br.com.askout://eventos/place:abc_1'), '/eventos/place:abc_1');
+  assert.equal(deepLinkPath('br.com.askout://eventos/../configuracoes'), undefined);
+  assert.equal(deepLinkPath('br.com.askout://conversas/<x>'), undefined);
+});
+
 it('link do convite abre o app pelo site (Universal Link / App Link) ou pelo intent do Android', async () => {
   const { deepLinkPath } = await import('./deep-link.ts');
   assert.equal(deepLinkPath('https://askout.com.br/convite/ana.s'), '/convite/ana.s');

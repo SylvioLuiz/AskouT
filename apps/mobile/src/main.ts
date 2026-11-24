@@ -55,6 +55,13 @@ if (Capacitor.isNativePlatform()) {
     const path = deepLinkPath(url);
     if (path) openInApp(path, window);
   });
+  // Aberto pelo toque num widget com o app fechado: o link chega como URL de abertura (no Android pode não vir no appUrlOpen).
+  void App.getLaunchUrl()
+    .then((launch) => {
+      const path = launch?.url ? deepLinkPath(launch.url) : undefined;
+      if (path) openInApp(path, window);
+    })
+    .catch(() => undefined);
   const location = createLocationBridge({
     checkPermissions: () => Geolocation.checkPermissions(),
     requestPermissions: () => Geolocation.requestPermissions(),
@@ -114,6 +121,22 @@ if (Capacitor.isNativePlatform()) {
   // compartilhado (ShareSessionPlugin.swift). O app web chama set/clear (apps/web/src/lib/share-session.ts).
   if (Capacitor.isPluginAvailable('AskouTShareSession')) {
     w['AskouTShareSession'] = registerPlugin<{ set(o: { token: string; apiBase: string }): Promise<void>; clear(): Promise<void> }>('AskouTShareSession');
+  }
+  // Widgets da tela inicial (iPhone: extensão AskouTWidgets + WidgetsPlugin.swift; Android: WidgetsPlugin.java).
+  // O widget busca GET /me/widgets sozinho com a sessão do app. No iPhone a sessão já vai pelo Keychain compartilhado
+  // (AskouTShareSession acima); no Android o mesmo set/clear do app web grava a sessão para o widget. Ao sair do app,
+  // pede para o widget buscar de novo e já mostrar o que mudou (presença confirmada, NOW ligado, convite aceito...).
+  if (Capacitor.isPluginAvailable('AskouTWidgets')) {
+    const widgets = registerPlugin<{ reload(): Promise<void>; set?(o: { token: string; apiBase: string }): Promise<void>; clear?(): Promise<void> }>('AskouTWidgets');
+    if (Capacitor.getPlatform() === 'android' && !w['AskouTShareSession']) {
+      w['AskouTShareSession'] = {
+        set: (o: { token: string; apiBase: string }) => widgets.set!(o),
+        clear: () => widgets.clear!(),
+      };
+    }
+    void App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) void widgets.reload().catch(() => undefined);
+    });
   }
   // "Compartilhar com o AskouT" vindo de outro app (Android; ShareInPlugin.java). No iPhone a extensão envia sozinha. O app web abre
   // "Enviar para…" (apps/web/src/lib/share-in.ts). Build antigo, sem o plugin: a ponte não existe.

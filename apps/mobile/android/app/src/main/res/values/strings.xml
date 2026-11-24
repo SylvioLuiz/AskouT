@@ -7,4 +7,13 @@
     <!-- Aviso fixo do plugin de localização em segundo plano (chegada no NOW). -->
     <string name="capacitor_background_geolocation_notification_channel_name">Chegada no NOW</string>
     <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_askout</string>
+    <!-- Widgets da tela inicial (br.com.askout.widgets). -->
+    <string name="widget_next_label">Próximo encontro</string>
+    <string name="widget_next_description">O próximo plano da sua agenda: quando, o quê e onde.</string>
+    <string name="widget_active_label">Encontro ativo</string>
+    <string name="widget_active_description">O encontro do NOW ou o plano que está rolando agora, até quando vai.</string>
+    <string name="widget_agenda_label">Agenda</string>
+    <string name="widget_agenda_description">Seus próximos planos: encontros confirmados e eventos em que você vai.</string>
+    <string name="widget_now_label">Amigos no NOW</string>
+    <string name="widget_now_description">Quantos amigos estão livres agora, convites do NOW e um atalho para ligar o seu.</string>
 </resources>

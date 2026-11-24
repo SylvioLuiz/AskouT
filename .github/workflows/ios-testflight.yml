@@ -122,6 +122,19 @@ jobs:
           CREATE_BUNDLE: '1'
         run: node .github/scripts/ios-dev-profile.mjs
 
+      - name: Perfil dos widgets da tela inicial e da tela bloqueada (AskouTWidgets)
+        # Mesmo certificado fixo; cria o App ID br.com.askout.Widgets na primeira vez. Sem capacidades no portal: a
+        # sessão vem do Keychain compartilhado com o app, como na extensão "Compartilhar".
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          BUNDLE_ID: br.com.askout.Widgets
+          PROFILE_NAME: AskouT CI Widgets
+          PROFILE_ENV: WIDGETS_PROFILE_NAME
+          CAPABILITIES: ''
+          CREATE_BUNDLE: '1'
+        run: node .github/scripts/ios-dev-profile.mjs
+
       - name: Assinatura manual no build (só no CI)
         # No Mac de vocês o projeto continua com assinatura automática; aqui o Release do app passa a usar
         # o certificado fixo e o perfil acima. O aps-environment vai como development no Archive
@@ -140,10 +153,11 @@ jobs:
               block = block.replace('CODE_SIGN_STYLE = Automatic;',
                 'CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Development";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "%s";' % profile)
               return s[:i] + block + s[j:]
-          # App, a extensão "Compartilhar" (ShareExtension) e a Live Activity (ArrivalWidget), cada um com o seu perfil.
+          # App, a extensão "Compartilhar" (ShareExtension), a Live Activity (ArrivalWidget) e os widgets (AskouTWidgets), cada um com o seu perfil.
           s = manual(s, '504EC3181FED79650016851F /* Release */ = {', os.environ['PROFILE_NAME'])
           s = manual(s, 'A5C7E2422FF0000100A5C7E2 /* Release */ = {', os.environ['SHARE_PROFILE_NAME'])
           s = manual(s, 'A5C7E32A2FF0000100A5C7E3 /* Release */ = {', os.environ['ARRIVAL_PROFILE_NAME'])
+          s = manual(s, 'A5C7E42A2FF0000100A5C7E4 /* Release */ = {', os.environ['WIDGETS_PROFILE_NAME'])
           open(p, 'w').write(s)
           e = 'App/App.entitlements'
           t = open(e).read()
