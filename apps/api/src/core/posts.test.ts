@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { POST_IMAGES_MAX } from './post-service.ts';
-import { rejectsWith } from './testing/helpers.ts';
+import { postsOnly, rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
 const JPEG = (n = 10) => `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(n, 1)]).toString('base64')}`;
@@ -104,8 +104,8 @@ test('feed: seus posts e os de quem você segue, amigo ou não', async () => {
   w.clock.tick(1000);
   await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: 'da Ana', images: [JPEG()] });
   const feed = await w.core.posts.feed(ana);
-  assert.deepEqual(feed.items.map((p) => p.caption), ['da Ana', 'do Caio', 'da Bia']);
-  assert.equal(feed.items[2]!.author.username, 'bia');
+  assert.deepEqual(postsOnly(feed.items).map((p) => p.caption), ['da Ana', 'do Caio', 'da Bia']);
+  assert.equal(postsOnly(feed.items)[2]!.author.username, 'bia');
   assert.equal(feed.hasMore, false);
   assert.equal(feed.total, null);
 });
@@ -165,7 +165,7 @@ test('evento: título, lugar e início (pode ser no passado); fim padrão 3 h de
   assert.equal(plain.event, null);
   const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Bar do Zé', event: { title: 'Pagode de sábado', startsAt: start } });
   assert.equal(ev.event?.title, 'Pagode de sábado');
-  assert.equal(new Date(ev.event!.endsAt).getTime() - new Date(ev.event!.startsAt).getTime(), 3 * 3_600_000);
+  assert.equal(new Date(ev.event!.endsAt!).getTime() - new Date(ev.event!.startsAt!).getTime(), 3 * 3_600_000);
   assert.equal((await w.core.posts.get(ana, ev.id)).event?.title, 'Pagode de sábado');
   assert.equal((await w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Sem lugar', startsAt: start } })).event?.title, 'Sem lugar', 'o lugar é opcional');
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: '', startsAt: start } }), 'VALIDATION');
@@ -331,7 +331,7 @@ test('evento: pode durar mais de 24 h, até 30 dias', async () => {
   const start = new Date(w.clock.now().getTime() + 24 * 3_600_000);
   const at = (days: number) => new Date(start.getTime() + days * 24 * 3_600_000).toISOString();
   const festival = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Festival de 3 dias', startsAt: start.toISOString(), endsAt: at(3) } });
-  assert.equal(new Date(festival.event!.endsAt).getTime() - start.getTime(), 3 * 24 * 3_600_000);
+  assert.equal(new Date(festival.event!.endsAt!).getTime() - start.getTime(), 3 * 24 * 3_600_000);
   await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Mês inteiro', startsAt: start.toISOString(), endsAt: at(30) } });
   const err = await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Longo demais', startsAt: start.toISOString(), endsAt: at(31) } }), 'VALIDATION');
   assert.match(JSON.stringify(err.details), /30 dias/);
@@ -368,7 +368,7 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
   assert.ok(await w.core.posts.image(cover!.id), 'a capa continua sendo uma imagem');
   // Quem vê o feed enxerga que é vídeo.
   const feed = await w.core.posts.feed(bia, {});
-  assert.equal(feed.items[0]!.images[0]!.video, true);
+  assert.equal(postsOnly(feed.items)[0]!.images[0]!.video, true);
 });
 
 test('comentário: curtir e descurtir (sem duplicar), contagem, aviso ao autor e some junto com o comentário', async () => {

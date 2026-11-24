@@ -130,8 +130,8 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   }
 
   /** Cria vários usuários de uma vez e devolve os ids por username. */
-  async function signUpMany(...names: string[]): Promise<Record<string, string>> {
-    const out: Record<string, string> = {};
+  async function signUpMany<N extends string>(...names: N[]): Promise<Record<N, string> & Record<string, string | undefined>> {
+    const out = {} as Record<N, string>;
     for (const name of names) out[name] = (await signUp(name)).user.id;
     return out;
   }
