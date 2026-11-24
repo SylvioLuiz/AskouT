@@ -20,7 +20,7 @@ export class PlacesController {
   /** Foto de um lugar do Google, buscada pelo servidor (a chave não sai daqui). Exige o endereço assinado. */
   @Public()
   @Get('photo')
-  @Header('Cache-Control', 'private, max-age=1800')
+  @Header('Cache-Control', 'private, max-age=21600')
   @Header('X-Content-Type-Options', 'nosniff')
   async photo(@Query('ref') ref?: string, @Query('exp') exp?: string, @Query('sig') sig?: string) {
     if (!this.photos.google || !ref || !exp || !sig || !this.photos.signer.verify(ref, exp, sig)) throw new NotFoundException();

@@ -19,7 +19,8 @@ test('endereço assinado vale para a foto certa, dentro da validade', () => {
   assert.equal(s.verify(p.ref, p.exp, p.sig.slice(0, -2) + 'AA'), false, 'assinatura adulterada');
   assert.equal(s.verify(p.ref, p.exp, ''), false);
   assert.equal(s.verify(p.ref, 'abc', p.sig), false);
-  t += 31 * 60_000;
+  assert.equal(s.path(REF), s.path(REF), 'mesmo link dentro da janela');
+  t += 13 * 3_600_000;
   assert.equal(s.verify(p.ref, p.exp, p.sig), false, 'vencido');
   assert.equal(new PhotoSigner('outro-segredo-com-mais-de-32-caracteres', () => 1_000_000).verify(p.ref, p.exp, p.sig), false, 'outro segredo');
 });

@@ -126,3 +126,13 @@ test('fallback na busca por texto: sem pedir o Google, só a reserva gratuita; p
   assert.equal((await new FallbackPlaceSource(googleDown, osm).search('x', undefined, 5, { premium: true })).places[0]!.name, 'O');
   assert.equal(new FallbackPlaceSource(osm, osm).premiumSearch, false);
 });
+
+test('a mesma foto é buscada no Google uma vez só e não gasta a franquia de novo', async () => {
+  const f = fake(() => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, dailyLimits: { photo: 1 } });
+  const [a, b] = await Promise.all([src.photo('places/a/photos/b'), src.photo('places/a/photos/b')]);
+  assert.ok(a && b);
+  assert.ok(await src.photo('places/a/photos/b'), 'depois de gastar a franquia, a foto guardada continua saindo');
+  assert.equal(await src.photo('places/a/photos/outra'), undefined, 'outra foto sem franquia');
+  assert.equal(f.calls.length, 1);
+});

@@ -22,6 +22,9 @@ export type GoogleCallKind = 'nearby' | 'search' | 'lookup' | 'photo';
 /** Buscas iguais dentro de 10 minutos reaproveitam a resposta, sem chamar (nem pagar) o Google de novo. */
 const CACHE_TTL_MS = 10 * 60_000;
 const CACHE_MAX = 300;
+/** Fotos (640x400, poucas dezenas de KB cada): guardadas por 1 hora, no máximo 150. */
+const PHOTO_TTL_MS = 60 * 60_000;
+const PHOTO_CACHE_MAX = 150;
 
 export const GOOGLE_DAILY_DEFAULTS: Record<GoogleCallKind, number> = { nearby: 150, search: 150, lookup: 150, photo: 30 };
 /** Id de lugar do Google: só letras, números, `_` e `-` (o servidor monta a URL com ele). */
@@ -197,7 +200,30 @@ export class GooglePlaceSource implements PlaceSource {
 
   /** Baixa a foto no servidor. Devolve undefined se a referência for inválida ou o Google não entregar. */
   async photo(ref: string): Promise<{ type: string; bytes: Uint8Array } | undefined> {
-    if (!PHOTO_REF_RE.test(ref) || !this.spend('photo')) return undefined;
+    if (!PHOTO_REF_RE.test(ref)) return undefined;
+    // Cada foto custa uma chamada da franquia (30 por dia): o mapa abre muitas de uma vez, então a mesma foto é buscada
+    // no Google uma vez só por hora (e pedidos simultâneos dividem a mesma busca).
+    const hit = this.photos.get(ref);
+    if (hit && this.now() - hit.at < PHOTO_TTL_MS) return hit.value;
+    const pending = this.photoPending.get(ref);
+    if (pending) return pending;
+    const run = this.fetchPhoto(ref).then((value) => {
+      if (value) {
+        this.photos.delete(ref);
+        if (this.photos.size >= PHOTO_CACHE_MAX) this.photos.delete(this.photos.keys().next().value as string);
+        this.photos.set(ref, { at: this.now(), value });
+      }
+      return value;
+    }).finally(() => this.photoPending.delete(ref));
+    this.photoPending.set(ref, run);
+    return run;
+  }
+
+  private readonly photos = new Map<string, { at: number; value: { type: string; bytes: Uint8Array } }>();
+  private readonly photoPending = new Map<string, Promise<{ type: string; bytes: Uint8Array } | undefined>>();
+
+  private async fetchPhoto(ref: string): Promise<{ type: string; bytes: Uint8Array } | undefined> {
+    if (!this.spend('photo')) return undefined;
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/${ref}/media?maxWidthPx=640&maxHeightPx=400&key=${encodeURIComponent(this.apiKey)}`, {
         signal: AbortSignal.timeout(this.timeoutMs),
