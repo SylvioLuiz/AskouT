@@ -648,11 +648,11 @@ export class ConversationService {
 
   /**
    * Grupo do evento, criado pela página do evento. Só quem criou o evento (de pessoa, não arquivado) cria. Se já existe
-   * um grupo do evento em que você está, devolve ele. Entram direto os seus amigos que foram convidados ou confirmaram
-   * presença (no máximo o limite do grupo); os outros você adiciona depois, pelo grupo. O cartão do evento fica no grupo.
+   * um grupo do evento em que você está, devolve ele. Entra direto só quem já aceitou ("Eu vou"), no máximo o limite do
+   * grupo; convidado que ainda não respondeu entra sozinho quando aceitar. O cartão do evento fica no grupo.
    */
   async createEventGroup(actorId: string, rawPostId: unknown): Promise<{ id: string; created: boolean }> {
-    const { conversations, follows, blocks, posts, eventRoom, clock, ids } = this.deps;
+    const { conversations, blocks, posts, eventRoom, clock, ids } = this.deps;
     if (typeof rawPostId !== 'string' || rawPostId === '' || rawPostId.length > 64) throw notFound('Evento não encontrado');
     const post = (await posts.findById(rawPostId))?.post;
     if (!post || post.eventTitle === null || (post.archivedAt !== null && post.authorId !== actorId)) throw notFound('Evento não encontrado');
@@ -661,11 +661,9 @@ export class ConversationService {
     for (const id of await conversations.groupIdsForEventPost(post.id)) {
       if (((await conversations.participantIds(id)) ?? []).includes(actorId)) return { id, created: false };
     }
-    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
-    const friendSet = new Set(friends);
-    const hidden = new Set(related);
-    const candidates = [...(await posts.listInvites(post.id)).map((r) => r.userId), ...(await eventRoom.listGoing({ source: 'USER', id: post.id })).map((g) => g.userId)];
-    const members = [...new Set(candidates)].filter((id) => id !== actorId && friendSet.has(id) && !hidden.has(id)).slice(0, GROUP_MAX_MEMBERS);
+    const hidden = new Set(await blocks.listRelatedIds(actorId));
+    const going = (await eventRoom.listGoing({ source: 'USER', id: post.id })).map((g) => g.userId);
+    const members = [...new Set(going)].filter((id) => id !== actorId && !hidden.has(id)).slice(0, GROUP_MAX_MEMBERS);
     const now = clock.now();
     const name = Array.from(post.eventTitle.trim() || 'Evento').slice(0, GROUP_NAME_MAX).join('');
     const group = await conversations.createGroup({ id: ids.next(), name, ownerId: actorId, now, eventPostId: post.id });

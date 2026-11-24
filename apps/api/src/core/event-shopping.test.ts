@@ -22,6 +22,8 @@ async function setup() {
   for (const id of [bia, caio]) {
     const c = await w.core.conversations.open(ana, id);
     await w.core.conversations.send(ana, c.id, { eventId: post.id });
+    // Aceitou o convite: entra no grupo do evento.
+    await w.core.eventPages.go(id, post.id);
   }
   const group = await w.core.conversations.createEventGroup(ana, post.id);
   return { w, ana, bia, caio, zeca, eventId: post.id, groupId: group.id };

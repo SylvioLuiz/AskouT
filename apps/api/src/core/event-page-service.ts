@@ -14,6 +14,7 @@ import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
 import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
+import { joinEventGroups, leaveEventGroups } from './event-group-members.ts';
 
 /** Quantos avatares a página traz de uma vez. */
 export const EVENT_ATTENDEES_LIMIT = 60;
@@ -606,6 +607,8 @@ export class EventPageService {
       const added = await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now(), onProfile === true);
       // Já tinha confirmado: só muda a escolha do perfil, se veio uma.
       if (!added && typeof onProfile === 'boolean') await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile);
+      // Aceitou o convite (ou foi sozinha a um evento público): entra no grupo do evento, se houver.
+      if (ref.source === 'USER') await joinEventGroups(this.deps, ref.id, viewerId);
     }
     return this.get(viewerId, ref.id);
   }
@@ -614,6 +617,8 @@ export class EventPageService {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     if (owner?.userId === viewerId) throw forbidden('Você é o dono: o evento já conta com você. Apague o evento se não vai mais acontecer.');
     await this.deps.eventRoom.removeGoing(ref, viewerId);
+    // Não vai mais: sai do grupo do evento (segue convidada e, com a data em votação, segue votando).
+    if (ref.source === 'USER') await leaveEventGroups(this.deps, ref.id, viewerId);
     return this.get(viewerId, ref.id);
   }
 
