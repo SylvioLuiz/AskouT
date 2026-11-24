@@ -173,3 +173,80 @@ test('evento do grupo aberto ao público: o grupo de origem continua protegido',
   assert.ok(!(await w.conversations.participantIds(id))?.includes(eva));
   assert.equal((await w.core.eventPages.get(eva, post.id)).originGroup, null);
 });
+
+test('sair do grupo de amigos: a conversa fica só para ler até excluir; dá para sair e já excluir', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const { id } = await w.core.communities.create(ana, { name: 'Turma', memberIds: [bia, caio] });
+  await w.core.communities.accept(bia, id);
+  await w.core.communities.accept(caio, id);
+  await w.core.conversations.send(ana, id, { body: 'oi gente' });
+  w.clock.tick(1000);
+  await w.core.conversations.leave(bia, id);
+  w.clock.tick(1000);
+  await w.core.conversations.send(ana, id, { body: 'depois que a bia saiu' });
+
+  const item = (await w.core.conversations.list(bia)).find((c) => c.id === id)!;
+  assert.equal(item.left, true, 'continua na lista');
+  assert.equal(item.canSend, false);
+  const chat = await w.core.conversations.messages(bia, id);
+  assert.equal(chat.left, true);
+  assert.equal(chat.canSend, false);
+  const bodies = chat.messages.map((m) => m.body);
+  assert.ok(bodies.includes('oi gente'));
+  assert.ok(!bodies.includes('depois que a bia saiu'), 'só até sair');
+  await rejectsWith(w.core.conversations.send(bia, id, { body: 'posso?' }), 'NOT_FOUND');
+  await rejectsWith(w.core.communities.get(bia, id), 'NOT_FOUND');
+  assert.deepEqual((await w.core.communities.list(bia)).items, []);
+  assert.ok(!(await w.conversations.participantIds(id))?.includes(bia));
+
+  await w.core.conversations.forget(bia, id);
+  assert.equal((await w.core.conversations.list(bia)).some((c) => c.id === id), false, 'excluiu: some da lista');
+  await rejectsWith(w.core.conversations.messages(bia, id), 'NOT_FOUND');
+
+  // Sair e já excluir.
+  await w.core.conversations.leave(caio, id, true);
+  assert.equal((await w.core.conversations.list(caio)).some((c) => c.id === id), false);
+  // Membro não "exclui" sem sair.
+  await rejectsWith(w.core.conversations.forget(ana, id), 'NOT_FOUND');
+  // Convidada de novo, volta a ser membro.
+  await w.core.communities.invite(ana, id, { userIds: [bia] });
+  await w.core.communities.accept(bia, id);
+  assert.equal((await w.core.conversations.messages(bia, id)).left, false);
+});
+
+test('excluir o grupo de amigos: só o único administrador; os outros guardam o histórico e podem excluir', async () => {
+  const { w, ana, bia, caio, dani } = await setup();
+  const { id } = await w.core.communities.create(ana, { name: 'Turma', memberIds: [bia, caio, dani] });
+  await w.core.communities.accept(bia, id);
+  await w.core.communities.accept(caio, id);
+  await w.core.conversations.send(bia, id, { body: 'histórico' });
+  await w.core.conversations.setAdmin(ana, id, bia, true);
+  await rejectsWith(w.core.conversations.deleteGroup(caio, id), 'FORBIDDEN', 'membro comum não exclui');
+  await rejectsWith(w.core.conversations.deleteGroup(ana, id), 'FORBIDDEN', 'com outro administrador, não exclui');
+  await w.core.conversations.setAdmin(ana, id, bia, false);
+  w.clock.tick(1000);
+  await w.core.conversations.deleteGroup(ana, id);
+
+  assert.equal((await w.core.conversations.list(ana)).some((c) => c.id === id), false, 'quem excluiu não vê mais');
+  for (const who of [bia, caio]) {
+    const chat = await w.core.conversations.messages(who, id);
+    assert.equal(chat.left, true);
+    assert.ok(chat.messages.some((m) => m.body === 'histórico'), 'os outros guardam o histórico');
+    assert.ok(chat.messages.some((m) => /excluiu o grupo/.test(m.body)));
+  }
+  assert.deepEqual(await w.conversations.participantIds(id), []);
+  assert.equal((await w.core.communities.list(dani)).invites.length, 0, 'convites pendentes somem');
+  await w.core.conversations.forget(bia, id);
+  await w.core.conversations.forget(caio, id);
+  assert.equal(await w.conversations.findById(id), undefined, 'sem ninguém, o grupo é apagado');
+});
+
+test('removido do grupo de amigos guarda o histórico até ali', async () => {
+  const { w, ana, bia } = await setup();
+  const { id } = await w.core.communities.create(ana, { name: 'Turma', memberIds: [bia] });
+  await w.core.communities.accept(bia, id);
+  await w.core.conversations.removeMember(ana, id, bia);
+  const chat = await w.core.conversations.messages(bia, id);
+  assert.equal(chat.left, true);
+  assert.ok(chat.messages.some((m) => /removido/.test(m.body)));
+});

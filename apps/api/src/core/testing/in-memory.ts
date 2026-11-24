@@ -1423,10 +1423,34 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async addParticipant(conversationId: string, userId: string, now: Date): Promise<void> {
     const p = this.participants.get(conversationId);
     if (p && !p.has(userId)) p.set(userId, null);
+    if (p) this.former.delete(`${conversationId}|${userId}`);
     void now;
   }
 
   private readonly groupAdmins = new Map<string, Set<string>>();
+  /** Quem saiu do grupo guardando o histórico: `conversa|pessoa` → quando saiu (e até quando lia). */
+  readonly former = new Map<string, { at: Date; lastRead: Date | null }>();
+
+  async markLeft(conversationId: string, userId: string, at: Date): Promise<void> {
+    const p = this.participants.get(conversationId);
+    if (!p?.has(userId)) return;
+    this.former.set(`${conversationId}|${userId}`, { at, lastRead: p.get(userId) ?? null });
+    p.delete(userId);
+    this.groupAdmins.get(conversationId)?.delete(userId);
+  }
+
+  async leftAt(conversationId: string, userId: string): Promise<Date | null> {
+    return this.former.get(`${conversationId}|${userId}`)?.at ?? null;
+  }
+
+  async forget(conversationId: string, userId: string): Promise<void> {
+    const key = `${conversationId}|${userId}`;
+    if (!this.former.delete(key)) return;
+    this.cleared.delete(key);
+    this.prefs.delete(key);
+    const stillThere = (this.participants.get(conversationId)?.size ?? 0) > 0 || [...this.former.keys()].some((k) => k.startsWith(`${conversationId}|`));
+    if (!stillThere) await this.deleteGroup(conversationId);
+  }
 
   async removeParticipant(conversationId: string, userId: string): Promise<void> {
     this.participants.get(conversationId)?.delete(userId);
@@ -1442,6 +1466,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
     this.participants.delete(conversationId);
     this.groupAdmins.delete(conversationId);
     for (const key of [...this.groupInvites.keys()]) if (key.startsWith(`${conversationId}|`)) this.groupInvites.delete(key);
+    for (const key of [...this.former.keys()]) if (key.startsWith(`${conversationId}|`)) this.former.delete(key);
     for (let i = this.messages.length - 1; i >= 0; i--) if (this.messages[i]!.conversationId === conversationId) this.messages.splice(i, 1);
     for (const key of [...this.cleared.keys()]) if (key.startsWith(`${conversationId}|`)) this.cleared.delete(key);
     for (const key of [...this.prefs.keys()]) if (key.startsWith(`${conversationId}|`)) this.prefs.delete(key);
@@ -1481,6 +1506,15 @@ export class InMemoryConversationRepository implements ConversationRepository {
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
       const pref = this.prefs.get(`${id}|${userId}`);
       out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread, pinnedAt: pref?.pinnedAt ?? null, muted: pref?.muted ?? false, clearedAt });
+    }
+    for (const [key, left] of this.former) {
+      const [id, who] = key.split('|') as [string, string];
+      if (who !== userId || !this.conversations.has(id)) continue;
+      const clearedAt = this.cleared.get(key) ?? null;
+      const msgs = this.messages.filter((m) => m.conversationId === id && m.createdAt <= left.at && !hiddenSenderIds.includes(m.senderId) && (clearedAt === null || m.createdAt > clearedAt));
+      const unread = msgs.filter((m) => m.senderId !== userId && (left.lastRead === null || m.createdAt > left.lastRead)).length;
+      const pref = this.prefs.get(key);
+      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...(this.participants.get(id)?.keys() ?? [])], lastMessage: msgs.at(-1) ?? null, unread, pinnedAt: pref?.pinnedAt ?? null, muted: pref?.muted ?? false, clearedAt, leftAt: left.at });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
     return out.sort((a, b) => stamp(b) - stamp(a));

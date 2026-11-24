@@ -531,6 +531,8 @@ model ConversationParticipant {
   muted          Boolean   @default(false)
   /// Cor escolhida para a conversa (só para essa pessoa); nula = cor padrão do app.
   color          String?
+  /// Saiu do grupo de amigos (ou o grupo foi encerrado): continua vendo as mensagens até aqui, sem enviar, até excluir a conversa.
+  leftAt         DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -19,3 +19,6 @@ ALTER TABLE "GroupInvite" ADD CONSTRAINT "GroupInvite_userId_fkey" FOREIGN KEY (
 -- Evento criado dentro de um grupo de amigos (id da conversa do grupo).
 ALTER TABLE "Post" ADD COLUMN "originGroupId" UUID;
 CREATE INDEX "Post_originGroupId_createdAt_idx" ON "Post"("originGroupId", "createdAt");
+
+-- Quem sai do grupo de amigos (ou vê o grupo encerrado) guarda o histórico até excluir a conversa, como no WhatsApp.
+ALTER TABLE "ConversationParticipant" ADD COLUMN "leftAt" TIMESTAMP(3);

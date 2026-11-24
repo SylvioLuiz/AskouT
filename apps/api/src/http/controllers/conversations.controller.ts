@@ -194,11 +194,18 @@ export class ConversationsController {
     return this.core.conversations.deleteGroup(actor.userId, id);
   }
 
-  /** Sair do grupo. */
+  /** Sair do grupo. `{deleteChat: true}` (grupo de amigos): sai e já exclui a conversa; sem isso ela fica só para ler. */
   @Post(':id/leave')
   @HttpCode(200)
-  leave(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
-    return this.core.conversations.leave(actor.userId, id);
+  leave(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.conversations.leave(actor.userId, id, asBody(body).deleteChat);
+  }
+
+  /** Exclui da sua lista a conversa de um grupo de que você já saiu (ou que foi excluído). */
+  @Post(':id/forget')
+  @HttpCode(200)
+  forget(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.forget(actor.userId, id);
   }
 
   /** Quem criou o grupo remove alguém. */

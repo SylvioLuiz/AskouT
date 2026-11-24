@@ -371,6 +371,8 @@ export interface ConversationSummaryRecord {
   muted?: boolean;
   /** Quando quem pediu a lista limpou/apagou a conversa (mensagens até aí não aparecem para ela). */
   clearedAt?: Date | null;
+  /** Quem pediu a lista saiu do grupo e guardou o histórico até aqui (nulo: é membro). */
+  leftAt?: Date | null;
 }
 
 // ---------- Lugares e eventos ----------

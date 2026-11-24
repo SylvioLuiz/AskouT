@@ -451,6 +451,15 @@ export interface ConversationRepository {
   groupIdsForEventPost(postId: string): Promise<string[]>;
   /** Idempotente: coloca a pessoa no grupo. */
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
+  /**
+   * Saiu do grupo (de amigos) mas guarda o histórico: deixa de ser membro (some de `participantIds`, dos administradores
+   * e do acesso a eventos pelo cartão) e a conversa segue na lista dela, só para ler até `at`, até ela excluir.
+   */
+  markLeft(conversationId: string, userId: string, at: Date): Promise<void>;
+  /** Quando a pessoa saiu do grupo guardando o histórico (nulo se é membro ou nunca esteve). */
+  leftAt(conversationId: string, userId: string): Promise<Date | null>;
+  /** Exclui a conversa para quem já saiu. Sem ninguém mais (nem membros nem quem guardou o histórico), o grupo é apagado. */
+  forget(conversationId: string, userId: string): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */
   removeParticipant(conversationId: string, userId: string): Promise<void>;
   /** Apaga o grupo para todos: conversa, mensagens, membros e preferências. Só vale para conversas GROUP. */

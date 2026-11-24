@@ -167,7 +167,7 @@ export class CommunityService {
   async list(actorId: string): Promise<{ items: CommunitySummaryView[]; invites: CommunityInviteView[] }> {
     const { conversations, clock } = this.deps;
     const hidden = await this.deps.blocks.listRelatedIds(actorId);
-    const summaries = (await conversations.listForUser(actorId, hidden)).filter((s) => s.conversation.type === 'GROUP' && s.conversation.community);
+    const summaries = (await conversations.listForUser(actorId, hidden)).filter((s) => s.conversation.type === 'GROUP' && s.conversation.community && !s.leftAt);
     const now = clock.now();
     const items: CommunitySummaryView[] = [];
     for (const s of summaries) {

@@ -57,7 +57,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
   eventPostId: c.group?.eventPostId ?? null,
-  community: c.group?.community === true,
+  ...(c.group ? { community: c.group.community === true } : {}),
   ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null, venueId: c.venueId ?? null } : {}),
   createdAt: c.createdAt,
 });
@@ -240,6 +240,31 @@ export class PrismaConversationRepository implements ConversationRepository {
     return rows.map((r) => r.id);
   }
 
+  async markLeft(conversationId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation?.groupId) return;
+    const groupId = conversation.groupId;
+    await this.prisma.$transaction(async (tx) => {
+      const removed = await tx.groupMember.deleteMany({ where: { groupId, userId } });
+      if (removed.count > 0) await tx.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { leftAt: at } });
+    });
+  }
+
+  async leftAt(conversationId: string, userId: string): Promise<Date | null> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return null;
+    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { leftAt: true } });
+    return row?.leftAt ?? null;
+  }
+
+  async forget(conversationId: string, userId: string): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const removed = await this.prisma.conversationParticipant.deleteMany({ where: { conversationId, userId, leftAt: { not: null } } });
+    if (removed.count === 0) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true, _count: { select: { participants: true } } } });
+    if (conversation?.groupId && conversation._count.participants === 0) await this.prisma.group.delete({ where: { id: conversation.groupId } });
+  }
+
   async removeParticipant(conversationId: string, userId: string): Promise<void> {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
@@ -293,7 +318,8 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
     await this.prisma.$transaction(async (tx) => {
-      await tx.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId, userId } }, create: { conversationId, userId }, update: {} });
+      // Quem tinha saído guardando o histórico volta a ser membro.
+      await tx.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId, userId } }, create: { conversationId, userId }, update: { leftAt: null } });
       if (conversation?.groupId) {
         await tx.groupMember.upsert({ where: { groupId_userId: { groupId: conversation.groupId, userId } }, create: { groupId: conversation.groupId, userId, joinedAt: now }, update: {} });
       }
@@ -305,7 +331,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     const mine = await this.prisma.conversationParticipant.findMany({
       where: { userId },
       include: {
-        conversation: { include: { group: true, participants: { select: { userId: true } } } },
+        conversation: { include: { group: true, participants: { select: { userId: true, leftAt: true } } } },
       },
     });
     // Por conversa há dois acessos ao banco (não lidas e última mensagem). Em paralelo: antes eram em fila,
@@ -313,13 +339,17 @@ export class PrismaConversationRepository implements ConversationRepository {
     const built = await Promise.all(
       mine.map(async (p): Promise<ConversationSummaryRecord | undefined> => {
         const c = p.conversation;
-        const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
+        // Membros de verdade: quem saiu guardando o histórico não conta.
+        const ids = c.participants.filter((x: { leftAt: Date | null }) => x.leftAt === null).map((x: { userId: string }) => x.userId).sort();
         if (c.type === 'DIRECT' && ids.length !== 2) return undefined;
-        const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt ? { createdAt: { gt: p.clearedAt } } : {}) };
+        // Quem saiu do grupo vê só até quando saiu.
+        const window = { ...(p.clearedAt ? { gt: p.clearedAt } : {}), ...(p.leftAt ? { lte: p.leftAt } : {}) };
+        const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt || p.leftAt ? { createdAt: window } : {}) };
         const lastReadFloor = [p.lastReadAt, p.clearedAt].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
+        const unreadWindow = { ...(lastReadFloor ? { gt: lastReadFloor } : {}), ...(p.leftAt ? { lte: p.leftAt } : {}) };
         const [unread, last] = await Promise.all([
           this.prisma.message.count({
-            where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor ? { createdAt: { gt: lastReadFloor } } : {}) },
+            where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor || p.leftAt ? { createdAt: unreadWindow } : {}) },
           }),
           this.prisma.message.findFirst({ where: { conversationId: c.id, ...visible }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }),
         ]);
@@ -331,6 +361,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           pinnedAt: p.pinnedAt,
           muted: p.muted,
           clearedAt: p.clearedAt,
+          leftAt: p.leftAt,
         };
       }),
     );
@@ -512,7 +543,7 @@ export class PrismaConversationRepository implements ConversationRepository {
 
   async listReads(conversationId: string): Promise<{ userId: string; lastReadAt: Date | null }[]> {
     if (!isUuid(conversationId)) return [];
-    return this.prisma.conversationParticipant.findMany({ where: { conversationId }, select: { userId: true, lastReadAt: true } });
+    return this.prisma.conversationParticipant.findMany({ where: { conversationId, leftAt: null }, select: { userId: true, lastReadAt: true } });
   }
 
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
