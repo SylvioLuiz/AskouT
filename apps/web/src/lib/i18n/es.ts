@@ -3839,4 +3839,12 @@ export const ES: Readonly<Record<string, string>> = {
   "Ninguém encontrado": "No se encontró a nadie",
   "resultado": "resultado",
   "resultados": "resultados",
+  "Número do endereço": "Número de la dirección",
+  "Número": "Número",
+  "Ex.: 123": "Ej.: 123",
+  "Complemento (opcional)": "Complemento (opcional)",
+  "Ex.: apto 12, bloco B, fundos": "Ej.: depto 12, bloque B, fondo",
+  "Usar este endereço": "Usar esta dirección",
+  "Usar só a rua, sem número": "Usar solo la calle, sin número",
+  "Informe o número (ex.: 123).": "Indica el número (ej.: 123).",
 };

@@ -107,3 +107,29 @@ test('homônimo longe não esconde o lugar daqui: o Google entra mesmo com resul
   const noPos = await w.core.explore.searchPlaces(ana!, { q: 'buxixo' });
   assert.deepEqual(noPos.places.map((p) => p.key), ['osm:osmRJ']);
 });
+
+test('rua sem número: o número informado entra no nome, no endereço e no ponto do mapa', async () => {
+  const w = makeWorld();
+  const RUA = { externalId: 'way/42', source: 'OSM' as const, name: 'Rua Augusta', category: 'primary', lat: -23.556, lng: -46.66, address: 'Consolação - São Paulo - SP', street: true };
+  const CASA = { externalId: 'node/77', source: 'OSM' as const, name: 'Rua Augusta, 1500', category: 'house', lat: -23.5581, lng: -46.6612, address: 'Rua Augusta, 1500 - Consolação - São Paulo - SP' };
+  w.placeSource.searchable = [RUA, CASA];
+  const found = await w.core.explore.searchPlaces((await w.signUpMany('ana')).ana!, { q: 'Rua Augusta' });
+  assert.equal(found.places.find((p) => p.key === 'osm:way/42')?.street, true);
+  assert.equal(found.places.find((p) => p.key === 'osm:node/77')?.street, undefined);
+
+  const { venueId } = await w.core.venues.openExternal({ key: 'osm:way/42', lat: RUA.lat, lng: RUA.lng, number: '1500' });
+  const venue = await w.places.findVenue(venueId);
+  assert.equal(venue?.name, 'Rua Augusta, 1500');
+  assert.equal(venue?.address, 'Rua Augusta, 1500 - Consolação - São Paulo - SP');
+  assert.deepEqual([venue?.lat, venue?.lng], [CASA.lat, CASA.lng]);
+  // O mesmo número reaproveita o local; a rua sem número e outro número são locais à parte.
+  assert.equal((await w.core.venues.openExternal({ key: 'osm:way/42', lat: 0, lng: 0, number: '1500' })).venueId, venueId);
+  const other = await w.core.venues.openExternal({ key: 'osm:way/42', lat: RUA.lat, lng: RUA.lng, number: '20b' });
+  const otherVenue = await w.places.findVenue(other.venueId);
+  assert.equal(otherVenue?.name, 'Rua Augusta, 20B');
+  // Sem achar o número exato, fica no ponto da rua.
+  assert.deepEqual([otherVenue?.lat, otherVenue?.lng], [RUA.lat, RUA.lng]);
+  const plain = await w.core.venues.openExternal({ key: 'osm:way/42', lat: RUA.lat, lng: RUA.lng });
+  assert.notEqual(plain.venueId, venueId);
+  await rejectsWith(w.core.venues.openExternal({ key: 'osm:way/42', lat: RUA.lat, lng: RUA.lng, number: 'abc' }), 'VALIDATION');
+});
