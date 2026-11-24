@@ -599,6 +599,16 @@ export interface ChatMemberRead {
   readAt: string | null;
 }
 
+/** Cartão de um local compartilhado na conversa. */
+export interface ChatVenueCard {
+  id: string;
+  name: string;
+  category: string | null;
+  address: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
@@ -625,6 +635,8 @@ export interface ChatMessage {
   reactions: ChatReaction[];
   /** Evento compartilhado (kind EVENT). */
   event: EventCard | null;
+  /** Local compartilhado: texto com o link da página do local; aparece o cartão que abre a página no app. */
+  venue?: ChatVenueCard | null;
   /** Cartão do encontro (kind MEETUP). */
   meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */
@@ -849,6 +861,20 @@ export interface NotificationSounds {
   invites: NotificationSound;
   arrival: NotificationSound;
   other: NotificationSound;
+}
+
+/** Lembrete de evento: 1 dia antes, de manhã no dia ("É hoje!"), 2 h, 1 h, 30 min ou 15 min antes. */
+export type EventReminderOption = '1d' | 'manha' | '2h' | '1h' | '30m' | '15m';
+
+/** Escolha de lembretes: a que vale e se é personalizada (false = o padrão, ou num evento a escolha geral). */
+export interface EventReminderChoice {
+  reminders: EventReminderOption[];
+  custom: boolean;
+}
+
+export interface EventReminderEventChoice extends EventReminderChoice {
+  /** A escolha geral da pessoa (o padrão enquanto ela não mexer). */
+  general: EventReminderOption[];
 }
 
 export interface EventStoryItem {

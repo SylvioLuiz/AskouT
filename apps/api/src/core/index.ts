@@ -72,7 +72,7 @@ export function createCore(input: CoreInput) {
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
-  const eventPages = new EventPageService(deps, profiles);
+  const eventPages = new EventPageService(deps, profiles, input.notifications);
   const conversations = new ConversationService(deps, flash);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
@@ -113,7 +113,7 @@ export function createCore(input: CoreInput) {
     guestList: new GuestListService(deps, eventPages),
     /** Lista de compras e divisão de gastos dos eventos criados por pessoas. */
     eventShopping: new EventShoppingService(deps, eventPages),
-    eventReminders: new EventReminderService(deps),
+    eventReminders: new EventReminderService(deps, input.notifications),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
     calendarSync: new CalendarSyncService(deps),

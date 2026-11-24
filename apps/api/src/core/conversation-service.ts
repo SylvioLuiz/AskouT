@@ -59,6 +59,8 @@ export interface MessageView {
   meetup: MeetupView | null;
   /** Evento compartilhado (kind EVENT). */
   event: EventCardView | null;
+  /** Local compartilhado: texto com link da página do local (`…/bares/<id>`) vira cartão que abre a página no app. */
+  venue: VenueCardView | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio vem de `GET .../messages/:id/audio`. */
   /**
    * `played`: em mensagem sua, alguém da conversa já ouviu; em mensagem de outra pessoa, você já ouviu
@@ -298,6 +300,7 @@ interface ViewExtras {
   senderName?: string | null;
   meetup?: MeetupView | null;
   event?: EventCardView | null;
+  venue?: VenueCardView | null;
   replyTo?: ReplyView | null;
   reactions?: ReactionView[];
   /** Quem já ouviu esta mensagem de voz. */
@@ -319,6 +322,30 @@ export function linkedEventId(m: Pick<MessageRecord, 'kind' | 'body' | 'eventId'
   return id && UUID_RE.test(id) ? id.toLowerCase() : id;
 }
 
+/** Cartão do local dentro da conversa: o suficiente para mostrar e abrir a página do local no app. */
+export interface VenueCardView {
+  id: string;
+  name: string;
+  category: string | null;
+  address: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+}
+
+/** Link da página de um local do AskouT dentro de um texto (`…/bares/<id>`). */
+const VENUE_LINK_RE = /\/(?:bares|locais)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![A-Za-z0-9_-])/i;
+
+/** O local de um link colado numa mensagem de texto (o primeiro), quando a mensagem ainda não tem cartão de evento. */
+export function linkedVenueId(m: Pick<MessageRecord, 'kind' | 'body' | 'eventId' | 'postEventId'>): string | undefined {
+  if (m.kind !== 'TEXT' || m.eventId || m.postEventId || !m.body || linkedEventId(m)) return undefined;
+  return VENUE_LINK_RE.exec(m.body)?.[1]?.toLowerCase();
+}
+
+async function buildVenueCards(deps: CoreDeps, ids: string[]): Promise<Map<string, VenueCardView>> {
+  const found = await Promise.all([...new Set(ids)].map((id) => deps.places.findVenue(id)));
+  return new Map(found.flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, category: v.category, address: v.address, coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null }] as const] : [])));
+}
+
 function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
   const distances = extras.distances ?? null;
   const gone = m.deletedAt != null;
@@ -332,6 +359,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     suggestion: gone ? null : m.suggestion,
     meetup: gone ? null : (extras.meetup ?? null),
     event: gone ? null : (extras.event ?? null),
+    venue: gone ? null : (extras.venue ?? null),
     audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs, played: audioPlayed(m, actorId, extras.playedBy ?? []) } : null,
     gif: gone ? null : gifOf(m),
     storyId: gone ? null : (m.storyId ?? null),
@@ -620,11 +648,11 @@ export class ConversationService {
 
   /**
    * Grupo do evento, criado pela página do evento. Só quem criou o evento (de pessoa, não arquivado) cria. Se já existe
-   * um grupo do evento em que você está, devolve ele. Entram direto os seus amigos que foram convidados ou confirmaram
-   * presença (no máximo o limite do grupo); os outros você adiciona depois, pelo grupo. O cartão do evento fica no grupo.
+   * um grupo do evento em que você está, devolve ele. Entra direto só quem já aceitou ("Eu vou"), no máximo o limite do
+   * grupo; convidado que ainda não respondeu entra sozinho quando aceitar. O cartão do evento fica no grupo.
    */
   async createEventGroup(actorId: string, rawPostId: unknown): Promise<{ id: string; created: boolean }> {
-    const { conversations, follows, blocks, posts, eventRoom, clock, ids } = this.deps;
+    const { conversations, blocks, posts, eventRoom, clock, ids } = this.deps;
     if (typeof rawPostId !== 'string' || rawPostId === '' || rawPostId.length > 64) throw notFound('Evento não encontrado');
     const post = (await posts.findById(rawPostId))?.post;
     if (!post || post.eventTitle === null || (post.archivedAt !== null && post.authorId !== actorId)) throw notFound('Evento não encontrado');
@@ -633,11 +661,9 @@ export class ConversationService {
     for (const id of await conversations.groupIdsForEventPost(post.id)) {
       if (((await conversations.participantIds(id)) ?? []).includes(actorId)) return { id, created: false };
     }
-    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
-    const friendSet = new Set(friends);
-    const hidden = new Set(related);
-    const candidates = [...(await posts.listInvites(post.id)).map((r) => r.userId), ...(await eventRoom.listGoing({ source: 'USER', id: post.id })).map((g) => g.userId)];
-    const members = [...new Set(candidates)].filter((id) => id !== actorId && friendSet.has(id) && !hidden.has(id)).slice(0, GROUP_MAX_MEMBERS);
+    const hidden = new Set(await blocks.listRelatedIds(actorId));
+    const going = (await eventRoom.listGoing({ source: 'USER', id: post.id })).map((g) => g.userId);
+    const members = [...new Set(going)].filter((id) => id !== actorId && !hidden.has(id)).slice(0, GROUP_MAX_MEMBERS);
     const now = clock.now();
     const name = Array.from(post.eventTitle.trim() || 'Evento').slice(0, GROUP_NAME_MAX).join('');
     const group = await conversations.createGroup({ id: ids.next(), name, ownerId: actorId, now, eventPostId: post.id });
@@ -763,6 +789,7 @@ export class ConversationService {
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
     const eventCards = await buildEventCards(this.deps, [...new Set(items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [linkedEventId(m)].filter((id): id is string => !!id))))]);
+    const venueCards = await buildVenueCards(this.deps, items.flatMap((m) => [linkedVenueId(m)].filter((id): id is string => !!id)));
     // O cartão já chega marcado para quem confirmou presença antes de receber o evento na conversa.
     for (const [id, card] of eventCards) {
       card.going = card.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: card.userEvent ? 'USER' : 'PLACE', id }, actorId));
@@ -803,6 +830,7 @@ export class ConversationService {
           senderName: names ? (names.get(m.senderId) ?? null) : null,
           meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
           event: eventCards.get((m.eventId ?? m.postEventId ?? linkedEventId(m)) as string) ?? null,
+          venue: venueCards.get(linkedVenueId(m) ?? '') ?? null,
           replyTo: decor.replies.get(m.id) ?? null,
           reactions: decor.reactions.get(m.id) ?? [],
           playedBy: decor.plays.get(m.id) ?? [],
@@ -916,7 +944,9 @@ export class ConversationService {
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
     const linkCard = linked ? ((await buildEventCards(this.deps, [linked])).get(linked) ?? null) : null;
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null });
+    const linkedVenue = linkedVenueId(message);
+    const venueCard = linkedVenue ? ((await buildVenueCards(this.deps, [linkedVenue])).get(linkedVenue) ?? null) : null;
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, venue: venueCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null });
   }
 
   /** Bytes de uma foto, vídeo ou documento, só para quem está na conversa. Documento vem com o nome (para baixar). */

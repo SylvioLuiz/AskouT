@@ -93,10 +93,16 @@ export function GifPicker({ onPick, onClose }: { onPick: (gif: CommentGif) => vo
   );
 }
 
-/** Botões de emoji e GIF do campo de comentário. `onEmoji` acrescenta ao texto; `onGif` já publica o comentário. */
-export function CommentTools({ onEmoji, onGif, disabled }: { onEmoji: (emoji: string) => void; onGif: (gif: CommentGif) => void; disabled?: boolean }) {
+/**
+ * Botões de emoji e GIF do campo de comentário. `onEmoji` acrescenta ao texto; `onGif` já publica o comentário.
+ * `closeKey`: quando muda (ex.: a mensagem foi enviada), a bandeja de emojis fecha.
+ */
+export function CommentTools({ onEmoji, onGif, disabled, closeKey }: { onEmoji: (emoji: string) => void; onGif: (gif: CommentGif) => void; disabled?: boolean; closeKey?: number }) {
   const gifs = useGifEnabled();
   const [panel, setPanel] = useState<'emoji' | 'gif' | undefined>();
+  useEffect(() => {
+    if (closeKey) setPanel((p) => (p === 'emoji' ? undefined : p));
+  }, [closeKey]);
   return (
     <>
       {panel === 'emoji' ? (

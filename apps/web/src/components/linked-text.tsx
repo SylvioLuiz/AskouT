@@ -1,4 +1,4 @@
-import { inAppPath, splitLinks } from '../lib/linkify.ts';
+import { appHosts, inAppPath, splitLinks } from '../lib/linkify.ts';
 import { navigate } from '../router.tsx';
 
 /**
@@ -18,7 +18,7 @@ export function LinkedText({ text }: { text: string }) {
             rel="noopener noreferrer nofollow"
             onClick={(e) => {
               e.stopPropagation();
-              const path = inAppPath(part.href!);
+              const path = inAppPath(part.href!, appHosts());
               if (path) {
                 e.preventDefault();
                 navigate(path);

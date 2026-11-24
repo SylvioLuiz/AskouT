@@ -1080,6 +1080,15 @@ export interface NotificationRepository {
   /** Som de cada grupo de aviso (tudo `padrao` se nunca mexeu). */
   getSoundSettings(userId: string): Promise<import('./notification-sounds.ts').NotificationSoundSettings>;
   setSoundSettings(userId: string, settings: import('./notification-sounds.ts').NotificationSoundSettings, at: Date): Promise<void>;
+  /** Lembretes de evento escolhidos e o fuso de cada pessoa. Quem nunca mexeu não vem no mapa (segue o padrão). */
+  getEventReminderSettings(userIds: string[]): Promise<Map<string, EventReminderSettings>>;
+  setEventReminderSettings(userId: string, settings: EventReminderSettings, at: Date): Promise<void>;
+}
+
+/** Escolha geral de lembretes de evento: `reminders` nulo segue o padrão; `timeZone` é o do aparelho (nulo: o padrão). */
+export interface EventReminderSettings {
+  reminders: import('./event-reminders.ts').EventReminderOption[] | null;
+  timeZone: string | null;
 }
 
 export interface PushSubscriptionRepository {
@@ -1206,8 +1215,16 @@ export interface EventRoomRepository {
   countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]>;
   /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
   listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date; onProfile: boolean }[]>;
-  /** Marca que o lembrete de começo deste evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
-  markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean>;
+  /** Marca que este lembrete (`kind`, ver event-reminders.ts) do evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
+  markReminded(ref: EventRef, userId: string, kind: import('./event-reminders.ts').EventReminderOption, at: Date): Promise<boolean>;
+  /** Presenças em eventos (do local ou de pessoa, sem os apagados) que começam depois de `from` e até `to`, com o começo. */
+  listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]>;
+  /** Lembretes escolhidos só para estes eventos (no lugar da escolha geral de cada pessoa). */
+  listReminderChoices(refs: EventRef[]): Promise<{ ref: EventRef; userId: string; reminders: import('./event-reminders.ts').EventReminderOption[] }[]>;
+  /** A escolha da pessoa para este evento; `undefined` se ela segue a geral. */
+  getReminderChoice(ref: EventRef, userId: string): Promise<import('./event-reminders.ts').EventReminderOption[] | undefined>;
+  /** Guarda a escolha para este evento (lista vazia: nenhum lembrete); `null` volta a seguir a geral. */
+  setReminderChoice(ref: EventRef, userId: string, reminders: import('./event-reminders.ts').EventReminderOption[] | null, at: Date): Promise<void>;
   addStory(story: EventStoryRecord): Promise<void>;
   /** Stories ainda no ar (`expiresAt` depois de `now`) do evento, do mais antigo ao mais novo, sem os bytes. */
   listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]>;

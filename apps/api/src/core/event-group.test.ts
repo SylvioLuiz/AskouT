@@ -19,7 +19,7 @@ async function setup() {
   return { w, ana, bia, caio, zeca };
 }
 
-test('grupo do evento: quem criou cria pela página, com os amigos convidados; quem está no grupo acessa pela página', async () => {
+test('grupo do evento: quem criou cria pela página; convidado só entra quando aceita; quem está no grupo acessa pela página', async () => {
   const { w, ana, bia, caio } = await setup();
   const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', startsAt: '2026-12-20T20:00:00.000Z', endsAt: '2026-12-20T23:00:00.000Z', private: true } });
   const withBia = await w.core.conversations.open(ana, bia);
@@ -37,7 +37,16 @@ test('grupo do evento: quem criou cria pela página, com os amigos convidados; q
   page = await w.core.eventPages.get(ana, post.id);
   assert.deepEqual(page.group, { conversationId: created.id, name: 'Aniversário' });
   assert.equal(page.canCreateGroup, false);
-  assert.deepEqual((await w.core.eventPages.get(bia, post.id)).group, { conversationId: created.id, name: 'Aniversário' }, 'convidada amiga entra e vê o grupo');
+  assert.equal((await w.core.eventPages.get(bia, post.id)).group, null, 'convidada que não respondeu não entra');
+  assert.deepEqual(await w.conversations.participantIds(created.id), [ana]);
+
+  // Aceitou ("Eu vou"): entra sozinha no grupo, com aviso no grupo.
+  await w.core.eventPages.go(bia, post.id);
+  assert.deepEqual((await w.core.eventPages.get(bia, post.id)).group, { conversationId: created.id, name: 'Aniversário' }, 'aceitou: entra e vê o grupo');
+  assert.ok((await w.core.conversations.messages(ana, created.id)).messages.some((m) => /entrou no grupo/.test(m.body ?? '')));
+  // Confirmar de novo não muda nada.
+  await w.core.eventPages.go(bia, post.id);
+  assert.deepEqual((await w.conversations.participantIds(created.id))?.sort(), [ana, bia].sort());
 
   // Criar de novo devolve o mesmo grupo.
   assert.deepEqual(await w.core.conversations.createEventGroup(ana, post.id), { id: created.id, created: false });
@@ -51,18 +60,43 @@ test('grupo do evento: quem criou cria pela página, com os amigos convidados; q
   assert.equal(details.event?.id, post.id, 'o grupo sabe de que evento é');
 });
 
-test('grupo do evento: só entra amigo; quem não está no grupo não vê o atalho', async () => {
-  const { w, ana, bia, zeca } = await setup();
+test('grupo do evento: em evento público, quem marca "Eu vou" sozinho também entra; desmarcando, sai', async () => {
+  const { w, ana, bia, caio, zeca } = await setup();
   const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Show', startsAt: '2026-12-20T20:00:00.000Z', endsAt: '2026-12-20T23:00:00.000Z' } });
-  // zeca (não é amigo da ana) confirma presença num evento público.
+  // zeca (não é amigo nem convidado) confirma presença num evento público antes de o grupo existir.
   await w.core.follows.follow(zeca, ana);
   await w.core.eventPages.go(zeca, post.id, false);
   const { id } = await w.core.conversations.createEventGroup(ana, post.id);
-  assert.deepEqual(await w.conversations.participantIds(id), [ana], 'quem confirmou mas não é amigo não entra');
-  const forZeca = await w.core.eventPages.get(zeca, post.id);
-  assert.equal(forZeca.group, null);
-  assert.equal(forZeca.canCreateGroup, false);
-  void bia;
+  assert.deepEqual((await w.conversations.participantIds(id))?.sort(), [ana, zeca].sort(), 'quem já confirmou entra junto');
+  assert.equal((await w.core.eventPages.get(zeca, post.id)).group?.conversationId, id);
+
+  // Com o grupo criado, quem marca "Eu vou" entra na hora.
+  await w.core.eventPages.go(bia, post.id);
+  assert.ok((await w.conversations.participantIds(id))?.includes(bia));
+  // Quem só vê o evento não está no grupo e não vê o atalho.
+  const forCaio = await w.core.eventPages.get(caio, post.id);
+  assert.equal(forCaio.group, null);
+  assert.equal(forCaio.canCreateGroup, false);
+
+  // Desmarcou "Eu vou": sai do grupo, com aviso.
+  await w.core.eventPages.cancel(zeca, post.id);
+  assert.equal((await w.conversations.participantIds(id))?.includes(zeca), false);
+  assert.equal((await w.core.eventPages.get(zeca, post.id)).group, null);
+  assert.ok((await w.core.conversations.messages(ana, id)).messages.some((m) => /não vai mais ao evento/.test(m.body ?? '')));
+});
+
+test('grupo do evento: cheio, não recebe mais ninguém (a presença continua valendo)', async () => {
+  const w = makeWorld();
+  const names = Array.from({ length: 18 }, (_, i) => `pessoa${i}`);
+  const u = await w.signUpMany('ana', ...names);
+  const ana = u['ana']!;
+  const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Show', startsAt: '2026-12-20T20:00:00.000Z', endsAt: '2026-12-20T23:00:00.000Z' } });
+  const { id } = await w.core.conversations.createEventGroup(ana, post.id);
+  for (const n of names) {
+    await w.core.follows.follow(u[n]!, ana);
+    await w.core.eventPages.go(u[n]!, post.id);
+  }
+  assert.equal((await w.conversations.participantIds(id))?.length, 16, 'para no limite do grupo');
 });
 
 test('grupo do evento: votação da data aberta depois usa o grupo que já existe', async () => {
@@ -73,6 +107,9 @@ test('grupo do evento: votação da data aberta depois usa o grupo que já exist
   const { id } = await w.core.conversations.createEventGroup(ana, post.id);
   const poll = await w.core.scheduling.create(ana, undefined, { title: 'Churras', rangeStart: '2026-12-20', rangeEnd: '2026-12-22', eventPostId: post.id });
   assert.equal(poll.conversationId, id);
+  assert.ok(poll.participants.some((p) => p.profile.userId === bia), 'a convidada vota mesmo fora do grupo');
+  assert.equal((await w.core.eventPages.get(bia, post.id)).group, null);
+  await w.core.eventPages.go(bia, post.id);
   assert.equal((await w.core.eventPages.get(bia, post.id)).group?.conversationId, id);
 });
 
@@ -81,6 +118,7 @@ test('grupo do evento: quem sai ou é removido do grupo sai da votação aberta,
   const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Churras', dateByPoll: true } });
   const withBia = await w.core.conversations.open(ana, bia);
   await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+  await w.core.eventPages.go(bia, post.id);
   const { id } = await w.core.conversations.createEventGroup(ana, post.id);
   await w.core.conversations.addMembers(ana, id, [caio]);
   const poll = await w.core.scheduling.create(ana, undefined, { title: 'Churras', rangeStart: '2026-12-20', rangeEnd: '2026-12-22', eventPostId: post.id });

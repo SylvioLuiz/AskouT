@@ -255,6 +255,7 @@ model User {
   venueStories      VenueStory[]       @relation("VenueStoryAuthor")
   venueStoryReports VenueStoryReport[] @relation("VenueStoryReports")
   venueStoryMutes   VenueStoryMute[]
+  eventReminderChoices EventReminderChoice[]
   venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
@@ -747,6 +748,10 @@ model NotificationSetting {
   soundInvites String @default("padrao")
   soundArrival String @default("padrao")
   soundOther   String @default("padrao")
+  /// Lembretes de evento escolhidos (`manha,30m`; vazio = nenhum). Nulo: segue o padrão ("É hoje!" e 30 min antes).
+  eventReminders   String?
+  /// Fuso do aparelho, para o "É hoje!" sair de manhã na hora da pessoa. Nulo: America/Sao_Paulo.
+  reminderTimeZone String?
   updatedAt  DateTime @default(now())
 
   user User @relation("NotificationSettingUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -1553,16 +1558,33 @@ model ExternalIdentity {
   @@index([userId])
 }
 
-/// Lembrete "o evento começa em 30 minutos" já mandado a uma pessoa (uma vez por pessoa e evento). Sem chave estrangeira: guarda só o marcador.
+/// Lembrete de evento já mandado a uma pessoa (uma vez por pessoa, evento e tipo). Sem chave estrangeira: guarda só o marcador.
 model EventReminder {
   id      String   @id @default(uuid()) @db.Uuid
   userId  String   @db.Uuid
   source  String
   eventId String   @db.Uuid
+  /// Qual lembrete (ver apps/api/src/core/event-reminders.ts): `1d`, `manha`, `2h`, `1h`, `30m` ou `15m`.
+  kind    String   @default("30m")
   sentAt  DateTime
 
-  @@unique([userId, source, eventId])
+  @@unique([userId, source, eventId, kind])
   @@index([sentAt])
+}
+
+/// Lembretes que a pessoa escolheu só para um evento (no lugar da escolha geral). Sem chave estrangeira para o evento.
+model EventReminderChoice {
+  userId    String   @db.Uuid
+  source    String
+  eventId   String   @db.Uuid
+  /// Lista separada por vírgula (`manha,30m`); vazio = nenhum lembrete neste evento.
+  reminders String
+  updatedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, source, eventId])
+  @@index([source, eventId])
 }
 
 /// Impulsionamento: anúncio pago por quem administra o local (a página ou um evento dele).

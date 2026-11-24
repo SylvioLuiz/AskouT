@@ -10,10 +10,13 @@ import { loadEventExtras, resolveEventExtras } from './event-extras.ts';
 import type { EventExtraView } from './event-extras.ts';
 import type { EventCardView } from './event-card.ts';
 import { parsePage } from './profile-event-service.ts';
-import type { CoreDeps } from './ports.ts';
+import type { CoreDeps, EventReminderSettings, NotificationRepository } from './ports.ts';
+import { DEFAULT_EVENT_REMINDERS, parseReminderList } from './event-reminders.ts';
+import type { EventReminderChoiceView, EventReminderOption } from './event-reminders.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
 import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
+import { joinEventGroups, leaveEventGroups } from './event-group-members.ts';
 
 /** Quantos avatares a página traz de uma vez. */
 export const EVENT_ATTENDEES_LIMIT = 60;
@@ -243,10 +246,13 @@ interface Resolved {
 export class EventPageService {
   private readonly deps: CoreDeps;
   private readonly profiles: ProfileService;
+  /** Só para ler a escolha geral de lembretes. */
+  private readonly reminderSettings: Pick<NotificationRepository, 'getEventReminderSettings'> | undefined;
 
-  constructor(deps: CoreDeps, profiles: ProfileService) {
+  constructor(deps: CoreDeps, profiles: ProfileService, reminderSettings?: Pick<NotificationRepository, 'getEventReminderSettings'>) {
     this.deps = deps;
     this.profiles = profiles;
+    this.reminderSettings = reminderSettings;
   }
 
   /** O evento existe e o visitante pode vê-lo? Evento de pessoa segue a regra de privacidade do post. */
@@ -606,14 +612,38 @@ export class EventPageService {
       const added = await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now(), onProfile === true);
       // Já tinha confirmado: só muda a escolha do perfil, se veio uma.
       if (!added && typeof onProfile === 'boolean') await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile);
+      // Aceitou o convite (ou foi sozinha a um evento público): entra no grupo do evento, se houver.
+      if (ref.source === 'USER') await joinEventGroups(this.deps, ref.id, viewerId);
     }
     return this.get(viewerId, ref.id);
+  }
+
+  /**
+   * Lembretes deste evento para o visitante: `custom` true quando ele escolheu só para este evento; senão vale a
+   * escolha geral (`general`, que é o padrão enquanto ele não mexer).
+   */
+  async reminders(viewerId: string, rawId: unknown): Promise<EventReminderChoiceView & { general: EventReminderOption[] }> {
+    const { ref } = await this.resolve(viewerId, rawId);
+    const [own, settings] = await Promise.all([this.deps.eventRoom.getReminderChoice(ref, viewerId), this.reminderSettings?.getEventReminderSettings([viewerId]) ?? Promise.resolve(new Map<string, EventReminderSettings>())]);
+    const general = settings.get(viewerId)?.reminders ?? [...DEFAULT_EVENT_REMINDERS];
+    return own ? { reminders: own, custom: true, general } : { reminders: general, custom: false, general };
+  }
+
+  /** `reminders`: a lista só para este evento (vazia = nenhum lembrete) ou `null` para seguir a escolha geral. */
+  async setReminders(viewerId: string, rawId: unknown, value: unknown): Promise<EventReminderChoiceView & { general: EventReminderOption[] }> {
+    const reminders = value === null ? null : parseReminderList(value);
+    if (value !== null && reminders === null) throw validationError('Dados inválidos', { reminders: 'Escolha os lembretes da lista' });
+    const { ref } = await this.resolve(viewerId, rawId);
+    await this.deps.eventRoom.setReminderChoice(ref, viewerId, reminders, this.deps.clock.now());
+    return this.reminders(viewerId, ref.id);
   }
 
   async cancel(viewerId: string, rawId: unknown): Promise<EventPageView> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     if (owner?.userId === viewerId) throw forbidden('Você é o dono: o evento já conta com você. Apague o evento se não vai mais acontecer.');
     await this.deps.eventRoom.removeGoing(ref, viewerId);
+    // Não vai mais: sai do grupo do evento (segue convidada e, com a data em votação, segue votando).
+    if (ref.source === 'USER') await leaveEventGroups(this.deps, ref.id, viewerId);
     return this.get(viewerId, ref.id);
   }
 

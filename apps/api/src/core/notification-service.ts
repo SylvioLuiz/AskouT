@@ -4,6 +4,8 @@ import type { Clock, ConversationRepository, IdGenerator, LiveActivityTokens, Me
 import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from './types.ts';
 import { DEFAULT_SOUNDS, isNotificationSound, SOUND_GROUPS, soundGroup } from './notification-sounds.ts';
 import type { NotificationSound, NotificationSoundSettings, SoundGroup } from './notification-sounds.ts';
+import { DEFAULT_EVENT_REMINDERS, isValidTimeZone, parseReminderList } from './event-reminders.ts';
+import type { EventReminderChoiceView } from './event-reminders.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
@@ -412,6 +414,26 @@ export class NotificationService {
     const next: NotificationSoundSettings = { ...DEFAULT_SOUNDS, ...current, ...(p as Partial<NotificationSoundSettings>) };
     await this.deps.notifications.setSoundSettings(userId, next, this.deps.clock.now());
     return next;
+  }
+
+  /** Lembretes de evento da pessoa (o padrão, "É hoje!" e 30 min antes, enquanto ela não escolher). */
+  async eventReminderSettings(userId: string): Promise<EventReminderChoiceView> {
+    const saved = (await this.deps.notifications.getEventReminderSettings([userId])).get(userId);
+    return saved?.reminders ? { reminders: saved.reminders, custom: true } : { reminders: [...DEFAULT_EVENT_REMINDERS], custom: false };
+  }
+
+  /**
+   * `{reminders, timeZone?}`: `reminders` é a lista escolhida (vazia = nenhum lembrete) ou `null` para voltar ao padrão.
+   * `timeZone` é o fuso do aparelho, para o "É hoje!" sair de manhã na hora da pessoa.
+   */
+  async setEventReminderSettings(userId: string, body: { reminders?: unknown; timeZone?: unknown }): Promise<EventReminderChoiceView> {
+    const reminders = body.reminders === null ? null : parseReminderList(body.reminders);
+    if (body.reminders !== null && reminders === null) throw validationError('Dados inválidos', { reminders: 'Escolha os lembretes da lista' });
+    if (body.timeZone !== undefined && body.timeZone !== null && !isValidTimeZone(body.timeZone)) throw validationError('Fuso horário inválido', { timeZone: 'Fuso horário inválido' });
+    const saved = (await this.deps.notifications.getEventReminderSettings([userId])).get(userId);
+    const timeZone = typeof body.timeZone === 'string' ? body.timeZone : (saved?.timeZone ?? null);
+    await this.deps.notifications.setEventReminderSettings(userId, { reminders, timeZone }, this.deps.clock.now());
+    return this.eventReminderSettings(userId);
   }
 
   /** Marca um aviso, vários (lista de ids, da seleção na tela) ou todos (sem `id`) como lidos. */

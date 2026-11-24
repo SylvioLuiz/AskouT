@@ -40,7 +40,14 @@ export function splitLinks(text: string): TextPart[] {
 }
 
 /** Link do próprio AskouT (askout.com.br): abre dentro do app, no caminho dele. Outros: `undefined`. */
-export function inAppPath(href: string, hosts: readonly string[] = ['askout.com.br', 'www.askout.com.br']): string | undefined {
+export const APP_HOSTS: readonly string[] = ['askout.com.br', 'www.askout.com.br'];
+
+/** Endereços que abrem dentro do app: o público e o do próprio site aberto (homologação, por exemplo). */
+export function appHosts(current: string | undefined = typeof window === 'undefined' ? undefined : window.location.hostname): readonly string[] {
+  return current && !APP_HOSTS.includes(current.toLowerCase()) ? [...APP_HOSTS, current.toLowerCase()] : APP_HOSTS;
+}
+
+export function inAppPath(href: string, hosts: readonly string[] = APP_HOSTS): string | undefined {
   try {
     const url = new URL(href);
     if (!hosts.includes(url.hostname.toLowerCase())) return undefined;

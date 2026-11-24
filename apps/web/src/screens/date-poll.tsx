@@ -119,11 +119,14 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const canPropose = poll.isOrganizer && poll.status === 'VOTING' && (selected !== undefined || selectedTime !== undefined);
     const finished = poll.participants.filter((p) => p.finished).length;
   const weeks = calendarWeeks(poll.rangeStart, poll.rangeEnd);
+  // Votação de evento: quem ainda não aceitou ("Eu vou") vota sem estar no grupo, e volta para o evento.
+  const outsideGroup = poll.inConversation === false && Boolean(poll.eventPostId);
+  const backTo = outsideGroup ? `/eventos/${encodeURIComponent(poll.eventPostId ?? "")}` : `/conversas/${poll.conversationId}`;
   const allDays = poll.days.map((d) => d.date);
 
   return (
     <div className="dpoll">
-      <PageHead title={poll.title} back={`/conversas/${poll.conversationId}`} subtitle={votesDays ? `${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)}` : t('{day}: votação de horário', { day: longDay(poll.rangeStart) })}
+      <PageHead title={poll.title} back={backTo} subtitle={votesDays ? `${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)}` : t('{day}: votação de horário', { day: longDay(poll.rangeStart) })}
         action={
           poll.isOrganizer && poll.status === 'VOTING' && !poll.votingClosed ? (
             <button type="button" className="iconbtn" aria-label={t('Editar votação')} onClick={() => setEditing(true)}>
@@ -149,8 +152,8 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                 {t('Ver na agenda')}
               </Link>
             ) : null}
-            <Link to={`/conversas/${poll.conversationId}`} className="btn btn--secondary btn--small">
-              {t('Voltar à conversa')}
+            <Link to={backTo} className="btn btn--secondary btn--small">
+              {outsideGroup ? t('Ver o evento') : t('Voltar à conversa')}
             </Link>
             {poll.isOrganizer ? (
               <Link to={`/criar?${new URLSearchParams({ votacao: poll.id, titulo: poll.title, inicio: isoToLocalInput(poll.final.startsAt), fim: isoToLocalInput(poll.final.endsAt), conversa: poll.conversationId }).toString()}`} className="btn btn--primary btn--small">
@@ -478,7 +481,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
         confirming === 'cancel' ? (
           <Confirm danger question={t('Cancelar esta votação? Os votos ficam guardados, mas ninguém mais pode votar.')} confirmLabel={t('Cancelar votação')} busy={busy} onCancel={() => setConfirming(undefined)} onConfirm={() => void act(async () => {
             const next = await api.cancelPoll(poll.id);
-            navigate(`/conversas/${poll.conversationId}`);
+            navigate(backTo);
             return next;
           }).then(() => setConfirming(undefined))} />
         ) : (

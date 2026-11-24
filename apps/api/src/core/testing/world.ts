@@ -66,13 +66,13 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const scheduling = new InMemorySchedulingRepository();
   const profileEvents = new InMemoryProfileEventRepository();
   const posts = new InMemoryPostRepository();
-  const eventRoom = new InMemoryEventRoomRepository(posts);
   const albums = new InMemoryAlbumRepository();
   const venueStories = new InMemoryVenueStoryRepository();
   const notifications = new InMemoryNotificationRepository();
   const pushSubscriptions = new InMemoryPushSubscriptionRepository();
   const push = new FakePushSender();
   const places = new InMemoryPlaceRepository();
+  const eventRoom = new InMemoryEventRoomRepository(posts, places);
   const claims = new InMemoryVenueClaimRepository();
   const feed = new InMemoryFeedRepository(posts, places);
   const guestLists = new InMemoryGuestListRepository(places);

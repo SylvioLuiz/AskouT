@@ -68,6 +68,9 @@ import type {
   EventInvite,
   NotificationMute,
   NotificationSounds,
+  EventReminderChoice,
+  EventReminderEventChoice,
+  EventReminderOption,
   EventStoryGroup,
   CommentGif,
   RollingNowItem,
@@ -485,6 +488,12 @@ export function createApi(deps: ApiDeps) {
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
     notificationSounds: () => request<NotificationSounds>('GET', '/notifications/sounds'),
     setNotificationSounds: (patch: Partial<NotificationSounds>) => request<NotificationSounds>('PUT', '/notifications/sounds', { body: patch }),
+    eventReminderSettings: () => request<EventReminderChoice>('GET', '/notifications/event-reminders'),
+    /** `null` volta ao padrão. O fuso vai junto para o "É hoje!" sair de manhã na hora da pessoa. */
+    setEventReminderSettings: (reminders: EventReminderOption[] | null, timeZone?: string) => request<EventReminderChoice>('PUT', '/notifications/event-reminders', { body: { reminders, ...(timeZone ? { timeZone } : {}) } }),
+    eventReminders: (eventId: string) => request<EventReminderEventChoice>('GET', `/events/${id(eventId)}/reminders`),
+    /** `null` volta a seguir a escolha geral. */
+    setEventReminders: (eventId: string, reminders: EventReminderOption[] | null) => request<EventReminderEventChoice>('PUT', `/events/${id(eventId)}/reminders`, { body: { reminders } }),
 
     // Explorar
     explore: (params: ExploreParams) => {
