@@ -510,7 +510,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               ended ? null : (
                 // Quem criou chama mais gente: o evento chega na conversa e a pessoa vira convidada (e vota na data, se houver votação).
                 <div className="evgo">
-                  <Button full onClick={() => setInviting(true)}>
+                  <Button full onClick={() => (canInviteFriends ? setInvitingFriends(true) : setInviting(true))}>
                     <UsersIcon /> {t('Convidar')}
                   </Button>
                   {/* Evento sem data: abrir a votação (se ainda não tem) ou ir para ela, onde o lápis edita. */}
@@ -668,9 +668,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
               </ul>
               {e.confirmedCount > e.attendees.length ? <p className="muted evwho__more">{e.confirmedCount - e.attendees.length === 1 ? t('e mais 1 pessoa') : t('e mais {n} pessoas', { n: e.confirmedCount - e.attendees.length })}</p> : null}
               {canInviteFriends ? (
-                <Button full variant="secondary" onClick={() => { setWhoOpen(false); setInvitingFriends(true); }}>
-                  <PlusIcon /> {t('Convidar mais pessoas')}
-                </Button>
+                <div className="evwho__invite">
+                  <Button full variant="secondary" onClick={() => { setWhoOpen(false); setInvitingFriends(true); }}>
+                    <PlusIcon /> {t('Convidar mais pessoas')}
+                  </Button>
+                </div>
               ) : null}
             </Sheet>
           ) : null}

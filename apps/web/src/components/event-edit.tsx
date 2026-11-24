@@ -51,6 +51,15 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const coverInput = useRef<HTMLInputElement>(null);
   useEffect(() => () => { if (newCover) URL.revokeObjectURL(newCover.preview); }, [newCover]);
 
+  // A página de trás não rola junto enquanto a edição está aberta.
+  useEffect(() => {
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !sheet && !busy) onClose();
