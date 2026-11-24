@@ -112,6 +112,7 @@ import type {
   Profile,
   ProfilePatch,
   ProfileView,
+  BadgeId,
   ReferralOverview,
   PublicProfile,
   SessionUser,
@@ -165,6 +166,13 @@ function pageQuery(page: PageRequest | undefined): string {
 }
 
 const id = encodeURIComponent;
+
+function connectionsQuery(page: PageRequest | undefined, q: string | undefined): string {
+  const base = pageQuery(page);
+  const term = q?.trim();
+  if (!term) return base;
+  return `${base}${base ? '&' : '?'}q=${encodeURIComponent(term)}`;
+}
 
 /** De qual página é o feed: de um evento ou de um rolê (o trecho da rota na API). */
 export type FeedWhere = 'events' | 'venues';
@@ -284,10 +292,13 @@ export function createApi(deps: ApiDeps) {
     /** Convite sugerido para quem acabou de entrar pelo app sem o convite junto (mesma rede do toque no link). */
     pendingReferral: () => request<{ inviter: PublicProfile | null }>('GET', '/me/referral/pending'),
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
+    setBadgeHidden: (badge: BadgeId, hidden: boolean) => request<{ id: BadgeId; hidden: boolean }>('PUT', `/profiles/me/badges/${id(badge)}`, { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),
     setPhone: (phone: string | null) => request<{ phone: string | null; verified?: boolean }>('PUT', '/profiles/me/phone', { body: { phone } }),
+    phonePrompt: () => request<{ show: boolean }>('GET', '/profiles/me/phone/prompt'),
+    markPhonePrompted: () => request<{ ok: true }>('POST', '/profiles/me/phone/prompt'),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
     shownGoingEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/going${pageQuery(page)}`),
@@ -397,10 +408,11 @@ export function createApi(deps: ApiDeps) {
     follow: (userId: string) =>
       request<{ status: 'PENDING' | 'ACCEPTED'; isFriend: boolean }>('POST', `/users/${id(userId)}/follow`),
     unfollow: (userId: string) => request<{ removed: boolean }>('DELETE', `/users/${id(userId)}/follow`),
-    followers: (userId: string, page?: PageRequest) =>
-      request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${pageQuery(page)}`),
-    following: (userId: string, page?: PageRequest) =>
-      request<ConnectionsPage>('GET', `/users/${id(userId)}/following${pageQuery(page)}`),
+    /** `q` filtra por nome ou @ (no servidor, para achar quem ainda não foi carregado). */
+    followers: (userId: string, page?: PageRequest, q?: string) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${connectionsQuery(page, q)}`),
+    following: (userId: string, page?: PageRequest, q?: string) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/following${connectionsQuery(page, q)}`),
     mutualFriends: (userId: string) => request<{ items: PublicProfile[]; total: number }>('GET', `/users/${id(userId)}/mutual-friends`),
     followRequests: (page?: PageRequest) =>
       request<ConnectionsPage>('GET', `/me/follow-requests${pageQuery(page)}`),

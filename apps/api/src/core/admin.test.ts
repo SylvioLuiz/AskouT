@@ -476,6 +476,25 @@ test('detalhe da pessoa: cadastro inteiro, amigos, seguidores e eventos', async 
   await rejectsWith(w.core.admin.userDetail(A, 'nao-existe'), 'NOT_FOUND');
 });
 
+test('números da pessoa para a gestão: só admin, contagens e último uso', async () => {
+  const { w, A, U, ana, bia } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
+  await w.core.posts.create(ana, { images: [JPEG()], caption: 'Vem!', placeName: 'Praça', event: { title: 'Corrida de rua', startsAt: start } });
+  await rejectsWith(w.core.admin.userStats(U(ana), ana), 'FORBIDDEN');
+  const s = await w.core.admin.userStats(A, ana);
+  assert.equal(s.content.posts, 1);
+  assert.equal(s.events.created, 1);
+  assert.equal(s.social.friends, 1);
+  assert.ok(s.lastSeenAt);
+  assert.ok(s.actions30 >= 1);
+  assert.equal(s.activeDays30 >= 1, true);
+  assert.equal(s.accountAgeDays, 0);
+  assert.equal('body' in s.messages, false);
+  const other = await w.core.admin.userStats(A, bia);
+  assert.equal(other.content.posts, 0);
+  await rejectsWith(w.core.admin.userStats(A, 'nao-existe'), 'NOT_FOUND');
+});
+
 test('editar local pela gestão: motivo obrigatório, campos de admin e auditoria com o que mudou', async () => {
   const { w, A, U, ana } = await setup();
   await rejectsWith(w.core.admin.editVenue(U(ana), 'v1', { name: 'X', note: 'x' }), 'FORBIDDEN');
@@ -522,6 +541,24 @@ test('editar evento de local pela gestão: mesmas regras de quem administra e au
   assert.equal(log.action, 'PLACE_EVENT_EDITED');
   assert.match(log.note ?? '', /nome: Samba → Samba de roda/);
   await rejectsWith(w.core.admin.editPlaceEvent(A, 'nao-existe', { ...base, note: 'x' }), 'NOT_FOUND');
+});
+
+test('detalhe de evento criado por pessoa mostra quem vai e os convidados que ainda não confirmaram', async () => {
+  const { w, A, adm, ana, bia, caio } = await setup();
+  await w.core.follows.follow(ana, caio);
+  await w.core.follows.follow(caio, ana);
+  const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
+  const post = await w.core.posts.create(ana, { placeName: 'Praça', tagUserIds: [bia, caio], event: { title: 'Corrida', startsAt: start, private: false } });
+  await w.core.eventPages.go(bia, post.id);
+  await w.core.eventPages.go(adm, post.id);
+  await w.users.updateProfile({ ...(await w.users.findProfileById(bia))!, avatarUrl: 'https://exemplo.com/bia.jpg' });
+  const p = await w.core.admin.postDetail(A, post.id);
+  assert.deepEqual(p.going.map((g) => g.username), ['bia', 'adm']);
+  assert.deepEqual(p.going.map((g) => g.avatarUrl), ['https://exemplo.com/bia.jpg', null]);
+  assert.equal(p.counts.attendees, 2);
+  // bia foi convidada e confirmou: só caio continua pendente.
+  assert.deepEqual(p.invitedPending.map((i) => [i.username, i.invitedBy?.username]), [['caio', 'ana']]);
+  assert.equal(p.invitedPendingCount, 1);
 });
 
 test('detalhe do post e detalhes de local e evento trazem o resto do cadastro', async () => {

@@ -188,6 +188,33 @@ test('listas de seguidores/seguindo: públicas visíveis, paginadas e com total'
   assert.deepEqual(following.items.map((p) => p.username), ['alvo']);
 });
 
+test('listas de seguidores/seguindo: busca por @ (começo) ou nome (contém), com total filtrado', async () => {
+  const w = makeWorld();
+  const { alvo, anabela, bruno, carla } = await w.signUpMany('alvo', 'anabela', 'bruno', 'carla');
+  await w.core.profiles.updateOwn(carla!, { displayName: 'Carla Ana Lima' });
+  for (const id of [anabela!, bruno!, carla!]) {
+    w.clock.tick();
+    await w.core.follows.follow(id, alvo!);
+  }
+
+  const byAt = await w.core.follows.listFollowers(alvo!, alvo!, undefined, '@anab');
+  assert.deepEqual(byAt.items.map((p) => p.username), ['anabela'], 'o @ inicial é ignorado');
+  assert.equal(byAt.total, 1);
+
+  const byName = await w.core.follows.listFollowers(alvo!, alvo!, undefined, '  ANA ');
+  assert.deepEqual(byName.items.map((p) => p.username), ['carla', 'anabela'], 'nome contém, sem diferenciar maiúsculas');
+  assert.equal(byName.total, 2);
+
+  const none = await w.core.follows.listFollowers(alvo!, alvo!, undefined, 'zzz');
+  assert.equal(none.total, 0);
+  const blank = await w.core.follows.listFollowers(alvo!, alvo!, undefined, '   ');
+  assert.equal(blank.total, 3, 'termo vazio não filtra');
+
+  await w.core.follows.follow(alvo!, bruno!);
+  const following = await w.core.follows.listFollowing(alvo!, alvo!, undefined, 'bru');
+  assert.deepEqual(following.items.map((p) => p.username), ['bruno']);
+});
+
 test('listas: limite e offset absurdos são ajustados', async () => {
   const w = makeWorld();
   const { ana } = await w.signUpMany('ana');

@@ -32,8 +32,9 @@ export class FollowsController {
     @Param('userId', uuid()) userId: string,
     @Query('limit') limit: unknown,
     @Query('offset') offset: unknown,
+    @Query('q') q: unknown,
   ) {
-    return this.core.follows.listFollowers(actor.userId, userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) });
+    return this.core.follows.listFollowers(actor.userId, userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) }, q);
   }
 
   @Get('users/:userId/following')
@@ -42,8 +43,9 @@ export class FollowsController {
     @Param('userId', uuid()) userId: string,
     @Query('limit') limit: unknown,
     @Query('offset') offset: unknown,
+    @Query('q') q: unknown,
   ) {
-    return this.core.follows.listFollowing(actor.userId, userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) });
+    return this.core.follows.listFollowing(actor.userId, userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) }, q);
   }
 
   @Get('users/:userId/mutual-friends')

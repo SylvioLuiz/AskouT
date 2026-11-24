@@ -182,6 +182,12 @@ export class ReferralService {
     return confirmed >= REFERRAL_BADGE_THRESHOLD ? confirmed : null;
   }
 
+  /** Amigos confirmados, se já alcançou o selo (escondido ou não), ou null. */
+  async badgeCount(userId: string): Promise<{ confirmed: number; threshold: number } | null> {
+    const confirmed = (await this.visiblePeople(userId)).filter((p) => p.confirmed).length;
+    return confirmed >= REFERRAL_BADGE_THRESHOLD ? { confirmed, threshold: REFERRAL_BADGE_THRESHOLD } : null;
+  }
+
   /** Painel de gestão: quem mais trouxe gente. */
   async adminTop(actor: Actor, rawLimit?: unknown): Promise<TopInviterView[]> {
     if (actor.role !== 'ADMIN') throw forbidden('Acesso restrito a administradores');
@@ -195,7 +201,7 @@ export class ReferralService {
     });
   }
 
-  private async isBadgeHidden(userId: string): Promise<boolean> {
+  async isBadgeHidden(userId: string): Promise<boolean> {
     return (await this.deps.settings.get(hiddenKey(userId)))?.value === '1';
   }
 

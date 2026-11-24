@@ -217,6 +217,12 @@ export class AdminController {
     return this.core.admin.usernameAvailableFor(actor, id, username);
   }
 
+  /** Números da pessoa para a gestão (uso, vínculos, NOW, denúncias, bloqueios, compras), sem conteúdo de mensagens. */
+  @Get('users/:id/stats')
+  userStats(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.userStats(actor, id);
+  }
+
   /** Atividade da pessoa (`kind`: LIKE, COMMENT, POST, FOLLOW, EVENT; `cursor` da página anterior). */
   @Get('users/:id/activity')
   userActivity(@CurrentActor() actor: Actor, @Param('id') id: string, @Query() q: { kind?: unknown; cursor?: unknown }) {

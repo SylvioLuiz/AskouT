@@ -958,6 +958,16 @@ export interface AdminPersonRef {
   at: Date;
 }
 
+/** Pessoa ligada a um evento na gestão (confirmou "Eu vou" ou foi convidada), com a foto de perfil. */
+export interface AdminEventPerson extends AdminPersonRef {
+  avatarUrl: string | null;
+}
+
+/** Convidado de um evento criado por pessoa que ainda não confirmou, com quem convidou. */
+export interface AdminEventInvitee extends AdminEventPerson {
+  invitedBy: { id: string; username: string } | null;
+}
+
 /**
  * Tudo o que a gestão vê de uma pessoa além da linha da lista: o cadastro inteiro (menos a senha e o hash do celular),
  * as configurações, as contagens dos vínculos e as listas ligadas (amigos, seguidores, eventos, posts, locais).
@@ -1001,6 +1011,44 @@ export interface AdminUserExtras {
   venues: { id: string; name: string; role: 'OWNER' | 'MANAGER' | 'FOLLOWER' }[];
   claims: { id: string; venueId: string; venueName: string; status: ClaimStatus; createdAt: Date }[];
   groups: { id: string; name: string; role: string; joinedAt: Date }[];
+}
+
+/**
+ * Números de uma pessoa para quem modera e gerencia o app (o botão "Atividade" da lista de pessoas). Só contagens e
+ * datas: nunca o texto de mensagens nem com quem a pessoa conversa.
+ */
+export interface AdminUserStats {
+  /**
+   * Última vez que a pessoa fez algo no app (publicou, curtiu, comentou, mandou mensagem, confirmou presença, seguiu,
+   * ligou o NOW ou viu um conteúdo). O app não grava cada login, então é o melhor sinal de "último acesso".
+   */
+  lastSeenAt: Date | null;
+  accountAgeDays: number;
+  /** Dias diferentes (fuso de Brasília) com alguma ação ou visualização nos últimos 30 dias. */
+  activeDays30: number;
+  /** Ações (posts, comentários, curtidas, reações, mensagens, presenças, quem seguiu, stories, NOW) nos últimos 7 e 30 dias. */
+  actions7: number;
+  actions30: number;
+  social: { friends: number; followers: number; following: number; followersGained30: number; likesReceived: number; commentsReceived: number };
+  content: { posts: number; stories: number; feedPosts: number; comments: number; likes: number };
+  events: { created: number; going: number; checkins: number; invitesSent: number; invitesReceived: number; datePolls: number; cloakroomTickets: number };
+  now: { sessions: number; sessions30: number; lastAt: Date | null; invitesSent: number; invitesReceived: number; meetups: number; hiddenBy: number };
+  messages: { conversations: number; sent: number; sent30: number };
+  moderation: {
+    /** Denúncias contra a pessoa ou o que ela publicou (perfil, comentário, post, feed, story, conversa). */
+    reportsReceived: number;
+    reportsOpen: number;
+    /** Decididas pela gestão com providência tomada. */
+    reportsActioned: number;
+    reportsMade: number;
+    reportsMadeActioned: number;
+    blockedBy: number;
+    blocksMade: number;
+    suspensions: number;
+    lastSuspendedAt: Date | null;
+  };
+  purchases: { boostsPaid: number; spentCents: number; lastPaidAt: Date | null; boostsPending: number };
+  referrals: { invited: number; qualified: number };
 }
 
 /** O que a gestão vê de um local além do que o app já mostra. */
@@ -1051,6 +1099,12 @@ export interface AdminPostDetail {
   linkedEventId: string | null;
   images: { id: string; uploaded: boolean }[];
   tagged: AdminPersonRef[];
+  /** Evento: quem confirmou "Eu vou" (os primeiros 50, na ordem da confirmação; o total está em `counts.attendees`). */
+  going: AdminEventPerson[];
+  /** Evento: convidados que ainda não confirmaram (os primeiros 50, na ordem do convite). */
+  invitedPending: AdminEventInvitee[];
+  /** Quantos convidados ainda não confirmaram. */
+  invitedPendingCount: number;
   counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
   recentComments: { id: string; username: string; body: string; createdAt: Date }[];
 }

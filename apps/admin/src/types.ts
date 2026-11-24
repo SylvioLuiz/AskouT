@@ -78,6 +78,27 @@ export interface UserRow {
   loginProviders: ('GOOGLE' | 'APPLE')[];
 }
 
+/** Números de uma pessoa para moderar e gerenciar (datas em ISO). Nada do conteúdo das mensagens. */
+export interface UserStats {
+  /** Última ação ou visualização registrada no app (o app não grava cada login). */
+  lastSeenAt: string | null;
+  accountAgeDays: number;
+  activeDays30: number;
+  actions7: number;
+  actions30: number;
+  social: { friends: number; followers: number; following: number; followersGained30: number; likesReceived: number; commentsReceived: number };
+  content: { posts: number; stories: number; feedPosts: number; comments: number; likes: number };
+  events: { created: number; going: number; checkins: number; invitesSent: number; invitesReceived: number; datePolls: number; cloakroomTickets: number };
+  now: { sessions: number; sessions30: number; lastAt: string | null; invitesSent: number; invitesReceived: number; meetups: number; hiddenBy: number };
+  messages: { conversations: number; sent: number; sent30: number };
+  moderation: {
+    reportsReceived: number; reportsOpen: number; reportsActioned: number; reportsMade: number; reportsMadeActioned: number;
+    blockedBy: number; blocksMade: number; suspensions: number; lastSuspendedAt: string | null;
+  };
+  purchases: { boostsPaid: number; spentCents: number; lastPaidAt: string | null; boostsPending: number };
+  referrals: { invited: number; qualified: number };
+}
+
 /** Um item da atividade de uma pessoa (curtiu, comentou, publicou, foi, seguiu). */
 export interface UserActivityItem {
   id: string;
@@ -207,6 +228,11 @@ export interface PostDetail {
   linkedEventId: string | null;
   images: { id: string; uploaded: boolean }[];
   tagged: PersonRef[];
+  /** Evento: quem confirmou "Eu vou" (os primeiros 50; o total está em `counts.attendees`). */
+  going: (PersonRef & { avatarUrl: string | null })[];
+  /** Evento: convidados que ainda não confirmaram (os primeiros 50). */
+  invitedPending: (PersonRef & { avatarUrl: string | null; invitedBy: { id: string; username: string } | null })[];
+  invitedPendingCount: number;
   counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
   recentComments: { id: string; username: string; body: string; createdAt: string }[];
 }
@@ -283,7 +309,7 @@ export interface EventDetail {
   status: 'UPCOMING' | 'LIVE' | 'PAST';
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
-  going: { id: string; username: string; displayName: string; at: string }[];
+  going: { id: string; username: string; displayName: string; avatarUrl: string | null; at: string }[];
   /** Outras datas: eventos do mesmo local com o mesmo nome (sem este). */
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com esse nome, contando este. */

@@ -111,12 +111,13 @@ export class FollowService {
     await this.deps.follows.delete(followerId, actorId);
   }
 
-  listFollowers(viewerId: string, targetId: string, page?: Partial<Page>): Promise<ConnectionsPage> {
-    return this.listConnections(viewerId, targetId, 'followers', page);
+  /** `query` (opcional) filtra por @ (começa com) ou nome (contém), sem diferenciar maiúsculas. */
+  listFollowers(viewerId: string, targetId: string, page?: Partial<Page>, query?: unknown): Promise<ConnectionsPage> {
+    return this.listConnections(viewerId, targetId, 'followers', page, query);
   }
 
-  listFollowing(viewerId: string, targetId: string, page?: Partial<Page>): Promise<ConnectionsPage> {
-    return this.listConnections(viewerId, targetId, 'following', page);
+  listFollowing(viewerId: string, targetId: string, page?: Partial<Page>, query?: unknown): Promise<ConnectionsPage> {
+    return this.listConnections(viewerId, targetId, 'following', page, query);
   }
 
   /** Solicitações pendentes recebidas pelo próprio usuário. */
@@ -265,8 +266,10 @@ export class FollowService {
     targetId: string,
     direction: Direction,
     pageInput?: Partial<Page>,
+    queryInput?: unknown,
   ): Promise<ConnectionsPage> {
     const { follows, blocks, users } = this.deps;
+    const query = normalizeConnectionsQuery(queryInput);
     const target = await this.requireVisibleTarget(viewerId, targetId);
 
     if (viewerId !== targetId && target.isPrivate) {
@@ -276,8 +279,8 @@ export class FollowService {
 
     const page = normalizePage(pageInput);
     const [rows, total, related] = await Promise.all([
-      follows.list(targetId, direction, 'ACCEPTED', page),
-      follows.count(targetId, direction, 'ACCEPTED'),
+      follows.list(targetId, direction, 'ACCEPTED', page, query),
+      follows.count(targetId, direction, 'ACCEPTED', query),
       blocks.listRelatedIds(viewerId),
     ]);
     const hidden = new Set(related);
@@ -296,4 +299,11 @@ export class FollowService {
     if (actorId !== targetId && (await blocks.exists(targetId, actorId))) throw notFound(USER_NOT_FOUND);
     return profile;
   }
+}
+
+/** Termo da busca em seguidores/seguindo: sem "@" inicial, sem espaços nas pontas, minúsculo, até 60 caracteres. */
+export function normalizeConnectionsQuery(input: unknown): string | undefined {
+  if (typeof input !== 'string') return undefined;
+  const q = input.trim().replace(/^@+/, '').trim().toLowerCase().slice(0, 60);
+  return q.length > 0 ? q : undefined;
 }

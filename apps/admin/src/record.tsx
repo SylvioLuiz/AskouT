@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ApiError } from './api.ts';
+import { ApiError, avatarSrc } from './api.ts';
 import type { Async } from './hooks.ts';
 import { ActionDialog, CHANGED_EVENT, Modal } from './ui.tsx';
 import type { ActionSpec } from './ui.tsx';
@@ -524,10 +524,20 @@ export function RecordLink({ kind, id, children, label }: { kind: RecordKind; id
   );
 }
 
-/** Link para a pessoa: @usuário que abre o detalhe dela. */
-export function PersonLink({ id, username, displayName }: { id: string; username: string; displayName?: string }) {
+/** Link para a pessoa: @usuário que abre o detalhe dela. Com `avatarUrl` (mesmo nulo), mostra a foto (ou a inicial) ao lado. */
+export function PersonLink({ id, username, displayName, avatarUrl }: { id: string; username: string; displayName?: string; avatarUrl?: string | null }) {
+  const withPhoto = avatarUrl !== undefined;
   return (
     <RecordLink kind="user" id={id} label={`Abrir @${username}`}>
+      {withPhoto ? (
+        avatarUrl ? (
+          <img className="personlink__avatar" src={avatarSrc(avatarUrl)} alt="" loading="lazy" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="personlink__avatar personlink__avatar--empty" aria-hidden="true">
+            {(displayName || username).trim().charAt(0).toUpperCase()}
+          </span>
+        )
+      ) : null}
       {displayName ? <strong>{displayName}</strong> : null} <span className="handle">@{username}</span>
     </RecordLink>
   );

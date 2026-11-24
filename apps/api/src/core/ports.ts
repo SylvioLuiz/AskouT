@@ -1,6 +1,6 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
-import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -32,6 +32,10 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Quantas vezes o app já pediu para cadastrar o celular e quando foi a última (vale para todos os aparelhos). */
+  getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }>;
+  /** Registra mais um pedido de cadastro do celular. */
+  markPhonePrompted(userId: string, at: Date): Promise<void>;
   /** Troca os gostos de rolê da pessoa (já validados). */
   setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
@@ -62,9 +66,12 @@ export interface FollowRepository {
   delete(followerId: string, followeeId: string): Promise<boolean>;
   /** Remove o seguimento nos dois sentidos entre a e b. */
   deleteBetween(a: string, b: string): Promise<void>;
-  /** Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue. */
-  list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]>;
-  count(userId: string, direction: Direction, status: FollowStatus): Promise<number>;
+  /**
+   * Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue.
+   * `query` (já em minúsculas) filtra a outra ponta: @ começando com o termo ou nome contendo o termo.
+   */
+  list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]>;
+  count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number>;
   /** Aceita todas as solicitações pendentes recebidas por followeeId. Retorna quantas. */
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */
@@ -919,6 +926,8 @@ export interface AdminRepository {
   countList(kind: AdminCountKind, filter?: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean }): Promise<number>;
   /** O cadastro inteiro da pessoa e os vínculos (contagens e listas curtas) para o detalhe da gestão. */
   userExtras(userId: string): Promise<AdminUserExtras | undefined>;
+  /** Números da pessoa para a gestão (contagens e datas, sem conteúdo de mensagens). `now` marca as janelas de 7 e 30 dias. */
+  userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined>;
   venueExtras(venueId: string): Promise<AdminVenueExtras | undefined>;
   placeEventExtras(eventId: string): Promise<AdminPlaceEventExtras | undefined>;
   postDetail(postId: string): Promise<AdminPostDetail | undefined>;
