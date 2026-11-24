@@ -3802,6 +3802,12 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .ptile__info { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; background: rgb(27 31 74 / 0.62); }
 .ptile__title { font-weight: 700; font-size: 0.875rem; overflow-wrap: anywhere; }
 .ptile__when { font-size: 0.75rem; opacity: 0.9; }
+.ptile__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.ptile__tags:empty { display: none; }
+/* Marcador de origem do evento no perfil: criou, convite ou público. */
+.tag--origin-created { background: var(--brand); color: var(--brand-ink); }
+.tag--origin-invited { background: var(--surface); color: var(--brand-text); }
+.tag--origin-public { background: var(--surface); color: var(--ok-ink); }
 .ptile__remove { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--danger); font-size: 0.8125rem; cursor: pointer; }
 .attinfo { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin: -4px 0 12px; }
 .attinfo__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
@@ -4003,7 +4009,8 @@ a.actlog__row:hover { background: var(--surface); }
 .postgrid__item { position: relative; display: block; aspect-ratio: 1; background: var(--line); overflow: hidden; }
 .postgrid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .postgrid__none { display: block; width: 100%; height: 100%; }
-.postgrid__text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 10px; box-sizing: border-box; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--ink); font-size: 0.8125rem; font-weight: 600; line-height: 1.3; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.postgrid__text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 8px; box-sizing: border-box; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--ink); font-size: 0.6875rem; font-weight: 600; line-height: 1.25; text-align: center; overflow: hidden; }
+.postgrid__clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; max-height: calc(5 * 1.25em); }
 .postgrid__multi { position: absolute; top: 6px; right: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
 .postgrid__multi .icon { width: 20px; height: 20px; }
 
@@ -4104,6 +4111,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .sharelist__item--danger strong, .sharelist__item--danger > svg { color: var(--danger); }
 .sharelist__item--on { border-color: var(--brand); }
 .sharelist__item--on strong::after { content: 'Ativo'; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 600; vertical-align: 1px; }
+/* Menu de opções do perfil: letra e espaçamento menores, folha com no máximo 70% da tela e rolagem só na lista. */
+.sheet__panel:has(> .sharelist--compact) { display: flex; flex-direction: column; max-height: min(70dvh, calc(92dvh - var(--sa-top))); overflow: hidden; }
+.sheet__panel:has(> .sharelist--compact) > * { flex: none; }
+.sheet__panel > .sharelist--compact { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; gap: 6px; margin-bottom: 0; }
+.sharelist--compact .sharelist__item { padding: 10px 12px; gap: 1px; }
+.sharelist--compact .sharelist__item strong { font-size: 0.9375rem; }
+.sharelist--compact .sharelist__item span { font-size: 0.8125rem; line-height: 1.3; }
 .inlineicon { display: inline-flex; vertical-align: middle; }
 .inlineicon .icon { width: 18px; height: 18px; }
 .reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
@@ -4194,6 +4208,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chathead__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .chathead__name { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chathead__sub { color: var(--muted); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chathead__online { color: #16a34a; font-weight: 600; }
 
 /* Informações da conversa */
 .chatinfo { display: flex; justify-content: center; margin: 4px 0 14px; }
@@ -4211,6 +4226,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .avatarflash { position: relative; flex: none; display: inline-block; }
 .avatarflash__bolt { position: absolute; left: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: var(--brand-ink); border: 2px solid var(--bg); box-sizing: content-box; }
 .avatarflash__bolt svg { width: 62%; height: 62%; }
+/* Bolinha verde de online: canto de baixo à direita (o raio do NOW fica à esquerda). */
+.avataronline { position: absolute; right: 0; bottom: 0; border-radius: 50%; background: #22c55e; border: 2px solid var(--bg); box-sizing: content-box; pointer-events: none; }
+.newsmedia .avataronline { display: none; }
 /* Nos flashes (stories), o selo fica "negativo": só o raio escuro, sem o círculo rosa em volta. */
 .homestories .avatarflash__bolt, .storyring .avatarflash__bolt { background: none; border: 0; color: var(--brand-ink); filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)); }
 .homestories .avatarflash__bolt svg, .storyring .avatarflash__bolt svg { width: 100%; height: 100%; }
@@ -6763,19 +6781,20 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .calsync__done svg { width: 14px; height: 14px; }
 
 /* ---------- Criar evento: tela única (capa no topo, nome grande, linhas Quando/Onde/Tipo/Quem vê) ---------- */
-.evcover { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
-.evcover > img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.evcover:not(.evcover--empty)::after { content: ""; position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, rgb(0 0 0 / 0.5)); pointer-events: none; }
+/* Tudo preso em .evcover--compose: sem isso a bolinha/pílula branca do tipo (com texto rosa) vazava para os cards da home, do explorar e do chat e ficava ilegível. */
+.evcover--compose { position: relative; aspect-ratio: 16 / 10; max-width: 100%; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
+.evcover--compose > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.evcover--compose:not(.evcover--empty)::after { content: ""; position: absolute; inset: auto 0 0; height: 45%; background: linear-gradient(transparent, rgb(0 0 0 / 0.5)); pointer-events: none; }
 .evcover__change { position: absolute; z-index: 1; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(0 0 0 / 0.5); color: #fff; font: inherit; font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
 .evcover__change svg { width: 16px; height: 16px; }
 .evcover__video { position: absolute; z-index: 1; top: 14px; left: 14px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
-.evcover__kind { position: absolute; z-index: 1; left: 12px; bottom: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--brand-text); }
-.evcover__kind svg { width: 22px; height: 22px; }
+.evcover--compose .evcover__kind { position: absolute; z-index: 1; left: 12px; bottom: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--brand-text); }
+.evcover--compose .evcover__kind svg { width: 22px; height: 22px; }
 /* Tipo escrito por extenso (Show, Noite, Gastronomia...): vira uma pílula que cresce com o texto, em vez de um círculo fixo onde a palavra não cabe. */
-.evcover__kind:not(.evcover__kind--icon) { width: auto; max-width: calc(100% - 24px); height: auto; padding: 3px 10px; border-radius: 999px; font-family: inherit; font-size: 0.6875rem; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evcover--compose .evcover__kind:not(.evcover__kind--icon) { width: auto; max-width: calc(100% - 24px); height: auto; padding: 3px 10px; border-radius: 999px; font-family: inherit; font-size: 0.6875rem; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evcover__when { position: absolute; z-index: 1; left: 62px; right: 12px; bottom: 21px; color: #fff; font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.evcover--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: var(--surface); border: 1.5px dashed var(--line-strong); }
-.evcover--empty p { margin: 0; color: var(--muted); }
+.evcover--compose.evcover--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: var(--surface); border: 1.5px dashed var(--line-strong); }
+.evcover--compose.evcover--empty p { margin: 0; color: var(--muted); }
 .evcover__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .evcover__actions .btn svg { width: 18px; height: 18px; }
 .evphotohint { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; border-radius: 14px; background: var(--brand-soft); font-size: 0.875rem; color: var(--ink-2); }
@@ -7885,3 +7904,17 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .evshop__label { display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; font-weight: 600; }
 .evshop__label .evshop__input { font-weight: 400; }
 .evshop__editoractions { display: flex; gap: 8px; }
+/* Cor de cada tipo de evento nas capas sem foto (home, chat, rolês): vale nos dois temas.
+   Sem isto o tema escuro pintava todas de rosa e Ar livre/Esporte/Outros ficavam cinza no claro.
+   Capas com .evtone (explorar/home) já têm a cor própria e ficam de fora. Texto branco em todas: contraste >= 4.5:1. */
+:root .evcover.evcover--show:not(.evtone) { background: linear-gradient(150deg, #d6336c, #7a1d4a); }
+:root .evcover.evcover--cinema:not(.evtone) { background: linear-gradient(150deg, #364fc7, #1b1f4a); }
+:root .evcover.evcover--theater:not(.evtone) { background: linear-gradient(150deg, #9c36b5, #4a1f66); }
+:root .evcover.evcover--exhibition:not(.evtone) { background: linear-gradient(150deg, #0c8599, #0b4f5c); }
+:root .evcover.evcover--gastronomy:not(.evtone) { background: linear-gradient(150deg, #d9480f, #8f3406); }
+:root .evcover.evcover--night:not(.evtone) { background: linear-gradient(150deg, #4c3fd1, #14123f); }
+:root .evcover.evcover--digital:not(.evtone) { background: linear-gradient(150deg, #2b8a3e, #0f5a24); }
+:root .evcover.evcover--outdoor:not(.evtone) { background: linear-gradient(150deg, #1971c2, #0b3d6b); }
+:root .evcover.evcover--sport:not(.evtone) { background: linear-gradient(150deg, #c92a2a, #6b1515); }
+:root .evcover.evcover--other:not(.evtone) { background: linear-gradient(150deg, #5f3dc4, #2b1a63); }
+.evcover:not(.evcover--compose) .evcover__kind { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }

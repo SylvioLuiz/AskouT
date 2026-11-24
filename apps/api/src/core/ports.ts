@@ -423,6 +423,11 @@ export interface ConversationRepository {
   /** A pessoa (perfil público) escolheu receber mensagens de quem ela não segue direto na caixa de conversas. */
   getOpenDms(userId: string): Promise<boolean>;
   setOpenDms(userId: string, on: boolean): Promise<void>;
+  /** A pessoa mostra a bolinha verde de online (padrão: sim). */
+  getShowOnline(userId: string): Promise<boolean>;
+  setShowOnline(userId: string, on: boolean): Promise<void>;
+  /** Dentre `userIds`, quem escondeu a bolinha de online. */
+  listHiddenOnline(userIds: readonly string[]): Promise<string[]>;
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
@@ -1045,6 +1050,8 @@ export interface NotificationRepository {
   unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
+  /** Apaga os avisos da pessoa com essa chave (o motivo deixou de existir, como um convite cancelado). Devolve quantos saíram. */
+  deleteByKey(userId: string, dedupeKey: string): Promise<number>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */
   markRead(userId: string, now: Date, ids?: string[]): Promise<number>;
   /** O que a pessoa silenciou (tudo falso se nunca mexeu). */
@@ -1145,6 +1152,8 @@ export interface PushSender {
 /** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
 export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
+  /** Tira do sino os avisos com essa chave (o convite foi cancelado). Opcional nos dublês de teste. */
+  withdraw?(userId: string, dedupeKey: string): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
   live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void>;
 }

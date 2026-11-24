@@ -98,3 +98,23 @@ test('quem criou o evento pode tirá-lo da aba Eventos e deixar só no Participo
   assert.deepEqual(await eventTitles(bia), ['Corrida']);
   assert.deepEqual(titles(await w.core.eventPages.listAttended(ana, 'ana')), []);
 });
+
+test('cada evento das abas Eventos e Participou diz de onde veio: criou, convite ou público', async () => {
+  const { w, ana, bia, caio, aberto, secreto } = await setup();
+  const outro = await w.core.posts.create(ana, { images: [JPEG], placeName: 'Bar', event: { title: 'Happy hour', startsAt: new Date(w.clock.now().getTime() + 5 * H).toISOString() } });
+  // ana manda o cartão do Happy hour para caio: vira convite. Corrida, caio abre por conta própria.
+  const dm = await w.core.conversations.open(ana, caio);
+  await w.core.conversations.send(ana, dm.id, { eventId: outro.id });
+  for (const id of ['show', aberto.id, outro.id]) await w.core.eventPages.go(caio, id, true);
+  await w.core.eventPages.go(bia, secreto.id, true);
+  const origins = (page: { items: { title: string; origin?: string }[] }) => Object.fromEntries(page.items.map((e) => [e.title, e.origin]));
+  assert.deepEqual(origins(await w.core.eventPages.listShownGoing(bia, 'caio')), { Show: 'PUBLIC', Corrida: 'PUBLIC', 'Happy hour': 'INVITED' });
+  assert.deepEqual(origins(await w.core.eventPages.listShownGoing(bia, 'bia')), { 'Festa secreta': 'INVITED' });
+  // Evento da própria ana tirado da aba Eventos aparece no Participou como criado por ela.
+  await w.core.eventPages.setGoingOnProfile(ana, aberto.id, false);
+  assert.deepEqual(origins(await w.core.eventPages.listAttended(ana, 'ana')), { Corrida: 'CREATED' });
+  // Evento repostado do Explorar também traz a origem.
+  await w.core.profileEvents.post(caio, 'show');
+  await w.core.profileEvents.post(caio, outro.id);
+  assert.deepEqual(origins(await w.core.profileEvents.list(bia, 'caio')), { Show: 'PUBLIC', 'Happy hour': 'INVITED' });
+});

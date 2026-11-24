@@ -1,5 +1,5 @@
 import { canOpenByInvite } from './event-invites.ts';
-import { buildEventCards } from './event-card.ts';
+import { buildEventCards, eventOrigin } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
@@ -87,12 +87,17 @@ export class ProfileEventService {
     const [rows, total] = await Promise.all([profileEvents.list(view.profile.userId, page), profileEvents.count(view.profile.userId)]);
     const cards = await buildEventCards(this.deps, rows.map((r) => r.eventId));
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
-    const items: PostedEventView[] = rows.flatMap((r) => {
-      const card = cards.get(r.eventId);
-      // Evento de pessoa que virou privado depois, ou do qual o visitante está bloqueado, sai da grade.
-      if (!card || card.private || (card.ownerId && hidden.has(card.ownerId))) return [];
-      return [{ ...card, postedAt: r.createdAt.toISOString() }];
-    });
+    const ownerId = view.profile.userId;
+    const items: PostedEventView[] = (
+      await Promise.all(
+        rows.map(async (r): Promise<PostedEventView | undefined> => {
+          const card = cards.get(r.eventId);
+          // Evento de pessoa que virou privado depois, ou do qual o visitante está bloqueado, sai da grade.
+          if (!card || card.private || (card.ownerId && hidden.has(card.ownerId))) return undefined;
+          return { ...card, origin: await eventOrigin(this.deps, ownerId, card), postedAt: r.createdAt.toISOString() };
+        }),
+      )
+    ).filter((v): v is PostedEventView => v !== undefined);
     return { items, total, ...page };
   }
 }

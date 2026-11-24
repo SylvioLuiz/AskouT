@@ -510,7 +510,7 @@ export function CreatePostScreen() {
         {progressBars}
 
         {cover ? (
-          <div className="evcover">
+          <div className="evcover evcover--compose">
             <img src={cover.preview} alt={t('Capa do evento')} referrerPolicy="no-referrer" />
             <button type="button" className="evcover__change" onClick={() => setStep('photos')} disabled={busy}>
               <PhotoIcon /> {items.length > 1 ? t('Capa e fotos ({count})', { count: items.length }) : t('Trocar capa')}
@@ -522,7 +522,7 @@ export function CreatePostScreen() {
             {when ? <span className="evcover__when">{when}</span> : null}
           </div>
         ) : (
-          <div className="evcover evcover--empty">
+          <div className="evcover evcover--compose evcover--empty">
             <p>{reading ? t('Preparando as fotos…') : t('Adicione uma capa (opcional)')}</p>
             <div className="evcover__actions">
               <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>

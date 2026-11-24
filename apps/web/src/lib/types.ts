@@ -472,15 +472,19 @@ export interface EventCard {
   going?: boolean;
 }
 
+/** De onde o evento veio para a dona do perfil: criou, foi convidada ou é público (entrou por conta própria). */
+export type EventOrigin = 'CREATED' | 'INVITED' | 'PUBLIC';
+
 export interface PostedEvent extends EventCard {
   postedAt: string;
+  origin?: EventOrigin;
 }
 
 /** Evento em que a pessoa confirmou presença (abas Eventos e Participou do perfil). */
 export interface AttendedEvent extends EventCard {
   attendedAt: string;
   /** Evento privado criado por uma pessoa (só aparece para quem tem acesso a ele). */
-  private?: boolean;
+  private?: boolean;  origin?: EventOrigin;
 }
 
 export interface AttendedEventsPage {

@@ -436,6 +436,11 @@ export function createApi(deps: ApiDeps) {
     flashSetNote: (note: string) => request<FlashStatus>('PUT', '/me/flash/note', { body: { note } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
     flashActive: () => request<{ userIds: string[] }>('GET', '/flash/active'),
+    /** Também avisa o servidor de que estou com o app aberto (chamar só com a tela visível). */
+    presenceOnline: () => request<{ userIds: string[] }>('GET', '/presence/online'),
+    presenceAway: () => request<void>('POST', '/presence/away'),
+    presenceSettings: () => request<{ showOnline: boolean }>('GET', '/presence/settings'),
+    setPresenceSettings: (showOnline: boolean) => request<{ showOnline: boolean }>('PUT', '/presence/settings', { body: { showOnline } }),
     flashVisibility: (userId: string) => request<FlashVisibility>('GET', `/flash/visibility/${id(userId)}`),
     setFlashVisibility: (userId: string, body: Partial<FlashVisibility>) => request<FlashVisibility>('PUT', `/flash/visibility/${id(userId)}`, { body }),
     storyVisibility: (userId: string) => request<StoryVisibility>('GET', `/stories/visibility/${id(userId)}`),

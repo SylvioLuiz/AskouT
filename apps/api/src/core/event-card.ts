@@ -1,3 +1,4 @@
+import { canOpenByInvite } from './event-invites.ts';
 import type { CoreDeps } from './ports.ts';
 import type { EventKind } from './types.ts';
 
@@ -21,8 +22,24 @@ export interface EventCardView {
   ownerId?: string;
   /** Evento privado criado por uma pessoa. */
   private?: boolean;
+  /**
+   * Só nas abas Eventos e Participou do perfil: de onde o evento veio para a dona do perfil.
+   * CREATED: ela criou; INVITED: foi convidada (marcada, recebeu o cartão numa conversa ou é evento privado); PUBLIC: evento aberto.
+   */
+  origin?: EventOrigin;
   /** Só nos cartões da conversa: quem está vendo já confirmou presença (ou é o dono do evento). */
   going?: boolean;
+}
+
+export type EventOrigin = 'CREATED' | 'INVITED' | 'PUBLIC';
+
+/** De onde o evento veio para `userId`: criou, foi convidada ou é um evento público em que entrou por conta própria. */
+export async function eventOrigin(deps: Pick<CoreDeps, 'posts' | 'conversations'>, userId: string, card: EventCardView): Promise<EventOrigin> {
+  if (card.ownerId === userId) return 'CREATED';
+  if (!card.userEvent) return 'PUBLIC';
+  // Evento privado só abre com convite; no público, vale o convite registrado (marcação ou cartão enviado numa conversa).
+  if (card.private || (await canOpenByInvite(deps, userId, card.id))) return 'INVITED';
+  return 'PUBLIC';
 }
 
 export async function buildEventCards(deps: CoreDeps, ids: string[]): Promise<Map<string, EventCardView>> {

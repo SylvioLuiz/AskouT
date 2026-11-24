@@ -5,13 +5,30 @@ import { formatWhen } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
-import type { AttendedEvent, AttendedEventsPage } from '../lib/types.ts';
+import type { AttendedEvent, AttendedEventsPage, EventOrigin } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { InfoIcon } from './icons.tsx';
 import { TileMenu, useTileMenu } from './tile-press.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 const PAGE = 12;
+
+const ORIGIN: Record<EventOrigin, { label: string; hint: string }> = {
+  CREATED: { label: 'Criado', hint: 'Evento criado por quem é dono deste perfil' },
+  INVITED: { label: 'Convite', hint: 'Foi a convite: marcação, cartão numa conversa ou evento privado' },
+  PUBLIC: { label: 'Público', hint: 'Evento aberto, sem convite' },
+};
+
+/** Marcador do cartão do perfil: evento que a pessoa criou, para o qual foi convidada ou público. */
+export function OriginTag({ origin }: { origin?: EventOrigin }) {
+  if (!origin) return null;
+  const info = ORIGIN[origin];
+  return (
+    <span className={`tag tag--origin tag--origin-${origin.toLowerCase()}`} title={t(info.hint)}>
+      {t(info.label)}
+    </span>
+  );
+}
 
 /** Cartão de um evento em que a pessoa confirmou presença. `action` é a opção da dona (tirar ou mostrar no perfil), que aparece ao segurar o cartão. */
 export function GoingTile({ event, action }: { event: AttendedEvent; action?: { label: string; aria: string; busy: boolean; run: () => void } }) {
@@ -25,7 +42,10 @@ export function GoingTile({ event, action }: { event: AttendedEvent; action?: { 
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
-          {event.private ? <span className="tag">{t('Privado')}</span> : null}
+          <span className="ptile__tags">
+            <OriginTag origin={event.origin} />
+            {event.private ? <span className="tag">{t('Privado')}</span> : null}
+          </span>
         </span>
       </Link>
       {action ? (
