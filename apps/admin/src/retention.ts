@@ -37,3 +37,24 @@ export function experimentVerdict(d: ProportionDiff | null, thin: boolean, min: 
   if (!d.significant) return `Diferença de ${range}. O intervalo inclui zero: não dá para dizer que o bloco muda o retorno.`;
   return `Diferença de ${range}. O intervalo não inclui zero: com quem foi sorteado, ver o bloco ${d.diff > 0 ? 'aumentou' : 'diminuiu'} o retorno.`;
 }
+
+export type RetentionKind = 'd1' | 'd7';
+export type RetentionTone = 'ok' | 'warn' | 'bad' | 'neutral';
+
+/**
+ * Faixas de retorno, a partir das referências usuais de apps sociais (D1 de 25% a 40%,
+ * D7 de 10% a 20%). Acima do topo é bom, entre as duas é atenção, abaixo do piso é ruim.
+ */
+export const RETENTION_BANDS: Record<RetentionKind, { good: number; attention: number; label: string }> = {
+  d1: { good: 0.4, attention: 0.25, label: 'Voltou no dia seguinte (D1)' },
+  d7: { good: 0.2, attention: 0.1, label: 'Voltou 7 dias depois (D7)' },
+};
+
+/** Cor da taxa de retorno. Sem taxa ou com amostra pequena fica neutra, para não sugerir conclusão. */
+export function retentionTone(kind: RetentionKind, r: Pick<ReturnRate, 'rate' | 'sample'>, min: number): RetentionTone {
+  if (r.rate === null || isThin(r, min)) return 'neutral';
+  const b = RETENTION_BANDS[kind];
+  if (r.rate >= b.good) return 'ok';
+  if (r.rate >= b.attention) return 'warn';
+  return 'bad';
+}

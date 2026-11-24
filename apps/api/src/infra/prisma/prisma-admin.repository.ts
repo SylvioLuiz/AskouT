@@ -1,8 +1,9 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
+import { dayOf } from '../../core/retention.ts';
 import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
-  AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminEventPerson, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
+  AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminEventPerson, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
   AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
@@ -403,6 +404,158 @@ export class PrismaAdminRepository implements AdminRepository {
       ],
       claims: claims.map((x) => ({ id: x.id, venueId: x.venueId, venueName: x.venue.name, status: x.status as ClaimStatus, createdAt: x.createdAt })),
       groups: groups.map((g) => ({ id: g.group.id, name: g.group.name, role: g.role, joinedAt: g.joinedAt })),
+    };
+  }
+
+  async userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined> {
+    if (!isUuid(userId)) return undefined;
+    const p = this.prisma;
+    const DAY = 24 * 60 * 60 * 1000;
+    const since30 = new Date(now.getTime() - 30 * DAY);
+    const since7 = new Date(now.getTime() - 7 * DAY);
+    const recent = { gte: since30 };
+    const CAP = 5000;
+    // Datas das ações dos últimos 30 dias (só a data: nada do conteúdo) e a mais recente de cada tipo, para "visto por último".
+    const dated = <T extends { createdAt: Date }>(rows: T[]) => rows.map((r) => r.createdAt);
+    const at = { createdAt: true } as const;
+    const desc = { createdAt: 'desc' } as const;
+    const [actionDates, viewDates, sessionDates] = await Promise.all([
+      Promise.all([
+        p.post.findMany({ where: { authorId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.postComment.findMany({ where: { authorId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.postLike.findMany({ where: { userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.feedPost.findMany({ where: { authorId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.feedComment.findMany({ where: { authorId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.feedReaction.findMany({ where: { userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.message.findMany({ where: { senderId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.eventAttendance.findMany({ where: { userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.follow.findMany({ where: { followerId: userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+        p.eventStory.findMany({ where: { userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+      ]).then((lists) => lists.flat()),
+      p.contentDwell.findMany({ where: { userId, createdAt: recent }, select: at, orderBy: desc, take: CAP }).then(dated),
+      p.flashSession.findMany({ where: { userId, startsAt: recent }, select: { startsAt: true }, orderBy: { startsAt: 'desc' }, take: CAP }).then((r) => r.map((x) => x.startsAt)),
+    ]);
+    const allRecent = [...actionDates, ...sessionDates];
+    const latest = (dates: Date[]) => dates.reduce<Date | null>((m, d) => (m === null || d > m ? d : m), null);
+    // Sem nada nos últimos 30 dias: procura a ação mais recente de cada tipo, sem limite de data.
+    const lastSeenAt =
+      latest([...allRecent, ...viewDates]) ??
+      latest(
+        (
+          await Promise.all([
+            p.post.findFirst({ where: { authorId: userId }, select: at, orderBy: desc }),
+            p.postComment.findFirst({ where: { authorId: userId }, select: at, orderBy: desc }),
+            p.postLike.findFirst({ where: { userId }, select: at, orderBy: desc }),
+            p.feedPost.findFirst({ where: { authorId: userId }, select: at, orderBy: desc }),
+            p.feedComment.findFirst({ where: { authorId: userId }, select: at, orderBy: desc }),
+            p.feedReaction.findFirst({ where: { userId }, select: at, orderBy: desc }),
+            p.message.findFirst({ where: { senderId: userId }, select: at, orderBy: desc }),
+            p.eventAttendance.findFirst({ where: { userId }, select: at, orderBy: desc }),
+            p.follow.findFirst({ where: { followerId: userId }, select: at, orderBy: desc }),
+            p.eventStory.findFirst({ where: { userId }, select: at, orderBy: desc }),
+            p.contentDwell.findFirst({ where: { userId }, select: at, orderBy: desc }),
+            p.flashSession.findFirst({ where: { userId }, select: { startsAt: true }, orderBy: { startsAt: 'desc' } }).then((r) => (r ? { createdAt: r.startsAt } : null)),
+          ])
+        )
+          .filter((r): r is { createdAt: Date } => r !== null)
+          .map((r) => r.createdAt),
+      );
+    const activeDays30 = new Set([...allRecent, ...viewDates].map((d) => dayOf(d))).size;
+
+    const open = { resolvedAt: null };
+    const actioned = { resolution: 'ACTIONED' };
+    const received = {
+      user: { reportedUserId: userId },
+      conversation: { reportedUserId: userId },
+      post: { post: { authorId: userId } },
+      feed: { reportedUserId: userId },
+      story: { story: { userId } },
+    };
+    const countReceived = (extra: object) =>
+      Promise.all([
+        p.userReport.count({ where: { ...received.user, ...extra } }),
+        p.conversationReport.count({ where: { ...received.conversation, ...extra } }),
+        p.postReport.count({ where: { ...received.post, ...extra } }),
+        p.feedReport.count({ where: { ...received.feed, ...extra } }),
+        p.eventStoryReport.count({ where: { ...received.story, ...extra } }),
+      ]).then((n) => n.reduce((a, b) => a + b, 0));
+    const countMade = (extra: object) =>
+      Promise.all([
+        p.userReport.count({ where: { reporterId: userId, ...extra } }),
+        p.conversationReport.count({ where: { reporterId: userId, ...extra } }),
+        p.postReport.count({ where: { reporterId: userId, ...extra } }),
+        p.feedReport.count({ where: { reporterId: userId, ...extra } }),
+        p.eventStoryReport.count({ where: { reporterId: userId, ...extra } }),
+      ]).then((n) => n.reduce((a, b) => a + b, 0));
+    const mutual = { followerId: userId, status: 'ACCEPTED' as const, followee: { following: { some: { followeeId: userId, status: 'ACCEPTED' as const } } } };
+
+    const [
+      friends, followers, following, followersGained30, postLikesReceived, feedReactionsReceived, postCommentsReceived, feedCommentsReceived,
+      posts, stories, feedPosts, postComments, feedComments, postLikes, feedReactions,
+      eventsCreated, going, checkins, invitesSent, invitesReceived, datePolls, cloakroomTickets,
+      sessions, invitesNowSent, invitesNowReceived, meetups, hiddenBy,
+      conversations, sent, sent30,
+      reportsReceived, reportsOpen, reportsActioned, reportsMade, reportsMadeActioned, blockedBy, blocksMade, suspensions,
+      boostsPaid, boostsPending, referralsInvited, referralsQualified,
+    ] = await Promise.all([
+      p.follow.count({ where: mutual }),
+      p.follow.count({ where: { followeeId: userId, status: 'ACCEPTED' } }),
+      p.follow.count({ where: { followerId: userId, status: 'ACCEPTED' } }),
+      p.follow.count({ where: { followeeId: userId, status: 'ACCEPTED', createdAt: recent } }),
+      p.postLike.count({ where: { post: { authorId: userId }, userId: { not: userId } } }),
+      p.feedReaction.count({ where: { post: { authorId: userId }, userId: { not: userId } } }),
+      p.postComment.count({ where: { post: { authorId: userId }, authorId: { not: userId } } }),
+      p.feedComment.count({ where: { post: { authorId: userId }, authorId: { not: userId } } }),
+      p.post.count({ where: { authorId: userId } }),
+      p.eventStory.count({ where: { userId } }),
+      p.feedPost.count({ where: { authorId: userId } }),
+      p.postComment.count({ where: { authorId: userId } }),
+      p.feedComment.count({ where: { authorId: userId } }),
+      p.postLike.count({ where: { userId } }),
+      p.feedReaction.count({ where: { userId } }),
+      p.post.count({ where: { authorId: userId, eventTitle: { not: null } } }),
+      p.eventAttendance.count({ where: { userId } }),
+      p.venueCheckin.count({ where: { userId } }),
+      p.eventInvite.count({ where: { invitedById: userId } }),
+      p.eventInvite.count({ where: { userId } }),
+      p.datePoll.count({ where: { organizerId: userId } }),
+      p.cloakroomTicket.count({ where: { userId } }),
+      p.flashSession.count({ where: { userId } }),
+      p.flashInvite.count({ where: { fromUserId: userId } }),
+      p.flashInvite.count({ where: { toUserId: userId } }),
+      p.flashInvite.count({ where: { OR: [{ fromUserId: userId }, { toUserId: userId }], status: { in: ['ACCEPTED', 'ENDED'] } } }),
+      p.flashHidden.count({ where: { otherId: userId, hideTheirs: true } }),
+      p.conversationParticipant.count({ where: { userId } }),
+      p.message.count({ where: { senderId: userId } }),
+      p.message.count({ where: { senderId: userId, createdAt: recent } }),
+      countReceived({}),
+      countReceived(open),
+      countReceived(actioned),
+      countMade({}),
+      countMade(actioned),
+      p.block.count({ where: { blockedId: userId } }),
+      p.block.count({ where: { blockerId: userId } }),
+      p.adminAudit.findMany({ where: { targetType: 'USER', targetId: userId, action: 'USER_SUSPENDED' }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+      p.boost.aggregate({ where: { ownerId: userId, paidAt: { not: null } }, _count: { _all: true }, _sum: { amountCents: true }, _max: { paidAt: true } }),
+      p.boost.count({ where: { ownerId: userId, status: 'PENDING_PAYMENT' } }),
+      p.referral.count({ where: { inviterId: userId } }),
+      p.referral.count({ where: { inviterId: userId, qualifiedAt: { not: null } } }),
+    ]);
+
+    return {
+      lastSeenAt,
+      accountAgeDays: Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / DAY)),
+      activeDays30,
+      actions7: allRecent.filter((d) => d >= since7).length,
+      actions30: allRecent.length,
+      social: { friends, followers, following, followersGained30, likesReceived: postLikesReceived + feedReactionsReceived, commentsReceived: postCommentsReceived + feedCommentsReceived },
+      content: { posts, stories, feedPosts, comments: postComments + feedComments, likes: postLikes + feedReactions },
+      events: { created: eventsCreated, going, checkins, invitesSent, invitesReceived, datePolls, cloakroomTickets },
+      now: { sessions, sessions30: sessionDates.length, lastAt: latest(sessionDates) ?? (await p.flashSession.findFirst({ where: { userId }, select: { startsAt: true }, orderBy: { startsAt: 'desc' } }))?.startsAt ?? null, invitesSent: invitesNowSent, invitesReceived: invitesNowReceived, meetups, hiddenBy },
+      messages: { conversations, sent, sent30 },
+      moderation: { reportsReceived, reportsOpen, reportsActioned, reportsMade, reportsMadeActioned, blockedBy, blocksMade, suspensions: suspensions.length, lastSuspendedAt: suspensions[0]?.createdAt ?? null },
+      purchases: { boostsPaid: boostsPaid._count._all, spentCents: boostsPaid._sum.amountCents ?? 0, lastPaidAt: boostsPaid._max.paidAt, boostsPending },
+      referrals: { invited: referralsInvited, qualified: referralsQualified },
     };
   }
 
