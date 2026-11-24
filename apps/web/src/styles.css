@@ -4666,8 +4666,10 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 /* Pessoas que você talvez conheça (Home) */
 .suggest__track { display: flex; gap: 12px; margin: 0; padding: 4px 2px 8px; list-style: none; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .suggest__track::-webkit-scrollbar { display: none; }
-.suggest__card { flex: 0 0 auto; width: 120px; scroll-snap-align: start; }
-.suggest__link { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); text-align: center; color: var(--ink); text-decoration: none; }
+.suggest__card { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; width: 132px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); scroll-snap-align: start; }
+.suggest__link { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 10px; border-radius: var(--radius-panel) var(--radius-panel) 0 0; text-align: center; color: var(--ink); text-decoration: none; }
+/* "Seguir" no próprio cartão, sem abrir o perfil. */
+.suggest__card > .btn { width: auto; margin: 0 10px 12px; }
 .suggest__link:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; }
 .suggest__name { color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.9375rem; }
 .suggest__mutual { color: var(--muted); font-size: 0.75rem; line-height: 1.2; }

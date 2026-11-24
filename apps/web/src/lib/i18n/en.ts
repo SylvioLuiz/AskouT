@@ -3714,4 +3714,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Ficar no grupo": "Stay in the group",
   "Eventos passados": "Past events",
   "Eventos do dia": "Events this day",
+  "Seguir {name}": "Follow {name}",
+  "Deixar de seguir {name}": "Unfollow {name}",
 };
