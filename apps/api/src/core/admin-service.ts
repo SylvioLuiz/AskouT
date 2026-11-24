@@ -7,7 +7,7 @@ import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
 import type { AuthResult, AuthService, LoginInput, MfaChallenge, SocialLoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
-import type { VenueService } from './venue-service.ts';
+import type { VenueEventInput, VenueProfileInput, VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
 import type { EventExtraInput, EventExtraOption } from './event-extras.ts';
@@ -15,7 +15,7 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
 import { ADMIN_SORTS, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -45,6 +45,8 @@ export interface AdminVenueDetail {
   upcomingCount: number;
   /** Próximos eventos (até 15) e os últimos que já passaram (até 5), do mais novo para o mais antigo dentro de cada grupo. */
   events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
+  /** O resto do cadastro e os vínculos (equipe, pedidos, contagens). */
+  extra: AdminVenueExtras | null;
 }
 
 /** Detalhe de um evento de local na gestão: o cadastro, o local, quem responde por ele e quem confirmou presença. */
@@ -70,6 +72,56 @@ export interface AdminEventDetail {
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com o mesmo nome, contando este. */
   sameTitleTotal: number;
+  /** O resto do cadastro e os vínculos (feed, chapelaria, lista, Hunter). */
+  extra: AdminPlaceEventExtras | null;
+}
+
+/** Uma pessoa inteira na gestão: o que dá para editar, o resto do cadastro e os vínculos. */
+export interface AdminUserDetail {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  status: UserStatus;
+  role: string;
+  createdAt: Date;
+  birthDate: string | null;
+  extra: AdminUserExtras | null;
+}
+
+/** Edição de local pela gestão: os campos do perfil (como o dono) e os que só a gestão troca. */
+export type AdminVenueEditInput = VenueProfileInput & { lat?: unknown; lng?: unknown; isSample?: unknown; feedPolicy?: unknown; note?: unknown };
+/** Edição de evento de local pela gestão: os campos de quem administra e os que só a gestão troca. */
+export type AdminEventEditInput = VenueEventInput & { isSample?: unknown; feedPolicy?: unknown; note?: unknown };
+
+const FEED_POLICIES: readonly FeedPolicy[] = ['OPEN', 'MODERATED', 'OWNER_ONLY'];
+
+function feedPolicyOf(value: unknown, current: FeedPolicy): FeedPolicy {
+  if (value === undefined) return current;
+  if (typeof value !== 'string' || !(FEED_POLICIES as readonly string[]).includes(value)) throw validationError('Dados inválidos', { feedPolicy: 'Use OPEN, MODERATED ou OWNER_ONLY' });
+  return value as FeedPolicy;
+}
+
+function flagOf(value: unknown, current: boolean, field: string): boolean {
+  if (value === undefined) return current;
+  if (typeof value !== 'boolean') throw validationError('Dados inválidos', { [field]: 'Use sim ou não' });
+  return value;
+}
+
+function coordOf(value: unknown, current: number, field: 'lat' | 'lng'): number {
+  if (value === undefined) return current;
+  const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  const max = field === 'lat' ? 90 : 180;
+  if (!Number.isFinite(n) || Math.abs(n) > max) throw validationError('Dados inválidos', { [field]: field === 'lat' ? 'Latitude entre -90 e 90' : 'Longitude entre -180 e 180' });
+  return n;
+}
+
+/** "campo: antes → depois" de cada campo que mudou, para a auditoria. */
+function changesOf(labels: Record<string, string>, before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  const show = (v: unknown) => (v === null || v === undefined || v === '' ? '(vazio)' : v instanceof Date ? v.toISOString() : Array.isArray(v) ? v.join(', ') || '(vazio)' : String(v).slice(0, 60));
+  const same = (a: unknown, b: unknown) => (a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : JSON.stringify(a ?? null) === JSON.stringify(b ?? null));
+  return Object.entries(labels).filter(([k]) => !same(before[k], after[k])).map(([k, label]) => `${label}: ${show(before[k])} → ${show(after[k])}`);
 }
 
 /** Linha da lista de eventos de locais, com quantas pessoas confirmaram presença. */
@@ -285,13 +337,17 @@ export class AdminService {
     return { id: target.id, birthDate: parsed.birthDate };
   }
 
-  /** Dados que a gestão pode editar de uma pessoa (para abrir o formulário já preenchido). */
-  async userDetail(actor: Actor, userId: unknown): Promise<{ id: string; email: string; username: string; displayName: string; bio: string | null; status: UserStatus; role: string }> {
+  /** Uma pessoa inteira: o que a gestão pode editar, o resto do cadastro e os vínculos (amigos, seguidores, eventos, posts, locais). */
+  async userDetail(actor: Actor, userId: unknown): Promise<AdminUserDetail> {
     this.assertAdmin(actor);
     const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
     const profile = target ? await this.deps.users.findProfileById(target.id) : undefined;
     if (!target || !profile) throw notFound('Usuário não encontrado');
-    return { id: target.id, email: target.email, username: profile.username, displayName: profile.displayName, bio: profile.bio, status: target.status, role: target.role };
+    const extra = (await this.deps.admin.userExtras(target.id)) ?? null;
+    return {
+      id: target.id, email: target.email, username: profile.username, displayName: profile.displayName, bio: profile.bio, status: target.status, role: target.role,
+      createdAt: target.createdAt, birthDate: target.birthDate ?? null, extra,
+    };
   }
 
   /**
@@ -554,7 +610,36 @@ export class AdminService {
       eventsTotal: events.length,
       upcomingCount: ahead.length,
       events: [...ahead.slice(0, 15).map((e) => view(e, true)), ...behind.slice(0, 5).map((e) => view(e, false))],
+      extra: (await this.deps.admin.venueExtras(venue.id)) ?? null,
     };
+  }
+
+  /**
+   * Corrige o cadastro de um local: o que o dono edita (nome, endereço, tipo, descrição, capa, logo) e o que só a gestão troca
+   * (posição, dado de teste, quem publica no feed). Motivo obrigatório; o que mudou (de → para) fica na auditoria.
+   */
+  async editVenue(actor: Actor, venueId: unknown, input: AdminVenueEditInput): Promise<AdminVenueDetail> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
+    const reason = noteText(input.note, true);
+    const current = typeof venueId === 'string' && venueId.length > 0 && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
+    if (!current) throw notFound('Local não encontrado');
+    const extra = await this.deps.admin.venueExtras(current.id);
+    const feedBefore: FeedPolicy = extra?.feedPolicy ?? 'OWNER_ONLY';
+    const adminBefore = { lat: current.lat, lng: current.lng, isSample: current.isSample, feedPolicy: feedBefore };
+    const adminAfter = {
+      lat: coordOf(input.lat, current.lat, 'lat'), lng: coordOf(input.lng, current.lng, 'lng'),
+      isSample: flagOf(input.isSample, current.isSample, 'isSample'), feedPolicy: feedPolicyOf(input.feedPolicy, feedBefore),
+    };
+    const profile: VenueProfileInput = { name: input.name, address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, hours: input.hours };
+    const labels = { name: 'nome', address: 'endereço', category: 'tipo', description: 'descrição', coverUrl: 'capa', logoUrl: 'logo' };
+    const preview = this.venues.checkProfileForAdmin(current, profile);
+    const changes = [...changesOf(labels, { ...current }, { ...current, ...preview }), ...changesOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    if (changes.length === 0) throw conflict('Nada mudou');
+    await this.venues.adminUpdateProfile(current.id, profile);
+    if (!(await this.deps.admin.updateVenueAdminFields(current.id, adminAfter))) throw notFound('Local não encontrado');
+    await this.log(actor.userId, 'VENUE_EDITED', 'VENUE', current.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    return this.venueDetail(actor, current.id);
   }
 
   /** Tira o responsável de um local (ele volta a poder ser reivindicado). */
@@ -620,7 +705,34 @@ export class AdminService {
       going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
       sameTitle: others.map((e) => ({ id: e.id, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), upcoming: e.endsAt.getTime() >= now })),
       sameTitleTotal: Math.max(siblings.length, 1),
+      extra: (await this.deps.admin.placeEventExtras(event.id)) ?? null,
     };
+  }
+
+  /**
+   * Corrige um evento de local com as mesmas regras de quem administra (nome, descrição, tipo, datas, entrada, capa, hashtags,
+   * ingresso) e o que só a gestão troca (dado de teste, quem publica no feed). Motivo obrigatório; o que mudou fica na auditoria.
+   */
+  async editPlaceEvent(actor: Actor, eventId: unknown, input: AdminEventEditInput): Promise<AdminEventDetail> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { event: 'Dados do evento inválidos' });
+    const reason = noteText(input.note, true);
+    const found = typeof eventId === 'string' && eventId.length > 0 && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
+    if (!found) throw notFound('Evento não encontrado');
+    const extra = await this.deps.admin.placeEventExtras(found.event.id);
+    const feedBefore: FeedPolicy = extra?.feedPolicy ?? 'OWNER_ONLY';
+    const adminBefore = { isSample: found.event.isSample, feedPolicy: feedBefore };
+    const adminAfter = { isSample: flagOf(input.isSample, adminBefore.isSample, 'isSample'), feedPolicy: feedPolicyOf(input.feedPolicy, feedBefore) };
+    const fields: VenueEventInput = { title: input.title, description: input.description, kind: input.kind, startsAt: input.startsAt, endsAt: input.endsAt, isFree: input.isFree, imageUrl: input.imageUrl, imageData: input.imageData, tags: input.tags, ticketUrl: input.ticketUrl };
+    const labels = { title: 'nome', description: 'descrição', kind: 'tipo', startsAt: 'início', endsAt: 'fim', isFree: 'grátis', imageUrl: 'capa', tags: 'hashtags', ticketUrl: 'ingresso' };
+    // Confere antes de gravar: "nada mudou" não deve tocar no evento.
+    const preview = this.venues.checkEventForAdmin(found.event, fields);
+    const changes = [...changesOf(labels, { ...found.event }, { ...found.event, ...preview }), ...changesOf({ isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    if (changes.length === 0) throw conflict('Nada mudou');
+    await this.venues.adminUpdateEvent(found.event.id, fields);
+    if (!(await this.deps.admin.updatePlaceEventAdminFields(found.event.id, adminAfter))) throw notFound('Evento não encontrado');
+    await this.log(actor.userId, 'PLACE_EVENT_EDITED', 'PLACE_EVENT', found.event.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    return this.eventDetail(actor, found.event.id);
   }
 
   async deletePlaceEvent(actor: Actor, eventId: unknown, note: unknown): Promise<{ deleted: true }> {
@@ -636,6 +748,14 @@ export class AdminService {
     const text = queryText(query.q);
     const onlyEvents = query.events === 'true' || query.events === true;
     return this.paged(query, (page) => this.deps.admin.searchPosts(text, onlyEvents, page), () => this.deps.admin.countList('POSTS', { text, onlyEvents }), ADMIN_SORTS.posts);
+  }
+
+  /** Um post inteiro: texto, lugar, dados de evento, fotos, marcações, contagens e os últimos comentários. */
+  async postDetail(actor: Actor, postId: unknown): Promise<AdminPostDetail> {
+    this.assertAdmin(actor);
+    const post = typeof postId === 'string' && postId.length > 0 && postId.length <= 64 ? await this.deps.admin.postDetail(postId) : undefined;
+    if (!post) throw notFound('Post não encontrado');
+    return post;
   }
 
   async deletePost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {

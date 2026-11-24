@@ -198,7 +198,7 @@ export class AdminController {
     return this.core.admin.setUserBirthDate(actor, id, b.birthDate, b.note);
   }
 
-  /** Uma pessoa: nome, @usuário, biografia (para o formulário de editar). */
+  /** Uma pessoa inteira: cadastro, configurações, vínculos (amigos, seguidores, eventos, posts, locais) e contagens. */
   @Get('users/:id')
   user(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.core.admin.userDetail(actor, id);
@@ -238,6 +238,24 @@ export class AdminController {
   @Get('venues/:id')
   venue(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.core.admin.venueDetail(actor, id);
+  }
+
+  /** Corrige o cadastro do local (`{name?, address?, category?, description?, imageUrl?, logoUrl?, lat?, lng?, isSample?, feedPolicy?, note}`; motivo obrigatório). */
+  @Put('venues/:id')
+  editVenue(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.editVenue(actor, id, asBody(body));
+  }
+
+  /** Corrige o evento de local (mesmos campos de quem administra, mais `isSample` e `feedPolicy`; `note` obrigatório). */
+  @Put('place-events/:id')
+  editPlaceEvent(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.editPlaceEvent(actor, id, asBody(body));
+  }
+
+  /** Um post inteiro: texto, lugar, dados de evento, fotos, marcações, contagens e comentários. */
+  @Get('posts/:id')
+  post(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.postDetail(actor, id);
   }
 
   @Delete('venues/:id/owner')

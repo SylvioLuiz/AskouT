@@ -73,7 +73,8 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+} from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository, AdminCountKind, MfaRepository } from '../ports.ts';
@@ -3056,8 +3057,10 @@ export class InMemoryAdminRepository implements AdminRepository {
   private readonly claims: InMemoryVenueClaimRepository;
   private readonly eventRoom: InMemoryEventRoomRepository;
   private readonly identities: InMemoryIdentityRepository | undefined;
+  private readonly follows: InMemoryFollowRepository | undefined;
 
-  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository; eventRoom: InMemoryEventRoomRepository; identities?: InMemoryIdentityRepository }) {
+  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository; eventRoom: InMemoryEventRoomRepository; identities?: InMemoryIdentityRepository; follows?: InMemoryFollowRepository }) {
+    this.follows = parts.follows;
     this.eventRoom = parts.eventRoom;
     this.identities = parts.identities;
     this.users = parts.users;
@@ -3353,6 +3356,135 @@ export class InMemoryAdminRepository implements AdminRepository {
     return rows
       .slice(page.offset, page.offset + page.limit)
       .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
+  }
+
+  /** O que só a gestão troca e o registro em memória não guarda (quem publica no feed). */
+  readonly feedPolicies = new Map<string, FeedPolicy>();
+
+  private personRef(id: string, at: Date): AdminPersonRef {
+    const p = this.users.profiles.get(id);
+    return { id, username: p?.username ?? '(removido)', displayName: p?.displayName ?? '', at };
+  }
+
+  async userExtras(userId: string): Promise<AdminUserExtras | undefined> {
+    const u = this.users.users.get(userId);
+    if (!u) return undefined;
+    const profile = this.users.profiles.get(userId);
+    const follows = [...(this.follows?.rows.values() ?? [])];
+    const accepted = (f: { status: string }) => f.status === 'ACCEPTED';
+    const following = follows.filter((f) => f.followerId === userId && accepted(f));
+    const followers = follows.filter((f) => f.followeeId === userId && accepted(f));
+    const friends = following.filter((f) => followers.some((g) => g.followerId === f.followeeId));
+    const requests = follows.filter((f) => f.followeeId === userId && f.status === 'PENDING');
+    const newest = <T extends { createdAt: Date }>(rows: T[]) => [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const posts = newest([...this.posts.posts.values()].filter((p) => p.authorId === userId));
+    const events = posts.filter((p) => p.eventTitle !== null);
+    const going = [...this.eventRoom.going.values()].filter((g) => g.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const venues = [...this.places.venues.values()];
+    const owned = venues.filter((v) => v.ownerId === userId);
+    const managed = [...this.places.venueManagers.values()].filter((m) => m.userId === userId && m.status === 'ACCEPTED');
+    const followedVenues = [...this.places.venueFollows.keys()].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.split('|')[1]!);
+    const claims = newest([...this.claims.claims.values()].filter((c) => c.userId === userId));
+    const venueName = (id: string) => this.places.venues.get(id)?.name ?? '(removido)';
+    return {
+      updatedAt: u.createdAt, termsAcceptedAt: u.termsAcceptedAt ?? null, termsVersion: u.termsVersion ?? null, onboardedAt: u.onboardedAt ?? null, tastes: u.tastes ?? [],
+      profilePending: u.profilePending === true, passwordless: u.passwordless === true, phone: u.phone ?? null, phoneVerifiedAt: u.phoneVerifiedAt ?? null,
+      avatarUrl: profile?.avatarUrl ?? null, isPrivate: profile?.isPrivate ?? false, mfaEnabled: false, settings: null, region: null, invitedBy: null, loginProviders: this.providersOf(userId),
+      counts: {
+        friends: friends.length, followers: followers.length, following: following.length, followRequests: requests.length, posts: posts.length, eventsCreated: events.length, eventsGoing: going.length,
+        feedPosts: 0, postComments: [...this.posts.comments.values()].filter((c) => c.authorId === userId).length, postLikes: [...this.posts.likes.keys()].filter((k) => k.includes(userId)).length,
+        stories: 0, venuesFollowed: followedVenues.length, venuesOwned: owned.length, venuesManaged: managed.length, claims: claims.length,
+        reportsMade: 0, reportsReceived: this.reportsAgainst(userId), blocksMade: 0, blockedBy: 0, groups: 0, conversations: 0, messages: 0, referrals: 0,
+      },
+      friends: newest(friends).slice(0, 50).map((f) => this.personRef(f.followeeId, f.createdAt)),
+      followers: newest(followers).slice(0, 50).map((f) => this.personRef(f.followerId, f.createdAt)),
+      following: newest(following).slice(0, 50).map((f) => this.personRef(f.followeeId, f.createdAt)),
+      followRequests: newest(requests).slice(0, 50).map((f) => this.personRef(f.followerId, f.createdAt)),
+      eventsCreated: events.slice(0, 50).map((p) => ({ id: p.id, title: p.eventTitle ?? '', startsAt: p.eventStartsAt, endsAt: p.eventEndsAt, private: p.eventPrivate === true, createdAt: p.createdAt })),
+      eventsGoing: going.slice(0, 50).map((g) => {
+        if (g.ref.source === 'PLACE') {
+          const e = this.places.events.get(g.ref.id);
+          return { id: g.ref.id, source: 'PLACE' as const, title: e?.title ?? '(removido)', startsAt: e?.startsAt ?? null, venueName: e ? venueName(e.venueId) : null, at: g.createdAt };
+        }
+        const p = this.posts.posts.get(g.ref.id);
+        return { id: g.ref.id, source: 'USER' as const, title: p?.eventTitle ?? '(removido)', startsAt: p?.eventStartsAt ?? null, venueName: p?.placeName ?? null, at: g.createdAt };
+      }),
+      posts: posts.slice(0, 20).map((p) => ({ id: p.id, caption: p.caption, eventTitle: p.eventTitle, archived: p.archivedAt !== null, createdAt: p.createdAt })),
+      venues: [
+        ...owned.map((v) => ({ id: v.id, name: v.name, role: 'OWNER' as const })),
+        ...managed.map((m) => ({ id: m.venueId, name: venueName(m.venueId), role: 'MANAGER' as const })),
+        ...followedVenues.map((id) => ({ id, name: venueName(id), role: 'FOLLOWER' as const })),
+      ],
+      claims: claims.slice(0, 50).map((c) => ({ id: c.id, venueId: c.venueId, venueName: venueName(c.venueId), status: c.status, createdAt: c.createdAt })),
+      groups: [],
+    };
+  }
+
+  async venueExtras(venueId: string): Promise<AdminVenueExtras | undefined> {
+    const v = this.places.venues.get(venueId);
+    if (!v) return undefined;
+    const managers = [...this.places.venueManagers.values()].filter((m) => m.venueId === venueId);
+    const claims = [...this.claims.claims.values()].filter((c) => c.venueId === venueId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const followers = [...this.places.venueFollows.entries()].filter(([k]) => k.endsWith(`|${venueId}`)).map(([k, at]) => this.personRef(k.split('|')[0]!, at));
+    const ratings = [...this.places.venueRatings.entries()].filter(([k]) => k.endsWith(`|${venueId}`)).map(([, stars]) => stars);
+    return {
+      createdAt: new Date(0), updatedAt: new Date(0), externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
+      hoursJson: v.hours ? JSON.stringify(v.hours) : null, feedPolicy: this.feedPolicies.get(venueId) ?? 'OWNER_ONLY',
+      rating: { count: ratings.length, average: ratings.length === 0 ? null : Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 },
+      counts: { checkins: 0, posts: [...this.posts.posts.values()].filter((p) => p.venueId === venueId).length, feedPosts: 0, stories: 0, claims: claims.length, offers: 0, boosts: 0, conversations: 0 },
+      managers: managers.map((m) => ({ ...this.personRef(m.userId, m.acceptedAt ?? m.createdAt), status: m.status })),
+      claims: claims.map((c) => ({ id: c.id, userId: c.userId, username: this.username(c.userId), status: c.status, createdAt: c.createdAt, reviewedAt: c.reviewedAt })),
+      followersSample: followers.slice(0, 50),
+    };
+  }
+
+  async placeEventExtras(eventId: string): Promise<AdminPlaceEventExtras | undefined> {
+    if (!this.places.events.has(eventId)) return undefined;
+    return {
+      createdAt: new Date(0), updatedAt: new Date(0), feedPolicy: this.feedPolicies.get(eventId) ?? 'OWNER_ONLY',
+      counts: { stories: 0, feedPosts: 0, meetings: 0, posts: [...this.posts.posts.values()].filter((p) => p.linkedEventId === eventId).length, cloakroomTickets: 0 },
+      hunterRef: null, cloakroom: null, guestList: null,
+    };
+  }
+
+  async postDetail(postId: string): Promise<AdminPostDetail | undefined> {
+    const p = this.posts.posts.get(postId);
+    if (!p) return undefined;
+    const images = [...this.posts.images.values()].filter((i) => i.postId === postId).sort((a, b) => a.position - b.position);
+    const comments = [...this.posts.comments.values()].filter((c) => c.postId === postId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const author = this.personRef(p.authorId, p.createdAt);
+    const venue = (id: string | null | undefined) => (id && this.places.venues.get(id) ? { id, name: this.places.venues.get(id)!.name } : null);
+    return {
+      id: p.id, caption: p.caption, author: { id: author.id, username: author.username, displayName: author.displayName },
+      placeName: p.placeName, placeAddress: p.placeAddress, eventTitle: p.eventTitle, eventStartsAt: p.eventStartsAt, eventEndsAt: p.eventEndsAt, eventKind: p.eventKind,
+      eventPrivate: p.eventPrivate === true, feedPolicy: this.feedPolicies.get(postId) ?? 'OWNER_ONLY', archivedAt: p.archivedAt, editedAt: p.editedAt, createdAt: p.createdAt,
+      venue: venue(p.venueId), placeVenue: venue(p.placeVenueId), linkedEventId: p.linkedEventId ?? null,
+      images: images.map((i) => ({ id: i.id, uploaded: i.mime !== null && i.placePhotoRef === null })),
+      tagged: [...this.posts.tags.values()].filter((t) => t.postId === postId).map((t) => this.personRef(t.userId, t.createdAt)),
+      counts: {
+        likes: [...this.posts.likes.keys()].filter((k) => k.includes(postId)).length, comments: comments.length,
+        reports: [...this.posts.reports.values()].filter((r) => r.postId === postId).length,
+        attendees: [...this.eventRoom.going.values()].filter((g) => g.ref.source === 'USER' && g.ref.id === postId).length,
+        invites: 0, stories: 0, feedPosts: 0, reposts: 0,
+      },
+      recentComments: comments.slice(0, 20).map((c) => ({ id: c.id, username: this.username(c.authorId), body: c.body, createdAt: c.createdAt })),
+    };
+  }
+
+  async updateVenueAdminFields(venueId: string, fields: { lat: number; lng: number; isSample: boolean; feedPolicy: FeedPolicy }): Promise<boolean> {
+    const v = this.places.venues.get(venueId);
+    if (!v) return false;
+    this.places.venues.set(venueId, { ...v, lat: fields.lat, lng: fields.lng, isSample: fields.isSample });
+    this.feedPolicies.set(venueId, fields.feedPolicy);
+    return true;
+  }
+
+  async updatePlaceEventAdminFields(eventId: string, fields: { isSample: boolean; feedPolicy: FeedPolicy }): Promise<boolean> {
+    const e = this.places.events.get(eventId);
+    if (!e) return false;
+    this.places.events.set(eventId, { ...e, isSample: fields.isSample });
+    this.feedPolicies.set(eventId, fields.feedPolicy);
+    return true;
   }
 }
 

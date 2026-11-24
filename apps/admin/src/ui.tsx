@@ -122,25 +122,34 @@ export function Loadable<T>({ state, empty, isEmpty, children }: { state: Async<
   );
 }
 
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+/** Modais abertos, do mais antigo ao mais novo: o Esc fecha só o de cima (o detalhe abre a confirmação por cima dele). */
+const openModals: symbol[] = [];
+
+/** `bare`: o título fica só para leitores de tela (o conteúdo tem o próprio cabeçalho, como no RecordView). */
+export function Modal({ title, onClose, children, wide, bare }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; bare?: boolean }) {
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
+    const me = Symbol('modal');
+    openModals.push(me);
     box.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && openModals[openModals.length - 1] === me) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      openModals.splice(openModals.indexOf(me), 1);
       previous?.focus?.();
     };
   }, [onClose]);
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={wide ? 'modal modal--wide' : 'modal'} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} ref={box}>
-        <h2 id={titleId}>{title}</h2>
+        <h2 id={titleId} className={bare ? 'visually-hidden' : undefined}>
+          {title}
+        </h2>
         {children}
       </div>
     </div>

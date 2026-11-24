@@ -6,7 +6,8 @@ import type { UserRow, UserStatus } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
 import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
-import { UserActivityDialog, UserDetailDialog } from './user-dialogs.tsx';
+import { UserActivityDialog, reactivateAction, suspendAction } from './user-dialogs.tsx';
+import { useOpenRecord, useReloadOnChange } from '../record.tsx';
 
 type UserSort = 'username' | 'email' | 'status' | 'posts' | 'birthDate' | 'createdAt';
 
@@ -15,7 +16,6 @@ export function UsersPage() {
   const [status, setStatus] = useState<UserStatus | ''>('');
   const [offset, setOffset] = useState(0);
   const [action, setAction] = useState<ActionSpec>();
-  const [viewing, setViewing] = useState<UserRow>();
   const [watching, setWatching] = useState<UserRow>();
   const q = useDebounced(text.trim());
   const { sort, toggle } = useSort<UserSort>();
@@ -24,17 +24,12 @@ export function UsersPage() {
     setOffset(0);
   };
   const list = useAsync(() => api.users({ q, status: status || undefined, offset, sort }), [q, status, offset, sort]);
+  useReloadOnChange(list.reload);
+  const openRecord = useOpenRecord();
+  const setViewing = (u: UserRow) => openRecord({ kind: 'user', id: u.id });
 
   function suspend(u: UserRow) {
-    setAction({
-      title: `Suspender @${u.username}`,
-      description: <p>A conta perde o acesso agora: as sessões abertas caem e o login fica bloqueado até você reativar.</p>,
-      confirmLabel: 'Suspender',
-      danger: true,
-      noteLabel: 'Motivo',
-      noteRequired: true,
-      run: (note) => api.setUserStatus(u.id, 'SUSPENDED', note),
-    });
+    setAction(suspendAction(u));
   }
   function fixBirth(u: UserRow) {
     setAction({
@@ -53,13 +48,7 @@ export function UsersPage() {
     });
   }
   function reactivate(u: UserRow) {
-    setAction({
-      title: `Reativar @${u.username}`,
-      description: <p>A conta volta a poder entrar no AskouT.</p>,
-      confirmLabel: 'Reativar',
-      noteLabel: 'Nota',
-      run: (note) => api.setUserStatus(u.id, 'ACTIVE', note),
-    });
+    setAction(reactivateAction(u));
   }
 
   return (
@@ -149,7 +138,6 @@ export function UsersPage() {
         )}
       </Loadable>
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={list.reload} /> : null}
-      {viewing ? <UserDetailDialog user={viewing} onClose={() => setViewing(undefined)} onDone={list.reload} /> : null}
       {watching ? <UserActivityDialog user={watching} onClose={() => setWatching(undefined)} /> : null}
     </>
   );

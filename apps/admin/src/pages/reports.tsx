@@ -5,6 +5,7 @@ import { REASON_LABEL, RESOLUTION_LABEL, formatDateTime } from '../labels.ts';
 import type { ConversationReportRow, FeedReportRow, PostReportRow, StoryReportRow, UserReportRow, VenueStoryReportRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
+import { PersonLink, RecordLink } from '../record.tsx';
 import { PostThumb, deletePostAction } from './posts.tsx';
 import { FeedPostSummary, FeedThumb, deleteFeedCommentAction, deleteFeedPostAction } from './feed.tsx';
 
@@ -27,12 +28,12 @@ function PostReportCard({ r, onAction }: { r: PostReportRow; onAction: (a: Actio
       <PostThumb post={r.post} />
       <div className="report__main">
         <div>
-          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         {r.details ? <p className="pre">“{r.details}”</p> : null}
         <div className="postbox">
           <div className="muted small">
-            Post de <span className="handle">@{r.post.author.username}</span> · {r.post.reportsCount} denúncia(s) no total
+            <RecordLink kind="post" id={r.post.id}>Post</RecordLink> de <PersonLink id={r.post.author.id} username={r.post.author.username} /> · {r.post.reportsCount} denúncia(s) no total
           </div>
           {r.post.eventTitle ? <strong>Evento: {r.post.eventTitle}</strong> : null}
           <div className="clip">{r.post.caption ?? <span className="muted">Sem legenda</span>}</div>
@@ -66,10 +67,10 @@ function FeedReportCard({ r, onAction }: { r: FeedReportRow; onAction: (a: Actio
       <div className="report__main">
         <div>
           <Badge tone="info">{isComment ? 'Comentário' : 'Publicação'}</Badge> <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge>{' '}
-          <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         <p className="muted small">
-          Pessoa denunciada: <span className="handle">@{target.username}</span> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
+          Pessoa denunciada: <PersonLink id={target.id} username={target.username} /> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
         </p>
         {r.details ? <p className="pre">“{r.details}”</p> : null}
         <details open>
@@ -167,11 +168,11 @@ function VenueStoryReportCard({ r, onAction }: { r: VenueStoryReportRow; onActio
       )}
       <div className="report__main">
         <div>
-          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         {r.details ? <p className="pre">“{r.details}”</p> : null}
         <div className="postbox">
-          <strong>Local: {r.story.venueName ?? '—'}</strong>
+          <strong>Local: <RecordLink kind="venue" id={r.story.venueId}>{r.story.venueName ?? '—'}</RecordLink></strong>
           <div className="muted small">{r.venueOpenReporters} pessoa(s) com denúncia aberta contra o local{r.venueOpenReporters >= 3 ? ' · publicação suspensa' : ''}</div>
           <div className="muted small">Publicado em {formatDateTime(r.story.createdAt)} · no ar até {formatDateTime(r.story.expiresAt)}</div>
         </div>
@@ -201,12 +202,12 @@ function StoryReportCard({ r, onAction }: { r: StoryReportRow; onAction: (a: Act
       <StoryPreview r={r} />
       <div className="report__main">
         <div>
-          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         {r.details ? <p className="pre">“{r.details}”</p> : null}
         <div className="postbox">
           <div className="muted small">
-            Story de <span className="handle">@{r.story.author.username}</span> · {r.story.reportsCount} denúncia(s) no total
+            Story de <PersonLink id={r.story.author.id} username={r.story.author.username} /> · {r.story.reportsCount} denúncia(s) no total
           </div>
           {r.story.eventTitle ? <strong>Evento: {r.story.eventTitle}</strong> : null}
           {r.story.caption ? <p className="pre">Texto no story: “{r.story.caption}”</p> : null}
@@ -252,12 +253,12 @@ function ConversationReportCard({ r, onAction }: { r: ConversationReportRow; onA
     <article className="report">
       <div className="report__main">
         <div>
-          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         <p className="muted small">
           {target ? (
             <>
-              Pessoa denunciada: <span className="handle">@{target.username}</span> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
+              Pessoa denunciada: <PersonLink id={target.id} username={target.username} /> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
             </>
           ) : (
             'Conversa em grupo'
@@ -314,10 +315,10 @@ function UserReportCard({ r, onAction }: { r: UserReportRow; onAction: (a: Actio
       <div className="report__main">
         <div>
           <Badge tone="info">{r.kind === 'COMMENT' ? 'Comentário' : 'Perfil'}</Badge> <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge>{' '}
-          <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+          <span className="muted small">denunciado por <PersonLink id={r.reporter.id} username={r.reporter.username} /> em {formatDateTime(r.createdAt)}</span>
         </div>
         <p className="muted small">
-          Pessoa denunciada: <span className="handle">@{target.username}</span> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
+          Pessoa denunciada: <PersonLink id={target.id} username={target.username} /> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
         </p>
         {r.details ? <p className="pre">“{r.details}”</p> : null}
         <details open>

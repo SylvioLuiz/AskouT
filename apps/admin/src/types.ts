@@ -101,6 +101,145 @@ export interface VenueRow {
   eventsCount: number;
 }
 
+export type FeedPolicy = 'OPEN' | 'MODERATED' | 'OWNER_ONLY';
+
+/** Pessoa numa lista ligada de um detalhe (amigos, seguidores, equipe), com a data do vínculo. */
+export interface PersonRef {
+  id: string;
+  username: string;
+  displayName: string;
+  at: string;
+}
+
+/** Uma pessoa inteira (o detalhe da gestão). */
+export interface UserDetail {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  status: UserStatus;
+  role: UserRole;
+  createdAt: string;
+  birthDate: string | null;
+  extra: UserExtras | null;
+}
+
+export interface UserExtras {
+  updatedAt: string;
+  termsAcceptedAt: string | null;
+  termsVersion: string | null;
+  onboardedAt: string | null;
+  tastes: string[];
+  profilePending: boolean;
+  passwordless: boolean;
+  phone: string | null;
+  phoneVerifiedAt: string | null;
+  avatarUrl: string | null;
+  isPrivate: boolean;
+  mfaEnabled: boolean;
+  settings: { timeZone: string; shareAvailability: boolean; openDms: boolean } | null;
+  region: { lat: number; lng: number; updatedAt: string } | null;
+  invitedBy: { id: string; username: string } | null;
+  loginProviders: ('GOOGLE' | 'APPLE')[];
+  counts: {
+    friends: number; followers: number; following: number; followRequests: number;
+    posts: number; eventsCreated: number; eventsGoing: number; feedPosts: number; postComments: number; postLikes: number; stories: number;
+    venuesFollowed: number; venuesOwned: number; venuesManaged: number; claims: number;
+    reportsMade: number; reportsReceived: number; blocksMade: number; blockedBy: number;
+    groups: number; conversations: number; messages: number; referrals: number;
+  };
+  friends: PersonRef[];
+  followers: PersonRef[];
+  following: PersonRef[];
+  followRequests: PersonRef[];
+  eventsCreated: { id: string; title: string; startsAt: string | null; endsAt: string | null; private: boolean; createdAt: string }[];
+  eventsGoing: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string | null; venueName: string | null; at: string }[];
+  posts: { id: string; caption: string | null; eventTitle: string | null; archived: boolean; createdAt: string }[];
+  venues: { id: string; name: string; role: 'OWNER' | 'MANAGER' | 'FOLLOWER' }[];
+  claims: { id: string; venueId: string; venueName: string; status: ClaimStatus; createdAt: string }[];
+  groups: { id: string; name: string; role: string; joinedAt: string }[];
+}
+
+export interface VenueExtras {
+  createdAt: string;
+  updatedAt: string;
+  externalKey: string | null;
+  photoRef: string | null;
+  photoAuthor: string | null;
+  hoursJson: string | null;
+  feedPolicy: FeedPolicy;
+  rating: { count: number; average: number | null };
+  counts: { checkins: number; posts: number; feedPosts: number; stories: number; claims: number; offers: number; boosts: number; conversations: number };
+  managers: (PersonRef & { status: 'PENDING' | 'ACCEPTED' })[];
+  claims: { id: string; userId: string; username: string; status: ClaimStatus; createdAt: string; reviewedAt: string | null }[];
+  followersSample: PersonRef[];
+}
+
+export interface EventExtras {
+  createdAt: string;
+  updatedAt: string;
+  feedPolicy: FeedPolicy;
+  counts: { stories: number; feedPosts: number; meetings: number; posts: number; cloakroomTickets: number };
+  hunterRef: string | null;
+  cloakroom: { enabled: boolean; priceCents: number | null; capacity: number | null } | null;
+  guestList: { limit: number | null; closesAt: string | null; maxCompanions: number } | null;
+}
+
+/** Um post inteiro (o detalhe da gestão). */
+export interface PostDetail {
+  id: string;
+  caption: string | null;
+  author: { id: string; username: string; displayName: string };
+  placeName: string | null;
+  placeAddress: string | null;
+  eventTitle: string | null;
+  eventStartsAt: string | null;
+  eventEndsAt: string | null;
+  eventKind: string;
+  eventPrivate: boolean;
+  feedPolicy: FeedPolicy;
+  archivedAt: string | null;
+  editedAt: string | null;
+  createdAt: string;
+  venue: { id: string; name: string } | null;
+  placeVenue: { id: string; name: string } | null;
+  linkedEventId: string | null;
+  images: { id: string; uploaded: boolean }[];
+  tagged: PersonRef[];
+  counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
+  recentComments: { id: string; username: string; body: string; createdAt: string }[];
+}
+
+/** O que a gestão muda num local (motivo à parte). */
+export interface VenueEdit {
+  name?: string;
+  address?: string | null;
+  category?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  logoUrl?: string | null;
+  lat?: number;
+  lng?: number;
+  isSample?: boolean;
+  feedPolicy?: FeedPolicy;
+}
+
+/** O que a gestão muda num evento de local. A API pede nome e início sempre (as mesmas regras de quem administra). */
+export interface EventEdit {
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  kind: string;
+  isFree: boolean;
+  description?: string | null;
+  imageUrl?: string | null;
+  tags?: string[];
+  ticketUrl?: string | null;
+  isSample?: boolean;
+  feedPolicy?: FeedPolicy;
+}
+
 /** Detalhe de um local (a gestão abre ao clicar no local da lista). */
 export interface VenueDetail {
   id: string;
@@ -121,6 +260,7 @@ export interface VenueDetail {
   eventsTotal: number;
   upcomingCount: number;
   events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
+  extra: VenueExtras | null;
 }
 
 /** Detalhe de um evento de local (a gestão abre ao clicar no evento da lista). */
@@ -144,6 +284,7 @@ export interface EventDetail {
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com esse nome, contando este. */
   sameTitleTotal: number;
+  extra: EventExtras | null;
 }
 
 export interface PlaceEventRow {

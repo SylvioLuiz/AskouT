@@ -5,6 +5,7 @@ import { formatDateTime } from '../labels.ts';
 import type { FeedCommentRow, FeedPostRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
+import { PersonLink, RecordLink } from '../record.tsx';
 
 type Filter = 'all' | 'pending' | 'published';
 
@@ -45,10 +46,17 @@ export function FeedPostSummary({ post }: { post: FeedPostRow }) {
     <div className="postbox">
       <div className="muted small">
         {PLACE_LABEL[post.place.type]}:{' '}
-        <a href={appUrl(post.place.url)} target="_blank" rel="noreferrer">
-          {post.place.title}
+        {post.place.type === 'PLACE_EVENT' ? (
+          <RecordLink kind="event" id={post.place.id}>{post.place.title}</RecordLink>
+        ) : post.place.type === 'VENUE' ? (
+          <RecordLink kind="venue" id={post.place.id}>{post.place.title}</RecordLink>
+        ) : (
+          <RecordLink kind="post" id={post.place.id}>{post.place.title}</RecordLink>
+        )}{' '}
+        <a href={appUrl(post.place.url)} target="_blank" rel="noreferrer" className="small">
+          (abrir no app)
         </a>{' '}
-        · <span className="handle">@{post.author.username}</span> · {formatDateTime(post.createdAt)}
+        · <PersonLink id={post.author.id} username={post.author.username} /> · {formatDateTime(post.createdAt)}
       </div>
       <div>
         {post.kind === 'NOTICE' ? <Badge tone="info">Aviso</Badge> : null} {post.status === 'PENDING' ? <Badge tone="warn">Aguardando o dono</Badge> : null}{' '}
@@ -71,7 +79,7 @@ function Comments({ postId, onAction }: { postId: string; onAction: (a: ActionSp
           {data.items.map((c: FeedCommentRow) => (
             <li key={c.id}>
               <div>
-                <span className="handle">@{c.author.username}</span> <span className="muted small">{formatDateTime(c.createdAt)}</span>{' '}
+                <PersonLink id={c.author.id} username={c.author.username} /> <span className="muted small">{formatDateTime(c.createdAt)}</span>{' '}
                 {c.openReportsCount > 0 ? <Badge tone="bad">{c.openReportsCount} denúncia(s)</Badge> : null}
                 {c.body ? <div className="pre">{c.body}</div> : null}
                 {c.gifUrl ? <img src={c.gifUrl} alt="GIF" style={{ display: 'block', maxWidth: 160, borderRadius: 8 }} referrerPolicy="no-referrer" /> : null}

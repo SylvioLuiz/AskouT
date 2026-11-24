@@ -80,7 +80,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const users = new InMemoryUserRepository();
   const referrals = new InMemoryReferralRepository(users);
   const identitiesRepo = new InMemoryIdentityRepository();
-  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo });
+  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo, follows });
   const pending = new InMemoryPendingSignupRepository();
   const passwordResets = new InMemoryPasswordResetRepository();
   const phoneCodes = new InMemoryPhoneCodeRepository();

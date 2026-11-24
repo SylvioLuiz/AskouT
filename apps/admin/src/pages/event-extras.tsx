@@ -3,6 +3,8 @@ import { api, ApiError } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import type { EventExtra, EventExtraInput } from '../types.ts';
 import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount } from '../ui.tsx';
+import { Mono, RecordView, TextInput, useRecordEditor } from '../record.tsx';
+import type { RecordSection } from '../record.tsx';
 import type { ActionSpec } from '../ui.tsx';
 // Os desenhos são os mesmos do app (um arquivo só, para os dois mostrarem igual).
 import { EVENT_EXTRA_ICON_LABELS, eventExtraIconPaths } from '../../../web/src/lib/event-extra-icons.ts';
@@ -20,86 +22,83 @@ export function ExtraIcon({ icon, size = 22 }: { icon: string; size?: number }) 
   );
 }
 
-function ExtraForm({ icons, initial, onClose, onSaved }: { icons: string[]; initial: EventExtra | null; onClose: () => void; onSaved: () => void }) {
-  const [icon, setIcon] = useState(initial?.icon ?? icons[0] ?? 'info');
-  const [label, setLabel] = useState(initial?.label ?? '');
-  const [type, setType] = useState<EventExtra['type']>(initial?.type ?? 'YES_NO');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const ready = label.trim() !== '' && !busy;
+type ExtraDraft = { label: string; type: EventExtra['type']; icon: string };
 
-  async function save() {
-    if (!ready) return;
-    setBusy(true);
-    setError(undefined);
-    const input: EventExtraInput = { icon, label: label.trim(), type };
-    try {
+/** Uma configuração de evento no padrão de detalhe: ver, editar (ou cadastrar uma nova) com o mesmo salvar e cancelar. */
+function ExtraForm({ icons, initial, onClose, onSaved }: { icons: string[]; initial: EventExtra | null; onClose: () => void; onSaved: () => void }) {
+  const editor = useRecordEditor<ExtraDraft>({
+    initial: { label: initial?.label ?? '', type: initial?.type ?? 'YES_NO', icon: initial?.icon ?? icons[0] ?? 'info' },
+    noteRequired: false,
+    startEditing: initial === null,
+    check: (d) => (d.label.trim() === '' ? { label: 'Informe o nome' } : {}),
+    save: async (_changes, _note, d) => {
+      const input: EventExtraInput = { icon: d.icon, label: d.label.trim(), type: d.type };
       if (initial) await api.updateEventExtra(initial.id, input);
       else await api.createEventExtra(input);
+    },
+    onSaved: () => {
       onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Algo deu errado. Tente de novo.');
-      setBusy(false);
-    }
-  }
-
+      if (!initial) onClose();
+    },
+  });
+  const d = editor.draft;
+  const sections: RecordSection[] = [
+    {
+      title: 'Configuração',
+      fields: [
+        { label: 'Nome', value: <strong>{initial?.label}</strong>, input: <TextInput editor={editor} k="label" maxLength={LABEL_MAX} placeholder="Ex.: Pode fumar?" />, problem: editor.problems.label, hint: `${d.label.trim().length}/${LABEL_MAX}` },
+        {
+          label: 'Tipo de resposta',
+          value: initial ? TYPE_LABEL[initial.type] : null,
+          input: (
+            <span className="record__checks">
+              <label className="check">
+                <input type="radio" name="extra-type" checked={d.type === 'YES_NO'} onChange={() => editor.set('type', 'YES_NO')} /> Sim ou não <span className="muted small">(ex.: Pode fumar?)</span>
+              </label>
+              <label className="check">
+                <input type="radio" name="extra-type" checked={d.type === 'TEXT'} onChange={() => editor.set('type', 'TEXT')} /> Texto livre <span className="muted small">(ex.: Estacionamento: “na rua de trás”)</span>
+              </label>
+            </span>
+          ),
+        },
+        {
+          label: 'Ícone',
+          value: initial ? (
+            <span className="extras__cellicon">
+              <ExtraIcon icon={initial.icon} /> {EVENT_EXTRA_ICON_LABELS[initial.icon] ?? initial.icon}
+            </span>
+          ) : null,
+          input: (
+            <div className="extras__icons" role="radiogroup" aria-label="Ícone">
+              {icons.map((key) => (
+                <button key={key} type="button" role="radio" aria-checked={d.icon === key} className={`extras__iconbtn${d.icon === key ? ' extras__iconbtn--on' : ''}`} onClick={() => editor.set('icon', key)} title={EVENT_EXTRA_ICON_LABELS[key] ?? key} aria-label={EVENT_EXTRA_ICON_LABELS[key] ?? key}>
+                  <ExtraIcon icon={key} />
+                </button>
+              ))}
+            </div>
+          ),
+          wide: true,
+        },
+        {
+          label: 'Na página do evento',
+          value: null,
+          input: (
+            <span className="extras__previewrow">
+              <ExtraIcon icon={d.icon} size={20} />
+              <span>{d.label.trim() || 'Nome da configuração'}</span>
+              <strong>{d.type === 'YES_NO' ? 'Sim' : 'na rua de trás'}</strong>
+            </span>
+          ),
+          wide: true,
+          hidden: !editor.editing,
+        },
+        { label: 'ID', value: initial ? <Mono>{initial.id}</Mono> : null, hidden: !initial },
+      ],
+    },
+  ];
   return (
-    <Modal title={initial ? 'Editar configuração' : 'Nova configuração de evento'} onClose={onClose} wide>
-      <div className="field">
-        <label htmlFor="extra-label">Nome</label>
-        <input id="extra-label" value={label} maxLength={LABEL_MAX} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: Pode fumar?" autoFocus />
-        <span className="muted small">{label.trim().length}/{LABEL_MAX}</span>
-      </div>
-      <fieldset className="field extras__fieldset">
-        <legend>Tipo de resposta</legend>
-        <label className="check">
-          <input type="radio" name="extra-type" checked={type === 'YES_NO'} onChange={() => setType('YES_NO')} /> Sim ou não <span className="muted small">(ex.: Pode fumar?)</span>
-        </label>
-        <label className="check">
-          <input type="radio" name="extra-type" checked={type === 'TEXT'} onChange={() => setType('TEXT')} /> Texto livre <span className="muted small">(ex.: Estacionamento: “na rua de trás”)</span>
-        </label>
-      </fieldset>
-      <fieldset className="field extras__fieldset">
-        <legend>Ícone</legend>
-        <div className="extras__icons" role="radiogroup" aria-label="Ícone">
-          {icons.map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={icon === key}
-              className={`extras__iconbtn${icon === key ? ' extras__iconbtn--on' : ''}`}
-              onClick={() => setIcon(key)}
-              title={EVENT_EXTRA_ICON_LABELS[key] ?? key}
-              aria-label={EVENT_EXTRA_ICON_LABELS[key] ?? key}
-            >
-              <ExtraIcon icon={key} />
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <div className="extras__preview" aria-label="Como aparece na página do evento">
-        <span className="muted small">Na página do evento:</span>
-        <span className="extras__previewrow">
-          <ExtraIcon icon={icon} size={20} />
-          <span>{label.trim() || 'Nome da configuração'}</span>
-          <strong>{type === 'YES_NO' ? 'Sim' : 'na rua de trás'}</strong>
-        </span>
-      </div>
-      {error ? (
-        <p className="notice notice--bad" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="modal__actions">
-        <button type="button" className="btn" onClick={onClose} disabled={busy}>
-          Cancelar
-        </button>
-        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={!ready || busy} aria-busy={busy || undefined}>
-          {busy ? 'Aguarde…' : initial ? 'Salvar' : 'Cadastrar'}
-        </button>
-      </div>
+    <Modal title={initial ? initial.label : 'Nova configuração de evento'} onClose={onClose} wide bare>
+      <RecordView title={initial ? initial.label : 'Nova configuração de evento'} subtitle="Configuração de evento" sections={sections} editor={editor} isNew={!initial} onClose={onClose} />
     </Modal>
   );
 }
@@ -184,7 +183,7 @@ export function EventExtrasPage() {
                   </td>
                   <td className="nowrap" style={{ textAlign: 'right' }}>
                     <button type="button" className="btn btn--small" onClick={() => setEditing(x)}>
-                      Editar
+                      Detalhes
                     </button>{' '}
                     <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => remove(x)}>
                       Apagar

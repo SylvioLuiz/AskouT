@@ -457,3 +457,68 @@ test('tabelas da gestão ordenam pela coluna pedida, nas duas direções, e recu
   await rejectsWith(w.core.admin.searchUsers(A, { sort: 'passwordHash' }), 'VALIDATION');
   await rejectsWith(w.core.admin.searchUsers(A, { sort: 'email', dir: 'up' }), 'VALIDATION');
 });
+
+test('detalhe da pessoa: cadastro inteiro, amigos, seguidores e eventos', async () => {
+  const { w, A, U, ana, bia, caio } = await setup();
+  await w.core.follows.follow(caio, ana);
+  const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
+  const ev = await w.core.posts.create(ana, { images: [JPEG()], caption: 'Vem!', placeName: 'Praça', event: { title: 'Corrida de rua', startsAt: start } });
+  await rejectsWith(w.core.admin.userDetail(U(ana), ana), 'FORBIDDEN');
+  const d = await w.core.admin.userDetail(A, ana);
+  assert.equal(d.username, 'ana');
+  assert.ok(d.extra);
+  assert.deepEqual(d.extra.friends.map((f) => f.id), [bia]);
+  assert.deepEqual(d.extra.followers.map((f) => f.id).sort(), [bia, caio].sort());
+  assert.deepEqual([d.extra.counts.friends, d.extra.counts.followers, d.extra.counts.following], [1, 2, 1]);
+  assert.deepEqual(d.extra.eventsCreated.map((e) => [e.id, e.title]), [[ev.id, 'Corrida de rua']]);
+  assert.equal(d.extra.counts.posts, 1);
+  assert.equal('passwordHash' in d, false);
+  await rejectsWith(w.core.admin.userDetail(A, 'nao-existe'), 'NOT_FOUND');
+});
+
+test('editar local pela gestão: motivo obrigatório, campos de admin e auditoria com o que mudou', async () => {
+  const { w, A, U, ana } = await setup();
+  await rejectsWith(w.core.admin.editVenue(U(ana), 'v1', { name: 'X', note: 'x' }), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { name: 'Bar do Zé Novo' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { name: 'Bar do Zé', note: 'nada' }), 'CONFLICT');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { lat: 200, note: 'posição' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.editVenue(A, 'v1', { feedPolicy: 'TODOS', note: 'feed' }), 'VALIDATION');
+  const d = await w.core.admin.editVenue(A, 'v1', { name: 'Bar do Zé Novo', description: 'Samba toda sexta', lat: -23.5, isSample: true, feedPolicy: 'OPEN', note: 'Pedido do dono' });
+  assert.deepEqual([d.name, d.description, d.lat, d.isSample, d.extra?.feedPolicy], ['Bar do Zé Novo', 'Samba toda sexta', -23.5, true, 'OPEN']);
+  assert.equal(d.address, 'Rua A, 1', 'o que não veio continua');
+  const log = (await w.core.admin.audit(A, {})).items[0]!;
+  assert.equal(log.action, 'VENUE_EDITED');
+  assert.match(log.note ?? '', /Pedido do dono/);
+  assert.match(log.note ?? '', /nome: Bar do Zé → Bar do Zé Novo/);
+  await rejectsWith(w.core.admin.editVenue(A, 'nao-existe', { name: 'X', note: 'x' }), 'NOT_FOUND');
+});
+
+test('editar evento de local pela gestão: mesmas regras de quem administra e auditoria', async () => {
+  const { w, A, U, ana } = await setup();
+  const now = w.clock.now().getTime();
+  // Evento que já começou: dá para corrigir o resto sem mexer no início.
+  await w.places.createEvent({ id: 'e1', venueId: 'v1', title: 'Samba', description: null, kind: 'SHOW', isFree: false, imageUrl: null, tags: [], startsAt: new Date(now - 2 * H), endsAt: new Date(now + 2 * H), isSample: false });
+  const base = { title: 'Samba', startsAt: new Date(now - 2 * H).toISOString(), endsAt: new Date(now + 2 * H).toISOString(), kind: 'SHOW', isFree: false };
+  await rejectsWith(w.core.admin.editPlaceEvent(U(ana), 'e1', { ...base, note: 'x' }), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.editPlaceEvent(A, 'e1', { ...base, title: 'Samba de roda' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.editPlaceEvent(A, 'e1', { ...base, note: 'nada' }), 'CONFLICT');
+  await rejectsWith(w.core.admin.editPlaceEvent(A, 'e1', { ...base, endsAt: base.startsAt, note: 'fim' }), 'VALIDATION');
+  const d = await w.core.admin.editPlaceEvent(A, 'e1', { ...base, title: 'Samba de roda', isFree: true, tags: ['samba'], ticketUrl: 'https://ingressos.exemplo.com/samba', feedPolicy: 'MODERATED', note: 'Nome errado' });
+  assert.deepEqual([d.title, d.isFree, d.tags, d.ticketUrl, d.extra?.feedPolicy], ['Samba de roda', true, ['samba'], 'https://ingressos.exemplo.com/samba', 'MODERATED']);
+  const log = (await w.core.admin.audit(A, {})).items[0]!;
+  assert.equal(log.action, 'PLACE_EVENT_EDITED');
+  assert.match(log.note ?? '', /nome: Samba → Samba de roda/);
+  await rejectsWith(w.core.admin.editPlaceEvent(A, 'nao-existe', { ...base, note: 'x' }), 'NOT_FOUND');
+});
+
+test('detalhe do post e detalhes de local e evento trazem o resto do cadastro', async () => {
+  const { w, A, U, ana } = await setup();
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'Foto do pôr do sol' });
+  await rejectsWith(w.core.admin.postDetail(U(ana), post.id), 'FORBIDDEN');
+  const p = await w.core.admin.postDetail(A, post.id);
+  assert.deepEqual([p.caption, p.author.username, p.placeName, p.images.length], ['Foto do pôr do sol', 'ana', 'Bar do Zé', 1]);
+  await rejectsWith(w.core.admin.postDetail(A, 'nao-existe'), 'NOT_FOUND');
+  await w.places.createEvent({ id: 'e1', venueId: 'v1', title: 'Samba', description: null, kind: 'SHOW', isFree: true, imageUrl: null, tags: [], startsAt: new Date(w.clock.now().getTime() + 2 * H), endsAt: new Date(w.clock.now().getTime() + 5 * H), isSample: false });
+  assert.equal((await w.core.admin.eventDetail(A, 'e1')).extra?.feedPolicy, 'OWNER_ONLY');
+  assert.deepEqual((await w.core.admin.venueDetail(A, 'v1')).extra?.managers, []);
+});

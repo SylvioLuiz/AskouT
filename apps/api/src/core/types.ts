@@ -944,6 +944,111 @@ export interface AdminPostRow {
   createdAt: Date;
 }
 
+/** Pessoa nas listas ligadas de um detalhe da gestão (amigos, seguidores, confirmados...), com a data do vínculo. */
+export interface AdminPersonRef {
+  id: string;
+  username: string;
+  displayName: string;
+  at: Date;
+}
+
+/**
+ * Tudo o que a gestão vê de uma pessoa além da linha da lista: o cadastro inteiro (menos a senha e o hash do celular),
+ * as configurações, as contagens dos vínculos e as listas ligadas (amigos, seguidores, eventos, posts, locais).
+ */
+export interface AdminUserExtras {
+  updatedAt: Date;
+  termsAcceptedAt: Date | null;
+  termsVersion: string | null;
+  onboardedAt: Date | null;
+  tastes: string[];
+  profilePending: boolean;
+  passwordless: boolean;
+  phone: string | null;
+  phoneVerifiedAt: Date | null;
+  avatarUrl: string | null;
+  isPrivate: boolean;
+  mfaEnabled: boolean;
+  settings: { timeZone: string; shareAvailability: boolean; openDms: boolean } | null;
+  region: { lat: number; lng: number; updatedAt: Date } | null;
+  invitedBy: { id: string; username: string } | null;
+  /** Contas Google/Apple ligadas. */
+  loginProviders: ExternalProvider[];
+  counts: {
+    friends: number; followers: number; following: number; followRequests: number;
+    posts: number; eventsCreated: number; eventsGoing: number; feedPosts: number; postComments: number; postLikes: number; stories: number;
+    venuesFollowed: number; venuesOwned: number; venuesManaged: number; claims: number;
+    reportsMade: number; reportsReceived: number; blocksMade: number; blockedBy: number;
+    groups: number; conversations: number; messages: number; referrals: number;
+  };
+  /** Amigos: seguem um ao outro (até 50, os mais recentes primeiro). */
+  friends: AdminPersonRef[];
+  followers: AdminPersonRef[];
+  following: AdminPersonRef[];
+  /** Pedidos para seguir ainda sem resposta (perfil privado). */
+  followRequests: AdminPersonRef[];
+  /** Eventos criados pela pessoa (posts com dados de evento), os mais novos primeiro. */
+  eventsCreated: { id: string; title: string; startsAt: Date | null; endsAt: Date | null; private: boolean; createdAt: Date }[];
+  /** Presenças confirmadas ("Eu vou"), as mais recentes primeiro. */
+  eventsGoing: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: Date | null; venueName: string | null; at: Date }[];
+  posts: { id: string; caption: string | null; eventTitle: string | null; archived: boolean; createdAt: Date }[];
+  venues: { id: string; name: string; role: 'OWNER' | 'MANAGER' | 'FOLLOWER' }[];
+  claims: { id: string; venueId: string; venueName: string; status: ClaimStatus; createdAt: Date }[];
+  groups: { id: string; name: string; role: string; joinedAt: Date }[];
+}
+
+/** O que a gestão vê de um local além do que o app já mostra. */
+export interface AdminVenueExtras {
+  createdAt: Date;
+  updatedAt: Date;
+  externalKey: string | null;
+  photoRef: string | null;
+  photoAuthor: string | null;
+  hoursJson: string | null;
+  feedPolicy: FeedPolicy;
+  rating: { count: number; average: number | null };
+  counts: { checkins: number; posts: number; feedPosts: number; stories: number; claims: number; offers: number; boosts: number; conversations: number };
+  managers: { id: string; username: string; displayName: string; status: 'PENDING' | 'ACCEPTED'; at: Date }[];
+  claims: { id: string; userId: string; username: string; status: ClaimStatus; createdAt: Date; reviewedAt: Date | null }[];
+  followersSample: AdminPersonRef[];
+}
+
+/** O que a gestão vê de um evento de local além do cadastro. */
+export interface AdminPlaceEventExtras {
+  createdAt: Date;
+  updatedAt: Date;
+  feedPolicy: FeedPolicy;
+  counts: { stories: number; feedPosts: number; meetings: number; posts: number; cloakroomTickets: number };
+  hunterRef: string | null;
+  cloakroom: { enabled: boolean; priceCents: number | null; capacity: number | null } | null;
+  guestList: { limit: number | null; closesAt: Date | null; maxCompanions: number } | null;
+}
+
+/** Um post inteiro para a gestão (sem os bytes das fotos). */
+export interface AdminPostDetail {
+  id: string;
+  caption: string | null;
+  author: { id: string; username: string; displayName: string };
+  placeName: string | null;
+  placeAddress: string | null;
+  eventTitle: string | null;
+  eventStartsAt: Date | null;
+  eventEndsAt: Date | null;
+  eventKind: EventKind;
+  eventPrivate: boolean;
+  feedPolicy: FeedPolicy;
+  archivedAt: Date | null;
+  editedAt: Date | null;
+  createdAt: Date;
+  venue: { id: string; name: string } | null;
+  placeVenue: { id: string; name: string } | null;
+  linkedEventId: string | null;
+  images: { id: string; uploaded: boolean }[];
+  tagged: AdminPersonRef[];
+  counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
+  recentComments: { id: string; username: string; body: string; createdAt: Date }[];
+}
+
 export interface AdminPostReportRow {
   id: string;
   reason: PostReportReason;
@@ -1078,6 +1183,8 @@ export type AuditAction =
   | 'CLAIM_APPROVED'
   | 'CLAIM_REJECTED'
   | 'VENUE_OWNER_REMOVED'
+  | 'VENUE_EDITED'
+  | 'PLACE_EVENT_EDITED'
   | 'POST_REMOVED'
   | 'PLACE_EVENT_REMOVED'
   | 'STORY_REMOVED'

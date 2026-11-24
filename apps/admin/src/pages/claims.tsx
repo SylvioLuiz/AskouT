@@ -3,9 +3,10 @@ import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { CLAIM_LABEL, formatDateTime } from '../labels.ts';
 import type { Claim, ClaimStatus } from '../types.ts';
-import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount, SortTh, Tabs } from '../ui.tsx';
+import { Badge, Loadable, Modal, PageHead, RecordCount, SortTh, Tabs } from '../ui.tsx';
+import { Mono, PersonLink, RecordLink, RecordView, YesNo } from '../record.tsx';
+import type { RecordSection } from '../record.tsx';
 import { sortRows, useSort } from '../sort.ts';
-import type { ActionSpec } from '../ui.tsx';
 
 function DocumentViewer({ claim }: { claim: Claim }) {
   const [doc, setDoc] = useState<{ url: string; mime: string }>();
@@ -35,95 +36,84 @@ function DocumentViewer({ claim }: { claim: Claim }) {
 }
 
 function ClaimDetail({ claim, onClose, onChanged }: { claim: Claim; onClose: () => void; onChanged: () => void }) {
-  const [action, setAction] = useState<ActionSpec>();
   const pending = claim.status === 'PENDING';
   const takenByOther = claim.venue.ownerId !== null && claim.venue.ownerId !== claim.user.id;
+  const kind = claim.venue.isOrganization ? 'Organização nova' : claim.venue.isUserCreated ? 'Local novo (criado do zero)' : 'Local já cadastrado';
+  const sections: RecordSection[] = [
+    {
+      title: 'Pedido',
+      fields: [
+        { label: 'Situação', value: <Badge tone={claim.status === 'APPROVED' ? 'ok' : claim.status === 'REJECTED' ? 'bad' : 'warn'}>{CLAIM_LABEL[claim.status]}</Badge> },
+        { label: 'Enviado em', value: formatDateTime(claim.createdAt) },
+        { label: 'Decidido em', value: claim.reviewedAt ? formatDateTime(claim.reviewedAt) : null },
+        { label: 'Mensagem', value: claim.note ? <span className="pre">{claim.note}</span> : null, wide: true },
+        { label: 'Nota da decisão', value: claim.reviewNote ? <span className="pre">{claim.reviewNote}</span> : null, wide: true },
+        { label: 'Documento', value: claim.documentMime },
+        { label: 'ID', value: <Mono>{claim.id}</Mono> },
+      ],
+    },
+    {
+      title: 'Local',
+      fields: [
+        { label: 'Tipo de pedido', value: kind },
+        { label: 'Local', value: <RecordLink kind="venue" id={claim.venue.id}>{claim.venue.name}</RecordLink> },
+        { label: 'Categoria', value: claim.venue.category ?? null },
+        { label: 'Endereço', value: claim.venue.address },
+        { label: 'Descrição', value: claim.venue.description ?? null, wide: true },
+        { label: 'Dado de teste', value: <YesNo value={claim.venue.isSample} /> },
+        { label: 'Já tem responsável', value: claim.venue.ownerId ? (takenByOther ? <RecordLink kind="user" id={claim.venue.ownerId}>Sim, outra pessoa</RecordLink> : 'Sim, quem pede') : 'Não' },
+      ],
+    },
+    {
+      title: 'Quem pede',
+      fields: [
+        { label: 'Pessoa', value: <PersonLink id={claim.user.id} username={claim.user.username} displayName={claim.user.displayName} /> },
+        { label: 'E-mail', value: claim.user.email },
+      ],
+    },
+    { title: 'Documento enviado', children: <DocumentViewer claim={claim} /> },
+  ];
   return (
-    <Modal title={`Pedido para ${claim.venue.name}`} onClose={onClose} wide>
-      <div className="split">
-        <div>
-          <dl className="facts">
-            <dt>{claim.venue.isOrganization ? 'Organização nova' : claim.venue.isUserCreated ? 'Local novo (criado do zero)' : 'Local'}</dt>
-            <dd>
-              {claim.venue.name}
-              {claim.venue.isSample ? ' [TESTE]' : ''}
-              {claim.venue.isOrganization ? <div className="muted small">{claim.venue.category ?? 'Organização'}</div> : null}
-              {claim.venue.isUserCreated && claim.venue.category ? <div className="muted small">{claim.venue.category}</div> : null}
-              <div className="muted small">{claim.venue.address ?? 'Sem endereço'}</div>
-              {claim.venue.isOrganization && claim.venue.description ? <div className="muted small">{claim.venue.description}</div> : null}
-            </dd>
-            <dt>Quem pede</dt>
-            <dd>
-              {claim.user.displayName} <span className="handle">@{claim.user.username}</span>
-              <div className="muted small">{claim.user.email}</div>
-            </dd>
-            <dt>Enviado em</dt>
-            <dd>{formatDateTime(claim.createdAt)}</dd>
-            <dt>Situação</dt>
-            <dd>
-              <Badge tone={claim.status === 'APPROVED' ? 'ok' : claim.status === 'REJECTED' ? 'bad' : 'warn'}>{CLAIM_LABEL[claim.status]}</Badge>
-            </dd>
-            {claim.note ? (
-              <>
-                <dt>Mensagem</dt>
-                <dd className="pre">{claim.note}</dd>
-              </>
-            ) : null}
-            {claim.reviewNote ? (
-              <>
-                <dt>Nota da decisão</dt>
-                <dd className="pre">{claim.reviewNote}</dd>
-              </>
-            ) : null}
-          </dl>
-          {pending && takenByOther ? <p className="notice notice--warn">Este local já tem outro responsável. Aprovar troca o responsável.</p> : null}
-        </div>
-        <div>
-          <DocumentViewer claim={claim} />
-        </div>
-      </div>
-      <div className="modal__actions">
-        <button type="button" className="btn" onClick={onClose}>
-          Fechar
-        </button>
-        {pending ? (
-          <>
-            <button
-              type="button"
-              className="btn btn--danger"
-              onClick={() =>
-                setAction({
-                  title: 'Recusar pedido',
-                  description: <p>@{claim.user.username} será avisada de que o pedido para {claim.venue.name} foi recusado, com a sua nota.</p>,
-                  confirmLabel: 'Recusar',
-                  danger: true,
-                  noteLabel: 'Motivo para a pessoa',
-                  noteRequired: true,
-                  run: (note) => api.reviewClaim(claim.id, 'REJECTED', note),
-                })
-              }
-            >
-              Recusar
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() =>
-                setAction({
-                  title: 'Aprovar pedido',
-                  description: <p>@{claim.user.username} passa a administrar {claim.venue.name} e poderá criar e editar os eventos do local. Outros pedidos para este local são recusados.</p>,
-                  confirmLabel: 'Aprovar',
-                  noteLabel: 'Nota',
-                  run: (note) => api.reviewClaim(claim.id, 'APPROVED', note),
-                })
-              }
-            >
-              Aprovar
-            </button>
-          </>
-        ) : null}
-      </div>
-      {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={() => { onChanged(); onClose(); }} /> : null}
+    <Modal title={`Pedido para ${claim.venue.name}`} onClose={onClose} wide bare>
+      {pending && takenByOther ? <p className="notice notice--warn">Este local já tem outro responsável. Aprovar troca o responsável.</p> : null}
+      <RecordView
+        title={`Pedido para ${claim.venue.name}`}
+        subtitle={`de @${claim.user.username} · ${formatDateTime(claim.createdAt)}`}
+        status={<Badge tone={claim.status === 'APPROVED' ? 'ok' : claim.status === 'REJECTED' ? 'bad' : 'warn'}>{CLAIM_LABEL[claim.status]}</Badge>}
+        sections={sections}
+        actions={[
+          {
+            label: 'Recusar',
+            danger: true,
+            hidden: !pending,
+            confirm: {
+              title: 'Recusar pedido',
+              description: <p>@{claim.user.username} será avisada de que o pedido para {claim.venue.name} foi recusado, com a sua nota.</p>,
+              confirmLabel: 'Recusar',
+              danger: true,
+              noteLabel: 'Motivo para a pessoa',
+              noteRequired: true,
+              run: (note) => api.reviewClaim(claim.id, 'REJECTED', note),
+            },
+          },
+          {
+            label: 'Aprovar',
+            hidden: !pending,
+            confirm: {
+              title: 'Aprovar pedido',
+              description: <p>@{claim.user.username} passa a administrar {claim.venue.name} e poderá criar e editar os eventos do local. Outros pedidos para este local são recusados.</p>,
+              confirmLabel: 'Aprovar',
+              noteLabel: 'Nota',
+              run: (note) => api.reviewClaim(claim.id, 'APPROVED', note),
+            },
+          },
+        ]}
+        onClose={onClose}
+        onChanged={() => {
+          onChanged();
+          onClose();
+        }}
+      />
     </Modal>
   );
 }
@@ -162,13 +152,15 @@ export function ClaimsPage() {
               {sortRows(claims, sort, { venue: (c) => c.venue.name, user: (c) => c.user.username, createdAt: (c) => Date.parse(c.createdAt) }).map((c) => (
                 <tr key={c.id}>
                   <td>
-                    <strong>{c.venue.name}</strong>
+                    <RecordLink kind="venue" id={c.venue.id}>
+                      <strong>{c.venue.name}</strong>
+                    </RecordLink>
                     {c.venue.isOrganization ? <div className="muted small">Organização · {c.venue.category ?? 'universitária'}</div> : null}
                     {c.venue.isUserCreated ? <div className="muted small">Local novo{c.venue.category ? ` · ${c.venue.category}` : ''}</div> : null}
                     <div className="muted small">{c.venue.address ?? 'Sem endereço'}</div>
                   </td>
                   <td>
-                    {c.user.displayName} <span className="handle">@{c.user.username}</span>
+                    <PersonLink id={c.user.id} username={c.user.username} displayName={c.user.displayName} />
                     <div className="muted small">{c.user.email}</div>
                   </td>
                   <td>{formatDateTime(c.createdAt)}</td>

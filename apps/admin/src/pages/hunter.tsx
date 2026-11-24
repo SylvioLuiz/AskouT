@@ -6,6 +6,7 @@ import type { HunterOverview } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, SortTh } from '../ui.tsx';
 import { sortRows, useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
+import { RecordLink } from '../record.tsx';
 
 /**
  * Aba do Hunter (sistema separado que descobre e publica eventos). Aqui a gestão liga e desliga a ponte e vê, e pode remover,
@@ -144,8 +145,12 @@ export function HunterPage() {
                   <tbody>
                     {sortRows(s.items, sort, { title: (i) => i.title, venue: (i) => i.venueName, startsAt: (i) => Date.parse(i.startsAt), createdAt: (i) => Date.parse(i.createdAt) }).map((i) => (
                       <tr key={i.ref}>
-                        <td>{i.title}</td>
-                        <td>{i.venueName}</td>
+                        <td>
+                          <RecordLink kind="event" id={i.eventId}>{i.title}</RecordLink>
+                        </td>
+                        <td>
+                          <RecordLink kind="venue" id={i.venueId}>{i.venueName}</RecordLink>
+                        </td>
                         <td>{formatDateTime(i.startsAt)}</td>
                         <td>{formatDateTime(i.createdAt)}</td>
                         <td><button type="button" className="btn btn--danger" onClick={() => removeOne(i)}>Remover</button></td>
