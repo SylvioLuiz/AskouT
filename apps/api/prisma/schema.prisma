@@ -301,6 +301,8 @@ model UserSettings {
   shareAvailability Boolean @default(false)
   /// Perfil público aceita mensagens de quem ele não segue direto na caixa de conversas (sem virar solicitação).
   openDms Boolean @default(false)
+  /// Amigos (e quem conversa com a pessoa) veem a bolinha verde quando ela está com o app aberto. Desligado, ela também não vê a dos outros.
+  showOnline Boolean @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

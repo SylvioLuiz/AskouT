@@ -21,6 +21,7 @@ import { TastePicker, toggleTaste } from '../components/tastes.tsx';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
+import { ONLINE_CHANGED_EVENT } from '../components/online-presence.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
 import { ActivityKindIcon, ActivityLog } from '../components/activity-log.tsx';
 import { INTERACTIONS_TABS, interactionsPath, tabFromSlug, type InteractionsTab } from '../lib/activity-log.ts';
@@ -563,6 +564,43 @@ function OpenMessagesSetting({ isPrivate }: { isPrivate: boolean }) {
   );
 }
 
+/** Bolinha verde de online: amigos e quem conversa com você veem quando está com o app aberto. Desligada, você também não vê a dos outros. */
+function ShowOnlineSetting() {
+  const settings = useAsync(() => api.presenceSettings(), []);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const on = settings.data?.showOnline !== false;
+
+  async function toggle() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      settings.setData(await api.setPresenceSettings(!on));
+      window.dispatchEvent(new Event(ONLINE_CHANGED_EVENT));
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!settings.data) return null;
+  return (
+    <section className="setting">
+      <div className="setting__text">
+        <h2 className="setting__title" id="online-titulo">
+          {t('Mostrar quando estou online')}
+        </h2>
+        <p className="setting__help">{t('Amigos e pessoas com quem você conversa veem uma bolinha verde na sua foto enquanto você está com o app aberto. Desligado, você também não vê quem está online.')}</p>
+        {problem ? <Notice tone="error">{problem}</Notice> : null}
+      </div>
+      <button type="button" role="switch" aria-checked={on} aria-labelledby="online-titulo" className="switch" onClick={toggle} disabled={busy}>
+        <span className="switch__thumb" />
+      </button>
+    </section>
+  );
+}
+
 export function PrivacyScreen() {
   useTitle(t('Privacidade'));
   const user = useUser();
@@ -611,6 +649,7 @@ export function PrivacyScreen() {
         </button>
       </section>
       <OpenMessagesSetting isPrivate={isPrivate} />
+      <ShowOnlineSetting />
       <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
       <RegionSetting key={personalizeRev} userId={user.profile.userId} />
       <nav className="linklist" aria-label={t('Privacidade')}>

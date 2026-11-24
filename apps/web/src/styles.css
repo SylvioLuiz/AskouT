@@ -4194,6 +4194,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chathead__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .chathead__name { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chathead__sub { color: var(--muted); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chathead__online { color: #16a34a; font-weight: 600; }
 
 /* Informações da conversa */
 .chatinfo { display: flex; justify-content: center; margin: 4px 0 14px; }
@@ -4211,6 +4212,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .avatarflash { position: relative; flex: none; display: inline-block; }
 .avatarflash__bolt { position: absolute; left: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: var(--brand-ink); border: 2px solid var(--bg); box-sizing: content-box; }
 .avatarflash__bolt svg { width: 62%; height: 62%; }
+/* Bolinha verde de online: canto de baixo à direita (o raio do NOW fica à esquerda). */
+.avataronline { position: absolute; right: 0; bottom: 0; border-radius: 50%; background: #22c55e; border: 2px solid var(--bg); box-sizing: content-box; pointer-events: none; }
+.newsmedia .avataronline { display: none; }
 /* Nos flashes (stories), o selo fica "negativo": só o raio escuro, sem o círculo rosa em volta. */
 .homestories .avatarflash__bolt, .storyring .avatarflash__bolt { background: none; border: 0; color: var(--brand-ink); filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)); }
 .homestories .avatarflash__bolt svg, .storyring .avatarflash__bolt svg { width: 100%; height: 100%; }

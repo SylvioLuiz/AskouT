@@ -7,6 +7,7 @@ import { ChatBackgroundSheet } from './chat-background.tsx';
 import { ChatColorSheet } from './chat-color.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
+import { useOnline } from './online-presence.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { useUser } from '../auth.tsx';
@@ -27,6 +28,8 @@ export function ChatHead({ conversationId, other, venue, groupName, groupImageUr
   const name = asVenue ? asVenue.name : other ? other.displayName : (groupName ?? t('Grupo'));
   const to = asVenue ? `/bares/${encodeURIComponent(asVenue.id)}` : isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
   const [open, setOpen] = useState(false);
+  // Conversa 1 a 1 com a pessoa online: "Online" em verde junto do @.
+  const online = useOnline(asVenue ? undefined : (other?.userId ?? undefined));
   return (
     <header className="chathead">
       <Link to="/conversas" className="pagehead__back" aria-label={t('Voltar')}>
@@ -36,7 +39,14 @@ export function ChatHead({ conversationId, other, venue, groupName, groupImageUr
         {asVenue ? <GroupAvatar name={name} size={40} imageUrl={safeImage(asVenue.logoUrl)} /> : other ? <Avatar profile={other} size={40} /> : <GroupAvatar name={name} size={40} imageUrl={groupImageUrl} />}
         <span className="chathead__text">
           <span className="chathead__name">{name}</span>
-          {subtitle ? <span className="chathead__sub">{subtitle}</span> : null}
+          {online ? (
+            <span className="chathead__sub">
+              <span className="chathead__online">{t('Online')}</span>
+              {subtitle ? ` · ${subtitle}` : null}
+            </span>
+          ) : subtitle ? (
+            <span className="chathead__sub">{subtitle}</span>
+          ) : null}
         </span>
       </Link>
       <button type="button" className="iconbtn chathead__more" onClick={() => setOpen(true)} aria-label={t('Mais opções da conversa')} aria-haspopup="dialog">

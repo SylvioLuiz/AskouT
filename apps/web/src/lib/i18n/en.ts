@@ -3716,4 +3716,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Eventos do dia": "Events this day",
   "Seguir {name}": "Follow {name}",
   "Deixar de seguir {name}": "Unfollow {name}",
+  "Online": "Online",
+  "Mostrar quando estou online": "Show when I'm online",
+  "Amigos e pessoas com quem você conversa veem uma bolinha verde na sua foto enquanto você está com o app aberto. Desligado, você também não vê quem está online.": "Friends and people you chat with see a green dot on your photo while you have the app open. When off, you won't see who's online either.",
 };

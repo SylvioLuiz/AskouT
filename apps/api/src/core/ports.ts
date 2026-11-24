@@ -423,6 +423,11 @@ export interface ConversationRepository {
   /** A pessoa (perfil público) escolheu receber mensagens de quem ela não segue direto na caixa de conversas. */
   getOpenDms(userId: string): Promise<boolean>;
   setOpenDms(userId: string, on: boolean): Promise<void>;
+  /** A pessoa mostra a bolinha verde de online (padrão: sim). */
+  getShowOnline(userId: string): Promise<boolean>;
+  setShowOnline(userId: string, on: boolean): Promise<void>;
+  /** Dentre `userIds`, quem escondeu a bolinha de online. */
+  listHiddenOnline(userIds: readonly string[]): Promise<string[]>;
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
