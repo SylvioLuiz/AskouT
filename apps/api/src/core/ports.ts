@@ -974,6 +974,15 @@ export interface PlaceSource {
   lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }
 
+/**
+ * Cadastro de local pela gestão a partir do Google, só com o que é grátis: sugestões do Autocomplete (nome e endereço)
+ * e o detalhe "Essentials" (endereço, posição e tipos). Nunca lança.
+ */
+export interface GooglePlacePicker {
+  suggest(text: string, sessionToken: string): Promise<{ available: boolean; items: { placeId: string; name: string; address: string | null }[] }>;
+  essentials(placeId: string, sessionToken?: string): Promise<{ placeId: string; address: string | null; lat: number; lng: number; types: string[] } | undefined>;
+}
+
 /** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */
 export interface RouteSource {
   route(from: { lat: number; lng: number }, to: { lat: number; lng: number }, mode: 'foot' | 'driving'): Promise<RouteResult | undefined>;
@@ -1449,6 +1458,8 @@ export interface CoreDeps {
   placeSource: PlaceSource;
   /** Rotas do encontro Flash até o lugar escolhido. Opcional: sem ela o app mostra só a linha reta. */
   routes?: RouteSource;
+  /** Cadastro pela gestão a partir do Google (só com a chave do Google Places). */
+  googlePicker?: GooglePlacePicker;
   /** GIFs nos comentários (Giphy). Opcional: sem a chave GIPHY_API_KEY o recurso fica desligado. */
   gifs?: GifSource;
   pending: PendingSignupRepository;

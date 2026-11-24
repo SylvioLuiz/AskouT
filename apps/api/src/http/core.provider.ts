@@ -114,6 +114,7 @@ export const coreProvider = {
       oauthStates: new HmacOAuthStateTokens({ secret: config.codeSecret }),
       admin: new PrismaAdminRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
+      ...(google ? { googlePicker: google } : {}),
       ...(config.giphyApiKey ? { gifs: new GiphyGifSource({ apiKey: config.giphyApiKey }) } : {}),
       routes: new OsrmRouteSource({ baseUrl: process.env['OSRM_URL']?.trim() || undefined }),
       pending: new PrismaPendingSignupRepository(prisma),

@@ -1,9 +1,9 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api, appUrl, venueMediaUrl } from '../api.ts';
 import { VENUE_COVER, VENUE_LOGO, resizeImage } from '../image.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { CLAIM_LABEL, EVENT_KIND_LABEL, FEED_POLICY_LABEL, formatDate, formatDateTime, formatEventWhen, plural } from '../labels.ts';
-import type { FeedPolicy, GeocodeHit, VenueDetail } from '../types.ts';
+import type { FeedPolicy, GeocodeHit, GoogleSuggestion, VenueDetail } from '../types.ts';
 import { ActionDialog, Badge, Loadable, Modal, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
 import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
@@ -431,10 +431,113 @@ function GeocodeField({ editor }: { editor: RecordEditor<VenueDraft> }) {
   );
 }
 
+const newSession = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `s${Date.now()}${Math.random().toString(36).slice(2)}`);
+
+/**
+ * "Buscar no Google": sugestões do Autocomplete enquanto digita e, ao escolher, preenche nome, endereço, tipo e posição.
+ * Só usa o que o Google dá de graça; capa, logo, Instagram e descrição ficam para preencher à mão.
+ */
+function GooglePicker({ editor, linked, onLink }: { editor: RecordEditor<VenueDraft>; linked: GoogleSuggestion | undefined; onLink: (s: GoogleSuggestion | undefined) => void }) {
+  const [text, setText] = useState('');
+  const [items, setItems] = useState<GoogleSuggestion[]>([]);
+  const [off, setOff] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'warn' | 'bad'; text: string; id?: string }>();
+  const session = useRef(newSession());
+  const openRecord = useOpenRecord();
+  const q = useDebounced(text.trim(), 350);
+  useEffect(() => {
+    if (q.length < 3 || linked) {
+      setItems([]);
+      return;
+    }
+    let live = true;
+    api.googleSuggest(q, session.current).then(
+      (r) => {
+        if (!live) return;
+        setItems(r.items);
+        setOff(!r.available);
+      },
+      () => live && setItems([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [q, linked]);
+  const choose = async (s: GoogleSuggestion) => {
+    setBusy(true);
+    setNotice(undefined);
+    try {
+      const place = await api.googlePlace(s.placeId, s.name, session.current);
+      // A sessão do Autocomplete termina no detalhe: a próxima busca começa outra.
+      session.current = newSession();
+      if (place.linked) {
+        setNotice({ tone: 'bad', text: `Esse lugar já está no AskouT como “${place.linked.name}”.`, id: place.linked.id });
+        return;
+      }
+      editor.set('name', s.name.slice(0, 80));
+      if (place.address) editor.set('address', place.address);
+      if (place.category && editor.draft.category.trim() === '') editor.set('category', place.category);
+      editor.set('lat', String(place.lat));
+      editor.set('lng', String(place.lng));
+      onLink(s);
+      setItems([]);
+      setText('');
+      if (place.duplicate) setNotice({ tone: 'warn', text: `Já existe “${place.duplicate.name}” com esse nome a menos de 250 m; o cadastro será recusado.`, id: place.duplicate.id });
+    } catch (e) {
+      setNotice({ tone: 'bad', text: e instanceof Error ? e.message : 'Não foi possível buscar no Google agora.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (off && !linked) return <span className="muted small">A busca no Google está desligada agora (sem chave ou limite do dia atingido). Preencha à mão.</span>;
+  return (
+    <div className="gpick">
+      {linked ? (
+        <div className="gpick__linked">
+          <span>
+            Vinculado ao Google: <strong>{linked.name}</strong>
+            {linked.address ? <span className="muted small"> · {linked.address}</span> : null}
+          </span>
+          <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onLink(undefined)}>
+            Desvincular
+          </button>
+        </div>
+      ) : (
+        <input className="search gpick__input" type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Nome do local no Google Maps, ex.: Bar Brahma Centro" aria-label="Buscar no Google" maxLength={120} disabled={busy} />
+      )}
+      {items.length > 0 ? (
+        <ul className="geocode__list" aria-label="Lugares do Google">
+          {items.map((s) => (
+            <li key={s.placeId}>
+              <button type="button" className="geocode__hit" onClick={() => void choose(s)} disabled={busy}>
+                <strong>{s.name}</strong>
+                {s.address ? <span className="muted small">{s.address}</span> : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {busy ? <span className="muted small">Buscando endereço e posição…</span> : null}
+      {notice ? (
+        <span className={notice.tone === 'bad' ? 'small alert' : 'small warntext'} role="alert">
+          {notice.text}{' '}
+          {notice.id ? (
+            <button type="button" className="linkbtn" onClick={() => openRecord({ kind: 'venue', id: notice.id! })}>
+              Abrir
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** Cadastro manual de local: o mesmo formulário da edição (capa, logo, posição, feed, teste), já aberto para preencher. */
 export function NewVenueForm({ onClose }: { onClose: () => void }) {
   const openRecord = useOpenRecord();
   const createdId = useRef<string | undefined>(undefined);
+  const [google, setGoogle] = useState<GoogleSuggestion>();
   const editor = useRecordEditor<VenueDraft>({
     initial: { name: '', address: '', category: '', description: '', imageUrl: '', imageData: '', logoUrl: '', logoData: '', instagram: '', lat: '', lng: '', isSample: false, feedPolicy: 'OWNER_ONLY' },
     labels: VENUE_LABELS,
@@ -470,6 +573,7 @@ export function NewVenueForm({ onClose }: { onClose: () => void }) {
           ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
           isSample: d.isSample,
           feedPolicy: d.feedPolicy,
+          ...(google ? { googlePlaceId: google.placeId } : {}),
         },
         note,
       );
@@ -482,6 +586,18 @@ export function NewVenueForm({ onClose }: { onClose: () => void }) {
   });
   const p = editor.problems;
   const sections: RecordSection[] = [
+    {
+      title: 'Buscar no Google',
+      fields: [
+        {
+          label: 'Lugar',
+          value: null,
+          input: <GooglePicker editor={editor} linked={google} onLink={setGoogle} />,
+          hint: 'Preenche nome, endereço, tipo e posição (só dados grátis do Google). Capa, logo, Instagram e descrição você completa abaixo. Opcional.',
+          wide: true,
+        },
+      ],
+    },
     {
       title: 'Cadastro',
       fields: [
@@ -513,7 +629,7 @@ export function NewVenueForm({ onClose }: { onClose: () => void }) {
     <Modal title="Novo local" onClose={onClose} wide bare>
       <RecordView
         title="Novo local"
-        subtitle="Cadastro manual pela gestão"
+        subtitle="Cadastro pela gestão: do Google ou à mão"
         sections={sections}
         editor={editor}
         isNew

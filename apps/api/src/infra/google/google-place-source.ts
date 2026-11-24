@@ -1,4 +1,4 @@
-import type { PlaceSource } from '../../core/ports.ts';
+import type { GooglePlacePicker, PlaceSource } from '../../core/ports.ts';
 import type { ExternalPlace } from '../../core/types.ts';
 
 const ENDPOINT = 'https://places.googleapis.com/v1';
@@ -11,9 +11,16 @@ const FIELDS = 'places.id,places.displayName,places.location,places.primaryType,
 /** Busca por texto e detalhe de um lugar também trazem o endereço, que vira o endereço do rolê vinculado. */
 const SEARCH_FIELDS = `${FIELDS},places.formattedAddress,places.types`;
 const DETAIL_FIELDS = 'id,displayName,location,primaryType,types,googleMapsUri,photos,formattedAddress';
+/**
+ * Cadastro pela gestão: só campos da faixa "Essentials" do detalhe (10.000 grátis por mês). O nome (`displayName`,
+ * faixa Pro) vem da sugestão do Autocomplete, que é grátis quando a sessão termina num detalhe. Foto, telefone, site,
+ * horário e avaliações (Pro/Enterprise) ficam de fora: a gestão preenche à mão.
+ */
+const ESSENTIAL_FIELDS = 'id,formattedAddress,location,types';
+const SESSION_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** Tipos de chamada, cada um com a sua franquia gratuita mensal no Google e o seu teto diário aqui. */
-export type GoogleCallKind = 'nearby' | 'search' | 'lookup' | 'photo';
+export type GoogleCallKind = 'nearby' | 'search' | 'lookup' | 'photo' | 'autocomplete' | 'essentials';
 
 /**
  * Tetos diários padrão, abaixo da franquia gratuita mensal dividida por 31 dias: busca por perto, por texto e detalhe
@@ -26,7 +33,8 @@ const CACHE_MAX = 300;
 const PHOTO_TTL_MS = 60 * 60_000;
 const PHOTO_CACHE_MAX = 150;
 
-export const GOOGLE_DAILY_DEFAULTS: Record<GoogleCallKind, number> = { nearby: 150, search: 150, lookup: 150, photo: 30 };
+/** Autocomplete (10.000/mês, e grátis na sessão que termina num detalhe) e detalhe Essentials (10.000/mês) do cadastro pela gestão. */
+export const GOOGLE_DAILY_DEFAULTS: Record<GoogleCallKind, number> = { nearby: 150, search: 150, lookup: 150, photo: 30, autocomplete: 300, essentials: 300 };
 /** Id de lugar do Google: só letras, números, `_` e `-` (o servidor monta a URL com ele). */
 const PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 /** Só aceita referências de foto no formato do Google (evita usar o servidor como proxy aberto). */
@@ -63,14 +71,14 @@ interface GooglePlace {
  * a foto é buscada pelo servidor (a chave nunca vai ao app) e quem usa deve mostrar o crédito ao Google.
  * Nunca lança: qualquer falha vira `available: false`.
  */
-export class GooglePlaceSource implements PlaceSource {
+export class GooglePlaceSource implements PlaceSource, GooglePlacePicker {
   private readonly apiKey: string;
   private readonly limits: Record<GoogleCallKind, number>;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
   private day = '';
-  private used: Record<GoogleCallKind, number> = { nearby: 0, search: 0, lookup: 0, photo: 0 };
+  private used: Record<GoogleCallKind, number> = { nearby: 0, search: 0, lookup: 0, photo: 0, autocomplete: 0, essentials: 0 };
   private readonly cache = new Map<string, { at: number; places: ExternalPlace[] }>();
   /** A busca por texto só existe no Google, e ele cobra: o app só usa quando a pessoa pede. */
   readonly premiumSearch = true;
@@ -84,6 +92,8 @@ export class GooglePlaceSource implements PlaceSource {
       search: Math.min(cap, limits.search),
       lookup: Math.min(cap, limits.lookup),
       photo: Math.min(cap, limits.photo),
+      autocomplete: Math.min(cap, limits.autocomplete),
+      essentials: Math.min(cap, limits.essentials),
     };
     this.timeoutMs = options.timeoutMs ?? 6000;
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -125,7 +135,7 @@ export class GooglePlaceSource implements PlaceSource {
     const today = new Date(this.now()).toISOString().slice(0, 10);
     if (today !== this.day) {
       this.day = today;
-      this.used = { nearby: 0, search: 0, lookup: 0, photo: 0 };
+      this.used = { nearby: 0, search: 0, lookup: 0, photo: 0, autocomplete: 0, essentials: 0 };
     }
     if (this.used[kind] >= this.limits[kind]) {
       this.warn(`teto diário de ${kind} atingido (${this.limits[kind]})`, `cap:${kind}:${today}`);
@@ -207,6 +217,71 @@ export class GooglePlaceSource implements PlaceSource {
     } catch (e) {
       this.warn(`search: ${e instanceof Error ? e.message : 'falha'}`, 'ex:search');
       return { available: false, places: [] };
+    }
+  }
+
+  private readonly suggestCache = new Map<string, { at: number; items: { placeId: string; name: string; address: string | null }[] }>();
+
+  /**
+   * Sugestões do Autocomplete (API nova) para o que a gestão digita: id, nome e endereço de cada lugar. Com o mesmo
+   * `sessionToken` do detalhe escolhido depois, o Google não cobra as sugestões.
+   */
+  async suggest(text: string, sessionToken: string): Promise<{ available: boolean; items: { placeId: string; name: string; address: string | null }[] }> {
+    const input = text.trim().replace(/\s+/g, ' ').slice(0, 120);
+    if (input.length < 3 || !SESSION_RE.test(sessionToken)) return { available: true, items: [] };
+    const key = input.toLowerCase();
+    const hit = this.suggestCache.get(key);
+    if (hit && this.now() - hit.at < CACHE_TTL_MS) return { available: true, items: hit.items.map((i) => ({ ...i })) };
+    if (!this.spend('autocomplete')) return { available: false, items: [] };
+    try {
+      const response = await this.fetchImpl(`${ENDPOINT}/places:autocomplete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat' },
+        body: JSON.stringify({ input, sessionToken, languageCode: 'pt-BR', regionCode: 'br', includedRegionCodes: ['br'] }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) {
+        await this.fail('autocomplete', response);
+        return { available: false, items: [] };
+      }
+      const json = (await response.json()) as { suggestions?: { placePrediction?: { placeId?: string; structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } } } }[] };
+      const items: { placeId: string; name: string; address: string | null }[] = [];
+      for (const s of json.suggestions ?? []) {
+        const p = s.placePrediction;
+        const name = p?.structuredFormat?.mainText?.text?.trim();
+        if (!p?.placeId || !PLACE_ID_RE.test(p.placeId) || !name) continue;
+        items.push({ placeId: p.placeId, name: name.slice(0, 120), address: p.structuredFormat?.secondaryText?.text?.trim().slice(0, 200) || null });
+      }
+      if (this.suggestCache.size >= CACHE_MAX) this.suggestCache.delete(this.suggestCache.keys().next().value as string);
+      this.suggestCache.set(key, { at: this.now(), items });
+      return { available: true, items: items.map((i) => ({ ...i })) };
+    } catch (e) {
+      this.warn(`autocomplete: ${e instanceof Error ? e.message : 'falha'}`, 'ex:autocomplete');
+      return { available: false, items: [] };
+    }
+  }
+
+  /** Detalhe "Essentials" do lugar escolhido: endereço, posição e tipos. Fecha a sessão do Autocomplete. */
+  async essentials(placeId: string, sessionToken?: string): Promise<{ placeId: string; address: string | null; lat: number; lng: number; types: string[] } | undefined> {
+    if (!PLACE_ID_RE.test(placeId) || !this.spend('essentials')) return undefined;
+    const session = sessionToken && SESSION_RE.test(sessionToken) ? `&sessionToken=${sessionToken}` : '';
+    try {
+      const response = await this.fetchImpl(`${ENDPOINT}/places/${placeId}?languageCode=pt-BR&regionCode=br${session}`, {
+        headers: { 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': ESSENTIAL_FIELDS },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) {
+        await this.fail('essentials', response);
+        return undefined;
+      }
+      const p = (await response.json()) as GooglePlace;
+      const lat = p.location?.latitude;
+      const lng = p.location?.longitude;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+      return { placeId: p.id && PLACE_ID_RE.test(p.id) ? p.id : placeId, address: p.formattedAddress?.slice(0, 200) ?? null, lat, lng, types: Array.isArray(p.types) ? p.types.filter((t) => typeof t === 'string').slice(0, 20) : [] };
+    } catch (e) {
+      this.warn(`essentials: ${e instanceof Error ? e.message : 'falha'}`, 'ex:essentials');
+      return undefined;
     }
   }
 

@@ -96,7 +96,18 @@ export interface AdminUserDetail {
 /** Edição de local pela gestão: os campos do perfil (como o dono) e os que só a gestão troca. */
 export type AdminVenueEditInput = VenueProfileInput & { lat?: unknown; lng?: unknown; isSample?: unknown; feedPolicy?: unknown; note?: unknown };
 /** Cadastro de local pela gestão: os mesmos campos da edição. Sem `lat`/`lng`, a posição sai do endereço. */
-export type AdminVenueCreateInput = AdminVenueEditInput;
+export type AdminVenueCreateInput = AdminVenueEditInput & { googlePlaceId?: unknown };
+
+/** Tipo do Google (campo `types`, grátis) para o "Tipo" do local, na ordem de preferência. */
+const GOOGLE_TYPE_LABEL: [string, string][] = [
+  ['night_club', 'balada'], ['karaoke', 'karaokê'], ['wine_bar', 'bar de vinhos'], ['pub', 'pub'], ['bar_and_grill', 'bar'], ['bar', 'bar'],
+  ['brewery', 'cervejaria'], ['concert_hall', 'casa de shows'], ['performing_arts_theater', 'teatro'], ['event_venue', 'casa de eventos'],
+  ['dance_hall', 'casa de dança'], ['comedy_club', 'comedy club'], ['pizza_restaurant', 'pizzaria'], ['brazilian_restaurant', 'restaurante'],
+  ['steak_house', 'churrascaria'], ['restaurant', 'restaurante'], ['coffee_shop', 'café'], ['cafe', 'café'], ['bakery', 'padaria'],
+  ['ice_cream_shop', 'sorveteria'], ['stadium', 'estádio'], ['park', 'parque'], ['museum', 'museu'], ['movie_theater', 'cinema'], ['food', 'restaurante'],
+];
+export const categoryFromGoogleTypes = (types: string[]): string | null => GOOGLE_TYPE_LABEL.find(([t]) => types.includes(t))?.[1] ?? null;
+const GOOGLE_PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 
 /** Uma linha da planilha de importação de locais (como veio; tudo é conferido). */
 export interface AdminVenueImportRow {
@@ -862,6 +873,35 @@ export class AdminService {
     return paid.places.slice(0, limit).map(view('GOOGLE'));
   }
 
+  /**
+   * Busca no Google para cadastrar um local: sugestões do Autocomplete (nome e endereço), sem custo quando a sessão
+   * termina no detalhe. `available: false` quando não há chave do Google ou o teto do dia acabou.
+   */
+  async googleSuggest(actor: Actor, input: { text?: unknown; sessionToken?: unknown }): Promise<{ available: boolean; items: { placeId: string; name: string; address: string | null }[] }> {
+    this.assertAdmin(actor);
+    const picker = this.deps.googlePicker;
+    if (!picker) return { available: false, items: [] };
+    if (typeof input.text !== 'string' || typeof input.sessionToken !== 'string') throw validationError('Dados inválidos', { text: 'Escreva o nome do local' });
+    return picker.suggest(input.text.slice(0, 120), input.sessionToken);
+  }
+
+  /**
+   * O lugar escolhido no Google: endereço, posição e tipo (detalhe "Essentials", grátis dentro da franquia). Avisa se ele
+   * já está no AskouT (vinculado ou com o mesmo nome ali perto). Capa, logo, Instagram e descrição a gestão preenche.
+   */
+  async googlePlace(actor: Actor, input: { placeId?: unknown; name?: unknown; sessionToken?: unknown }): Promise<{ placeId: string; address: string | null; lat: number; lng: number; category: string | null; linked: { id: string; name: string } | null; duplicate: { id: string; name: string } | null }> {
+    this.assertAdmin(actor);
+    const picker = this.deps.googlePicker;
+    if (!picker) throw conflict('A busca no Google não está ligada (falta a chave do Google Places)');
+    if (typeof input.placeId !== 'string' || !GOOGLE_PLACE_ID_RE.test(input.placeId)) throw validationError('Dados inválidos', { placeId: 'Lugar do Google inválido' });
+    const linked = await this.deps.places.findVenueByExternalKey(`google:${input.placeId}`);
+    const place = await picker.essentials(input.placeId, typeof input.sessionToken === 'string' ? input.sessionToken : undefined);
+    if (!place) throw conflict('O Google não respondeu agora (ou o limite do dia acabou). Tente de novo mais tarde ou preencha à mão');
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    const duplicate = !linked && name ? await this.findDuplicateVenue(name, place.lat, place.lng) : undefined;
+    return { placeId: input.placeId, address: place.address, lat: place.lat, lng: place.lng, category: categoryFromGoogleTypes(place.types), linked: linked ? { id: linked.id, name: linked.name } : null, duplicate: duplicate ?? null };
+  }
+
   /** Local do AskouT com o mesmo nome a menos de 250 m (o mesmo rolê cadastrado de novo). */
   private async findDuplicateVenue(name: string, lat: number, lng: number): Promise<{ id: string; name: string } | undefined> {
     const key = venueNameKey(name);
@@ -920,10 +960,18 @@ export class AdminService {
     this.assertAdmin(actor);
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
     const reason = noteText(input.note, false);
+    let googleKey: string | undefined;
+    if (input.googlePlaceId !== undefined && input.googlePlaceId !== null && input.googlePlaceId !== '') {
+      if (typeof input.googlePlaceId !== 'string' || !GOOGLE_PLACE_ID_RE.test(input.googlePlaceId)) throw validationError('Dados inválidos', { googlePlaceId: 'Lugar do Google inválido' });
+      googleKey = `google:${input.googlePlaceId}`;
+      const linked = await this.deps.places.findVenueByExternalKey(googleKey);
+      if (linked) throw conflict(`Esse lugar do Google já está no AskouT como “${linked.name}”`);
+    }
     const c = await this.checkNewVenue(input);
     if (c.duplicate) throw conflict(`Já existe “${c.duplicate.name}” com esse nome a menos de ${VENUE_DUPLICATE_RADIUS_M} m`);
+    if (googleKey) c.record.externalKey = googleKey;
     await this.saveNewVenue(c);
-    const where = c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)';
+    const where = (googleKey ? 'a partir do Google; ' : '') + (c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)');
     await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(cadastro manual; ${where})`.slice(0, 400), {
       targetLabel: c.record.name,
       changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...c.record }),

@@ -368,3 +368,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .import__filter { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 .import__table { max-height: 46vh; overflow: auto; border-radius: var(--radius); }
 .import__table .table td { padding: 8px 12px; }
+
+/* Cadastro a partir do Google */
+.gpick { display: flex; flex-direction: column; gap: 8px; }
+.gpick__input { width: 100%; }
+.gpick__linked { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px solid var(--brand); border-radius: 8px; padding: 8px 12px; }
+.warntext { color: var(--warn); }

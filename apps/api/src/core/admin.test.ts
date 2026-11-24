@@ -656,3 +656,40 @@ test('importar locais pela gestão: prévia por linha, erros, duplicados e impor
   // De novo: tudo duplicado, nada a importar.
   await rejectsWith(w.core.admin.importVenues(A, { rows: rows.slice(0, 2), dryRun: false }), 'CONFLICT');
 });
+
+test('cadastrar local a partir do Google: sugestões, detalhe só com campos grátis, vínculo e duplicados', async () => {
+  const calls: string[] = [];
+  const googlePicker = {
+    async suggest(text: string, session: string) {
+      calls.push(`suggest:${text}:${session}`);
+      return { available: true, items: [{ placeId: 'ChIJabc', name: 'Bar Augusta', address: 'Rua Augusta, 1500 - São Paulo' }] };
+    },
+    async essentials(placeId: string, session?: string) {
+      calls.push(`essentials:${placeId}:${session}`);
+      return placeId === 'ChIJabc' ? { placeId, address: 'Rua Augusta, 1500 - Consolação, São Paulo - SP', lat: -23.5558, lng: -46.6623, types: ['bar', 'restaurant', 'food'] } : undefined;
+    },
+  };
+  const w = makeWorld({ googlePicker });
+  const u = await w.signUpMany('adm', 'ana');
+  w.users.users.set(u['adm']!, { ...w.users.users.get(u['adm']!)!, role: 'ADMIN' });
+  const A = { userId: u['adm']!, role: 'ADMIN' as const };
+  await rejectsWith(w.core.admin.googleSuggest({ userId: u['ana']!, role: 'USER' }, { text: 'bar', sessionToken: 's' }), 'FORBIDDEN');
+  const s = await w.core.admin.googleSuggest(A, { text: 'bar augusta', sessionToken: 'sess-1234' });
+  assert.equal(s.items[0]!.name, 'Bar Augusta');
+  const place = await w.core.admin.googlePlace(A, { placeId: 'ChIJabc', name: 'Bar Augusta', sessionToken: 'sess-1234' });
+  assert.deepEqual([place.address, place.lat, place.category, place.linked, place.duplicate], ['Rua Augusta, 1500 - Consolação, São Paulo - SP', -23.5558, 'bar', null, null]);
+  assert.deepEqual(calls, ['suggest:bar augusta:sess-1234', 'essentials:ChIJabc:sess-1234'], 'a mesma sessão liga a sugestão ao detalhe');
+  await rejectsWith(w.core.admin.googlePlace(A, { placeId: 'nao/valido' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.googlePlace(A, { placeId: 'ChIJsumiu' }), 'CONFLICT');
+
+  const d = await w.core.admin.createVenue(A, { name: 'Bar Augusta', address: place.address, category: place.category, lat: place.lat, lng: place.lng, googlePlaceId: 'ChIJabc', instagram: '@baraugusta' });
+  assert.deepEqual([d.source, d.extra?.externalKey, d.instagram], ['GOOGLE', 'google:ChIJabc', 'baraugusta']);
+  await rejectsWith(w.core.admin.createVenue(A, { name: 'Outro nome', lat: -10, lng: -40, googlePlaceId: 'ChIJabc' }), 'CONFLICT');
+  const again = await w.core.admin.googlePlace(A, { placeId: 'ChIJabc', name: 'Bar Augusta' });
+  assert.equal(again.linked?.id, d.id);
+
+  const off = makeWorld();
+  const ou = await off.signUpMany('adm');
+  off.users.users.set(ou['adm']!, { ...off.users.users.get(ou['adm']!)!, role: 'ADMIN' });
+  assert.deepEqual(await off.core.admin.googleSuggest({ userId: ou['adm']!, role: 'ADMIN' }, { text: 'bar', sessionToken: 'sess-1234' }), { available: false, items: [] });
+});
