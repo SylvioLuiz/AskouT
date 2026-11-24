@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { inAppPath, splitLinks } from './linkify.ts';
+import { appHosts, inAppPath, splitLinks } from './linkify.ts';
 
 const links = (text: string) => splitLinks(text).filter((p) => p.href).map((p) => [p.text, p.href]);
 
@@ -32,4 +32,10 @@ test('splitLinks: o texto volta inteiro, na ordem', () => {
 test('inAppPath: só links do AskouT abrem dentro do app', () => {
   assert.equal(inAppPath('https://askout.com.br/eventos/1?x=2'), '/eventos/1?x=2');
   assert.equal(inAppPath('https://instagram.com/a'), undefined);
+});
+
+test('link do próprio site aberto (homologação) também abre dentro do app', () => {
+  assert.deepEqual(appHosts('askout.com.br'), ['askout.com.br', 'www.askout.com.br']);
+  assert.equal(inAppPath('https://homolog.askout.app/bares/1', appHosts('homolog.askout.app')), '/bares/1');
+  assert.equal(inAppPath('https://homolog.askout.app/bares/1'), undefined);
 });

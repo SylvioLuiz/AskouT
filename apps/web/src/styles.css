@@ -7144,6 +7144,10 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 
 /* Texto com link de evento: o cartão vem logo abaixo do texto, na mesma bolha. */
 .bubble__text + .evbubble { margin-top: 8px; }
+/* Cartão de local compartilhado na conversa (mesmo jeito do cartão de evento). */
+.vnbubble__cover { background: linear-gradient(135deg, var(--brand-soft, var(--line)), var(--line)); }
+.vnbubble__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vnbubble__head .vlogo { flex: none; }
 
 /* Galeria dentro do app (iPhone): a grade das fotos recentes por cima da câmera. */
 .storycam__grid { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; padding-top: calc(max(10px, var(--sa-top)) + 54px); background: #000; color: #fff; animation: storyreply-in 160ms ease-out; }

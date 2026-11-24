@@ -268,9 +268,9 @@ export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShar
         ) : null}
 
         {note ? <p className="muted sharesheet__note">{note}</p> : null}
-        {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
-
         <div className="sharesheet__foot">
+          {/* O aviso (enviado, link copiado, erro) fica no rodapé fixo da folha: com a lista cheia, ele ficava escondido atrás do rodapé. */}
+          {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
           {chosen.length > 0 ? (
             <form
               className="sharesheet__compose"

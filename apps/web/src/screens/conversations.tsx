@@ -26,6 +26,7 @@ import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
+import { VenueBubble } from '../components/venue-bubble.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
 import { PlaceMapSheet, SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
@@ -1353,6 +1354,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <EventBubble event={m.event} />
         ) : m.gif ? (
           <CommentGifView gif={m.gif} />
+        ) : m.kind === 'TEXT' && m.venue ? (
+          // Texto com link da página de um local: o texto e, embaixo, o cartão do local (abre a página no app).
+          <>
+            <p className="bubble__text"><LinkedText text={m.body} /></p>
+            <VenueBubble venue={m.venue} />
+          </>
         ) : m.kind === 'TEXT' && m.event ? (
           // Texto com link de evento: o texto e, embaixo, o cartão do evento (foto, título e link).
           <>
