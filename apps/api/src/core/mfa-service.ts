@@ -1,4 +1,6 @@
 import { randomInt } from 'node:crypto';
+import { recordAudit } from './audit.ts';
+import type { AuditAction } from './types.ts';
 import { conflict, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { generateTotpSecret, matchTotp, otpauthUrl } from './totp.ts';
@@ -94,6 +96,7 @@ export class MfaService {
     const recoveryCodes = this.newRecoveryCodes();
     const fresh = await this.deps.mfa.find(userId);
     await this.deps.mfa.save({ ...(fresh ?? record), enabledAt: this.deps.clock.now(), recoveryCodeHashes: recoveryCodes.map((c) => this.hashRecovery(userId, c)) });
+    await this.audit(userId, 'MFA_ENABLED');
     return { recoveryCodes };
   }
 
@@ -106,6 +109,7 @@ export class MfaService {
     }
     await this.check(record, rawCode, { allowRecovery: true });
     await this.deps.mfa.delete(userId);
+    await this.audit(userId, 'MFA_DISABLED');
     return { enabled: false };
   }
 
@@ -117,7 +121,19 @@ export class MfaService {
     const recoveryCodes = this.newRecoveryCodes();
     const fresh = (await this.deps.mfa.find(userId)) ?? record;
     await this.deps.mfa.save({ ...fresh, recoveryCodeHashes: recoveryCodes.map((c) => this.hashRecovery(userId, c)) });
+    await this.audit(userId, 'MFA_RECOVERY_REGENERATED');
     return { recoveryCodes };
+  }
+
+  /** Contas com poder (gestão e donos de local): ligar, desligar ou trocar os códigos da verificação vai para a auditoria. */
+  private async audit(userId: string, action: AuditAction): Promise<void> {
+    const user = await this.deps.users.findById(userId);
+    if (!user || user.role === 'USER') return;
+    const profile = await this.deps.users.findProfileById(userId);
+    await recordAudit(this.deps, {
+      actorId: userId, actorKind: user.role === 'ADMIN' ? 'ADMIN' : 'USER', action, targetType: 'USER', targetId: userId, targetLabel: profile ? `@${profile.username}` : null,
+      note: user.role === 'ADMIN' ? 'Conta da gestão' : 'Conta de dono de local',
+    });
   }
 
   /** Segunda etapa do login. Lança erro se o código não vale. */

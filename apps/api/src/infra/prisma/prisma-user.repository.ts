@@ -241,6 +241,21 @@ export class PrismaUserRepository implements UserRepository {
     await this.prisma.user.updateMany({ where: { id: userId, onboardedAt: null }, data: { onboardedAt: at } });
   }
 
+  async getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }> {
+    if (!isUuid(userId)) return { count: 0, lastAt: null };
+    const row = await this.prisma.userSettings.findUnique({ where: { userId }, select: { phonePromptCount: true, phonePromptAt: true } });
+    return { count: row?.phonePromptCount ?? 0, lastAt: row?.phonePromptAt ?? null };
+  }
+
+  async markPhonePrompted(userId: string, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.userSettings.upsert({
+      where: { userId },
+      create: { userId, phonePromptCount: 1, phonePromptAt: at },
+      update: { phonePromptCount: { increment: 1 }, phonePromptAt: at },
+    });
+  }
+
   async setTastes(userId: string, tastes: string[]): Promise<void> {
     if (!isUuid(userId)) return;
     await this.prisma.user.updateMany({ where: { id: userId }, data: { tastes } });

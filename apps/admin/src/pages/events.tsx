@@ -151,7 +151,7 @@ function EventRecord({ e, onClose, reload, onOpenDate }: { e: EventDetail; onClo
       ),
     },
     {
-      title: 'Quem confirmou',
+      title: 'Quem vai',
       count: e.goingCount,
       children: (
         <LinkedList
@@ -159,7 +159,7 @@ function EventRecord({ e, onClose, reload, onOpenDate }: { e: EventDetail; onClo
           total={e.goingCount}
           empty="Ninguém confirmou ainda."
           keyOf={(g) => g.id}
-          render={(g) => ({ main: <PersonLink id={g.id} username={g.username} displayName={g.displayName} />, side: formatDateTime(g.at) })}
+          render={(g) => ({ main: <PersonLink id={g.id} username={g.username} displayName={g.displayName} avatarUrl={g.avatarUrl} />, side: formatDateTime(g.at) })}
         />
       ),
     },

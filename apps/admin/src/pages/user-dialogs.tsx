@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ApiError, api } from '../api.ts';
+import { ApiError, api, avatarSrc } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
-import { CLAIM_LABEL, STATUS_LABEL, formatBirthDate, formatDate, formatDateTime, plural } from '../labels.ts';
-import type { PersonRef, UserActivityItem, UserDetail as UserDetailData, UserRow } from '../types.ts';
+import type { ReactNode } from 'react';
+import { CLAIM_LABEL, STATUS_LABEL, formatBirthDate, formatCents, formatDate, formatDateTime, plural } from '../labels.ts';
+import type { PersonRef, UserActivityItem, UserDetail as UserDetailData, UserRow, UserStats as UserStatsData } from '../types.ts';
 import { Badge, Modal } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { DateInput, LinkedList, Mono, PersonLink, RecordLink, RecordModal, RecordView, TextArea, TextInput, YesNo, useRecordEditor } from '../record.tsx';
 import type { RecordAction, RecordSection } from '../record.tsx';
+import { AuditTrail } from './audit.tsx';
 
 export const ROLE_LABEL: Record<UserRow['role'], string> = { USER: 'Pessoa', VENUE_OWNER: 'Responsável por local', ADMIN: 'Admin' };
 const VENUE_ROLE_LABEL = { OWNER: 'Dono', MANAGER: 'Administra', FOLLOWER: 'Segue' } as const;
@@ -115,7 +117,7 @@ function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => 
         { label: 'Nome', value: <strong>{u.displayName}</strong>, input: <TextInput editor={editor} k="displayName" maxLength={60} />, problem: editor.problems.displayName },
         { label: '@usuário', value: <span className="handle">@{u.username}</span>, input: <TextInput editor={editor} k="username" maxLength={30} />, problem: editor.problems.username, hint: usernameHint },
         { label: 'Biografia', value: u.bio ? <span className="pre">{u.bio}</span> : null, input: <TextArea editor={editor} k="bio" maxLength={160} />, wide: true, problem: editor.problems.bio },
-        { label: 'Foto', value: x?.avatarUrl ? <img className="record__avatar" src={x.avatarUrl} alt="" referrerPolicy="no-referrer" /> : null },
+        { label: 'Foto', value: x?.avatarUrl ? <img className="record__avatar" src={avatarSrc(x.avatarUrl)} alt="" referrerPolicy="no-referrer" /> : null },
         { label: 'Perfil privado', value: <YesNo value={x?.isPrivate} /> },
         { label: 'Gostos de rolê', value: x && x.tastes.length > 0 ? x.tastes.join(', ') : x ? 'Gosta de tudo' : null, wide: true },
       ],
@@ -296,6 +298,8 @@ function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => 
       children: x ? <LinkedList items={x.groups} total={x.counts.groups} empty="" keyOf={(g) => g.id} render={(g) => ({ main: g.name, side: `${GROUP_ROLE_LABEL[g.role] ?? g.role} · desde ${formatDate(g.joinedAt)}` })} /> : null,
     },
     { title: 'Atividade', children: <ActivityList userId={u.id} compact /> },
+    { title: 'Auditoria: com esta conta', children: <AuditTrail filter={{ targetId: u.id }} empty="Nada registrado sobre esta conta." /> },
+    { title: 'Auditoria: feito por esta conta', hidden: u.role === 'USER', children: <AuditTrail filter={{ actorId: u.id }} empty="Nada registrado." /> },
   ];
 
   return (
@@ -425,10 +429,145 @@ function ActivityList({ userId, compact }: { userId: string; compact?: boolean }
   );
 }
 
-/** A atividade sozinha, aberta direto da lista de pessoas. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "hoje", "ontem", "há 5 dias", "há 3 meses": quanto tempo faz, para ler de relance. */
+export function sinceText(iso: string | null, now = Date.now()): string {
+  if (!iso) return 'nunca';
+  const days = Math.floor((now - new Date(iso).getTime()) / DAY_MS);
+  if (days <= 0) return 'hoje';
+  if (days === 1) return 'ontem';
+  if (days < 60) return `há ${days} dias`;
+  const months = Math.floor(days / 30);
+  if (months < 24) return `há ${months} meses`;
+  return `há ${Math.floor(days / 365)} anos`;
+}
+
+/** Idade da conta em dias, meses ou anos. */
+export function ageText(days: number): string {
+  if (days < 1) return 'menos de 1 dia';
+  if (days < 60) return plural(days, 'dia', 'dias');
+  if (days < 730) return plural(Math.floor(days / 30), 'mês', 'meses');
+  return plural(Math.floor(days / 365), 'ano', 'anos');
+}
+
+/** Sinais que pedem um olhar de quem modera, do mais grave ao mais leve. */
+export function attentionSignals(s: UserStatsData, now = Date.now()): { tone: 'bad' | 'warn' | 'info'; text: string }[] {
+  const m = s.moderation;
+  const out: { tone: 'bad' | 'warn' | 'info'; text: string }[] = [];
+  if (m.reportsOpen > 0) out.push({ tone: 'bad', text: `${plural(m.reportsOpen, 'denúncia aberta', 'denúncias abertas')} contra a pessoa` });
+  if (m.reportsActioned > 0) out.push({ tone: 'bad', text: `${plural(m.reportsActioned, 'denúncia confirmada', 'denúncias confirmadas')} pela gestão` });
+  if (m.suspensions > 0) out.push({ tone: 'warn', text: `Já foi suspensa ${m.suspensions === 1 ? '1 vez' : `${m.suspensions} vezes`} (última ${formatDate(m.lastSuspendedAt)})` });
+  if (m.blockedBy >= 3) out.push({ tone: 'warn', text: `Bloqueada por ${plural(m.blockedBy, 'pessoa', 'pessoas')}` });
+  if (s.now.hiddenBy >= 3) out.push({ tone: 'warn', text: `${plural(s.now.hiddenBy, 'pessoa escondeu', 'pessoas esconderam')} o NOW dela` });
+  if (m.reportsMade >= 5 && m.reportsMadeActioned === 0) out.push({ tone: 'info', text: `Fez ${m.reportsMade} denúncias e nenhuma foi confirmada` });
+  if (s.accountAgeDays < 7 && s.actions7 >= 100) out.push({ tone: 'warn', text: `Conta nova com muita ação (${s.actions7} em 7 dias)` });
+  const idle = s.lastSeenAt ? (now - new Date(s.lastSeenAt).getTime()) / DAY_MS : Infinity;
+  if (idle > 30) out.push({ tone: 'info', text: s.lastSeenAt ? `Sem uso há mais de 30 dias` : 'Nenhuma ação registrada no app' });
+  return out;
+}
+
+function Stat({ label, value, sub, alert }: { label: string; value: ReactNode; sub?: ReactNode; alert?: boolean }) {
+  return (
+    <div className="stat">
+      <span className="stat__label">{label}</span>
+      <span className={alert ? 'stat__value stat__value--alert' : 'stat__value'}>{value}</span>
+      {sub ? <span className="stat__sub">{sub}</span> : null}
+    </div>
+  );
+}
+
+function StatGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="stats__group">
+      <h3 className="stats__title">{title}</h3>
+      <div className="stats__grid">{children}</div>
+    </section>
+  );
+}
+
+/** Retrato da pessoa para quem gerencia: uso, vínculos, eventos, NOW, mensagens (só quantas), moderação e compras. */
+export function UserStatsPanel({ userId }: { userId: string }) {
+  const state = useAsync(() => api.userStats(userId), [userId]);
+  if (state.loading && !state.data) return <p className="muted small">Carregando números…</p>;
+  if (state.error) return <p className="notice notice--bad" role="alert">{state.error}</p>;
+  const s = state.data;
+  if (!s) return null;
+  const m = s.moderation;
+  const signals = attentionSignals(s);
+  const rate = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—');
+  return (
+    <div className="stats">
+      {signals.length > 0 ? (
+        <ul className="stats__signals" aria-label="Pontos de atenção">
+          {signals.map((x) => (
+            <li key={x.text}>
+              <Badge tone={x.tone}>{x.tone === 'bad' ? 'Atenção' : x.tone === 'warn' ? 'Observar' : 'Info'}</Badge> {x.text}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <StatGroup title="Uso">
+        <Stat label="Visto por último" value={sinceText(s.lastSeenAt)} sub={s.lastSeenAt ? formatDateTime(s.lastSeenAt) : 'pela última ação ou visualização'} />
+        <Stat label="Conta criada há" value={ageText(s.accountAgeDays)} />
+        <Stat label="Dias ativos (30 dias)" value={`${s.activeDays30}/30`} />
+        <Stat label="Ações" value={s.actions30} sub={`${s.actions7} nos últimos 7 dias`} />
+      </StatGroup>
+      <StatGroup title="Social">
+        <Stat label="Amigos" value={s.social.friends} />
+        <Stat label="Seguidores" value={s.social.followers} sub={`+${s.social.followersGained30} em 30 dias`} />
+        <Stat label="Segue" value={s.social.following} />
+        <Stat label="Curtidas e reações recebidas" value={s.social.likesReceived} />
+        <Stat label="Comentários recebidos" value={s.social.commentsReceived} />
+        <Stat label="Convidou para o app" value={s.referrals.invited} sub={`${s.referrals.qualified} voltaram depois`} />
+      </StatGroup>
+      <StatGroup title="Conteúdo">
+        <Stat label="Posts" value={s.content.posts} />
+        <Stat label="Stories" value={s.content.stories} />
+        <Stat label="Publicações no feed" value={s.content.feedPosts} />
+        <Stat label="Comentários feitos" value={s.content.comments} />
+        <Stat label="Curtidas e reações dadas" value={s.content.likes} />
+      </StatGroup>
+      <StatGroup title="Eventos">
+        <Stat label="Criados" value={s.events.created} />
+        <Stat label="Presenças confirmadas" value={s.events.going} />
+        <Stat label="Check-ins em locais" value={s.events.checkins} />
+        <Stat label="Convites para eventos" value={s.events.invitesSent} sub={`recebeu ${s.events.invitesReceived}`} />
+        <Stat label="Enquetes de data" value={s.events.datePolls} />
+        <Stat label="Chapelaria" value={s.events.cloakroomTickets} sub="etiquetas" />
+      </StatGroup>
+      <StatGroup title="NOW">
+        <Stat label="Vezes que ligou" value={s.now.sessions} sub={`${s.now.sessions30} em 30 dias · último ${sinceText(s.now.lastAt)}`} />
+        <Stat label="Convites enviados" value={s.now.invitesSent} sub={`recebeu ${s.now.invitesReceived}`} />
+        <Stat label="Encontros aceitos" value={s.now.meetups} />
+        <Stat label="Esconderam o NOW dela" value={s.now.hiddenBy} alert={s.now.hiddenBy >= 3} />
+      </StatGroup>
+      <StatGroup title="Mensagens">
+        <Stat label="Conversas" value={s.messages.conversations} />
+        <Stat label="Mensagens enviadas" value={s.messages.sent} sub={`${s.messages.sent30} em 30 dias`} />
+      </StatGroup>
+      <StatGroup title="Moderação">
+        <Stat label="Denúncias recebidas" value={m.reportsReceived} sub={`${m.reportsOpen} abertas · ${m.reportsActioned} confirmadas`} alert={m.reportsOpen > 0 || m.reportsActioned > 0} />
+        <Stat label="Denúncias feitas" value={m.reportsMade} sub={`${rate(m.reportsMadeActioned, m.reportsMade)} confirmadas`} />
+        <Stat label="Bloqueada por" value={m.blockedBy} alert={m.blockedBy >= 3} />
+        <Stat label="Bloqueou" value={m.blocksMade} />
+        <Stat label="Suspensões" value={m.suspensions} sub={m.lastSuspendedAt ? `última em ${formatDate(m.lastSuspendedAt)}` : undefined} alert={m.suspensions > 0} />
+      </StatGroup>
+      <StatGroup title="Compras">
+        <Stat label="Impulsionamentos pagos" value={s.purchases.boostsPaid} sub={s.purchases.lastPaidAt ? `último em ${formatDate(s.purchases.lastPaidAt)}` : undefined} />
+        <Stat label="Total gasto" value={formatCents(s.purchases.spentCents)} />
+        <Stat label="Pagamentos pendentes" value={s.purchases.boostsPending} />
+      </StatGroup>
+    </div>
+  );
+}
+
+/** Os números e a atividade, abertos direto da lista de pessoas. */
 export function UserActivityDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
   return (
     <Modal title={`Atividade de @${user.username}`} onClose={onClose} wide>
+      <UserStatsPanel userId={user.id} />
+      <h3 className="stats__title">Linha do tempo</h3>
       <ActivityList userId={user.id} />
       <div className="modal__actions">
         <button type="button" className="btn btn--primary" onClick={onClose}>

@@ -1,6 +1,7 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { AuthService } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
+import { recordAudit } from './audit.ts';
 
 export interface AccountExportFile {
   /** Nome sugerido para o arquivo. */
@@ -51,6 +52,7 @@ export class AccountService {
     if (!profile) throw notFound('Conta não encontrada');
     const now = this.deps.clock.now();
     const sections = await this.deps.account.exportData(userId);
+    await recordAudit(this.deps, { actorId: userId, actorKind: 'USER', action: 'ACCOUNT_DATA_EXPORTED', targetType: 'USER', targetId: userId, targetLabel: `@${profile.username}`, note: 'Baixou a cópia dos próprios dados (LGPD)' });
     return {
       filename: `askout-meus-dados-${profile.username}-${now.toISOString().slice(0, 10)}.json`,
       data: {
@@ -87,6 +89,11 @@ export class AccountService {
     }
 
     await account.deleteAccount(user.id);
+    // Fica o registro de que a conta existiu e foi apagada pela própria pessoa (sem e-mail nem outros dados).
+    await recordAudit(this.deps, {
+      actorId: user.id, actorKind: 'USER', action: 'ACCOUNT_DELETED', targetType: 'USER', targetId: user.id, targetLabel: `@${profile.username}`,
+      note: 'Apagou a própria conta pelo app', changes: [{ field: 'conta criada em', before: user.createdAt.toISOString(), after: null }],
+    });
     // Confirmação para a própria pessoa. A conta já foi apagada: se o envio falhar, a exclusão continua valendo.
     try {
       await this.deps.mailer.sendAccountDeleted({ to: user.email, username: profile.username });

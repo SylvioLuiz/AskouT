@@ -1,4 +1,5 @@
 import type { ReferralService } from './referral-service.ts';
+import type { BadgeService, ProfileBadgeView } from './badge-service.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { normalizePhone } from './phone.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
@@ -43,6 +44,8 @@ export interface ProfileView {
   canViewContent: boolean;
   /** Selo de quem trouxe amigos: quantos amigos confirmados, ou null sem selo (não alcançou ou escondeu). */
   referralBadge: number | null;
+  /** Selos do perfil (Trouxe a galera, Organizador, Figurinha carimbada, Topa tudo). No próprio perfil vêm também os escondidos. */
+  badges: ProfileBadgeView[];
 }
 
 export interface ProfilePatch {
@@ -54,13 +57,21 @@ export interface ProfilePatch {
 export const SEARCH_MIN_LENGTH = 2;
 export const SEARCH_MAX_LIMIT = 50;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Quantas vezes, no máximo, o app pede para cadastrar o celular. */
+export const PHONE_PROMPT_MAX = 3;
+/** Dias entre um pedido de cadastro do celular e o próximo. */
+export const PHONE_PROMPT_GAP_DAYS = 5;
+
 export class ProfileService {
   private readonly deps: CoreDeps;
   private readonly referrals: ReferralService;
+  private readonly badges: BadgeService;
 
-  constructor(deps: CoreDeps, referrals: ReferralService) {
+  constructor(deps: CoreDeps, referrals: ReferralService, badges: BadgeService) {
     this.deps = deps;
     this.referrals = referrals;
+    this.badges = badges;
   }
 
   async getByUsername(viewerId: string, rawUsername: unknown): Promise<ProfileView> {
@@ -78,12 +89,14 @@ export class ProfileService {
     const referralBadge = await this.referrals.badgeFor(profile.userId);
 
     if (viewerId === profile.userId) {
+      const badges = await this.badges.forProfile(profile.userId, viewerId);
       return {
         profile,
         counts,
         relationship: { isSelf: true, following: 'NONE', followsYou: 'NONE', isFriend: false, blockedByViewer: false, message: 'NONE' },
         canViewContent: true,
         referralBadge,
+        badges,
       };
     }
 
@@ -109,6 +122,7 @@ export class ProfileService {
       },
       canViewContent: !blockedByViewer && (!profile.isPrivate || viewerFollows?.status === 'ACCEPTED'),
       referralBadge,
+      badges: await this.badges.forProfile(profile.userId, viewerId),
     };
   }
 
@@ -184,6 +198,29 @@ export class ProfileService {
     const user = await this.deps.users.findById(userId);
     if (!user) throw notFound('Perfil não encontrado');
     return { phone: user.phone ?? null, verified: Boolean(user.phone && user.phoneVerifiedAt) };
+  }
+
+  /**
+   * Se o app deve pedir agora para a pessoa cadastrar o celular: só para quem não tem, depois do primeiro dia de conta,
+   * no máximo {@link PHONE_PROMPT_MAX} vezes e com pelo menos {@link PHONE_PROMPT_GAP_DAYS} dias entre um pedido e outro.
+   * Fica na conta (não no aparelho), então trocar de celular ou entrar pelo site não faz aparecer de novo.
+   */
+  async phonePrompt(userId: string): Promise<{ show: boolean }> {
+    const { users, clock } = this.deps;
+    const user = await users.findById(userId);
+    if (!user || user.phone || user.profilePending) return { show: false };
+    const now = clock.now().getTime();
+    if (now - user.createdAt.getTime() < DAY_MS) return { show: false };
+    const asked = await users.getPhonePrompt(userId);
+    if (asked.count >= PHONE_PROMPT_MAX) return { show: false };
+    if (asked.lastAt && now - asked.lastAt.getTime() < PHONE_PROMPT_GAP_DAYS * DAY_MS) return { show: false };
+    return { show: true };
+  }
+
+  /** O app mostrou o pedido de cadastro do celular: conta mais um e recomeça o intervalo. */
+  async markPhonePrompted(userId: string): Promise<{ ok: true }> {
+    await this.deps.users.markPhonePrompted(userId, this.deps.clock.now());
+    return { ok: true };
   }
 
   /** Guarda o celular (qualquer formato; sem código do país, entende Brasil) ou, com `null` ou vazio, apaga. */

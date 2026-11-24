@@ -560,6 +560,8 @@ export interface PushSubscriptionRecord {
    * (só dados, o app monta o aviso); versões antigas do app não mostrariam nada, então só vale quando o app avisa.
    */
   replyable?: boolean;
+  /** O app desse aparelho tem os sons do AskouT (no Android, os canais de cada som). Versões antigas: só o som padrão. */
+  sounds?: boolean;
 }
 
 /** Foto de perfil guardada no banco (já reduzida pelo app). */
@@ -956,6 +958,16 @@ export interface AdminPersonRef {
   at: Date;
 }
 
+/** Pessoa ligada a um evento na gestão (confirmou "Eu vou" ou foi convidada), com a foto de perfil. */
+export interface AdminEventPerson extends AdminPersonRef {
+  avatarUrl: string | null;
+}
+
+/** Convidado de um evento criado por pessoa que ainda não confirmou, com quem convidou. */
+export interface AdminEventInvitee extends AdminEventPerson {
+  invitedBy: { id: string; username: string } | null;
+}
+
 /**
  * Tudo o que a gestão vê de uma pessoa além da linha da lista: o cadastro inteiro (menos a senha e o hash do celular),
  * as configurações, as contagens dos vínculos e as listas ligadas (amigos, seguidores, eventos, posts, locais).
@@ -999,6 +1011,44 @@ export interface AdminUserExtras {
   venues: { id: string; name: string; role: 'OWNER' | 'MANAGER' | 'FOLLOWER' }[];
   claims: { id: string; venueId: string; venueName: string; status: ClaimStatus; createdAt: Date }[];
   groups: { id: string; name: string; role: string; joinedAt: Date }[];
+}
+
+/**
+ * Números de uma pessoa para quem modera e gerencia o app (o botão "Atividade" da lista de pessoas). Só contagens e
+ * datas: nunca o texto de mensagens nem com quem a pessoa conversa.
+ */
+export interface AdminUserStats {
+  /**
+   * Última vez que a pessoa fez algo no app (publicou, curtiu, comentou, mandou mensagem, confirmou presença, seguiu,
+   * ligou o NOW ou viu um conteúdo). O app não grava cada login, então é o melhor sinal de "último acesso".
+   */
+  lastSeenAt: Date | null;
+  accountAgeDays: number;
+  /** Dias diferentes (fuso de Brasília) com alguma ação ou visualização nos últimos 30 dias. */
+  activeDays30: number;
+  /** Ações (posts, comentários, curtidas, reações, mensagens, presenças, quem seguiu, stories, NOW) nos últimos 7 e 30 dias. */
+  actions7: number;
+  actions30: number;
+  social: { friends: number; followers: number; following: number; followersGained30: number; likesReceived: number; commentsReceived: number };
+  content: { posts: number; stories: number; feedPosts: number; comments: number; likes: number };
+  events: { created: number; going: number; checkins: number; invitesSent: number; invitesReceived: number; datePolls: number; cloakroomTickets: number };
+  now: { sessions: number; sessions30: number; lastAt: Date | null; invitesSent: number; invitesReceived: number; meetups: number; hiddenBy: number };
+  messages: { conversations: number; sent: number; sent30: number };
+  moderation: {
+    /** Denúncias contra a pessoa ou o que ela publicou (perfil, comentário, post, feed, story, conversa). */
+    reportsReceived: number;
+    reportsOpen: number;
+    /** Decididas pela gestão com providência tomada. */
+    reportsActioned: number;
+    reportsMade: number;
+    reportsMadeActioned: number;
+    blockedBy: number;
+    blocksMade: number;
+    suspensions: number;
+    lastSuspendedAt: Date | null;
+  };
+  purchases: { boostsPaid: number; spentCents: number; lastPaidAt: Date | null; boostsPending: number };
+  referrals: { invited: number; qualified: number };
 }
 
 /** O que a gestão vê de um local além do que o app já mostra. */
@@ -1049,6 +1099,12 @@ export interface AdminPostDetail {
   linkedEventId: string | null;
   images: { id: string; uploaded: boolean }[];
   tagged: AdminPersonRef[];
+  /** Evento: quem confirmou "Eu vou" (os primeiros 50, na ordem da confirmação; o total está em `counts.attendees`). */
+  going: AdminEventPerson[];
+  /** Evento: convidados que ainda não confirmaram (os primeiros 50, na ordem do convite). */
+  invitedPending: AdminEventInvitee[];
+  /** Quantos convidados ainda não confirmaram. */
+  invitedPendingCount: number;
   counts: { likes: number; comments: number; reports: number; attendees: number; invites: number; stories: number; feedPosts: number; reposts: number };
   recentComments: { id: string; username: string; body: string; createdAt: Date }[];
 }
@@ -1208,20 +1264,83 @@ export type AuditAction =
   | 'TASTE_REMOVED'
   | 'RECO_EXPERIMENT_ENABLED'
   | 'RECO_EXPERIMENT_CHANGED'
-  | 'RECO_EXPERIMENT_DISABLED';
+  | 'RECO_EXPERIMENT_DISABLED'
+  // Gestão (antes sem registro)
+  | 'ADMIN_LOGIN'
+  | 'ADMIN_PASSWORD_CHANGED'
+  | 'CLAIM_DOCUMENT_VIEWED'
+  | 'EVENT_EXTRA_MOVED'
+  | 'TASTE_MOVED'
+  | 'HUNTER_ENABLED'
+  | 'HUNTER_DISABLED'
+  | 'HUNTER_EVENT_REMOVED'
+  | 'HUNTER_EVENTS_REMOVED_ALL'
+  | 'HUNTER_SYNC_RUN'
+  // Ações sensíveis de quem usa o app
+  | 'ACCOUNT_DELETED'
+  | 'ACCOUNT_DATA_EXPORTED'
+  | 'MFA_ENABLED'
+  | 'MFA_DISABLED'
+  | 'MFA_RECOVERY_REGENERATED'
+  | 'BOOST_ORDERED'
+  | 'BOOST_CANCELLED'
+  // Sistema
+  | 'BOOST_PAID'
+  | 'BOOST_PAYMENT_REFUSED'
+  | 'ROLE_CHANGED';
+
+/** Quem fez: alguém da gestão, a própria pessoa no app ou o sistema (pagamento, script). */
+export type AuditActorKind = 'ADMIN' | 'USER' | 'SYSTEM';
+export const AUDIT_ACTOR_KINDS: readonly AuditActorKind[] = ['ADMIN', 'USER', 'SYSTEM'];
+
+export type AuditTargetType = 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'VENUE_STORY' | 'VENUE_STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'COMMENT' | 'SETTING' | 'BOOST' | 'HUNTER';
+export const AUDIT_TARGET_TYPES: readonly AuditTargetType[] = ['USER', 'CLAIM', 'VENUE', 'POST', 'PLACE_EVENT', 'POST_REPORT', 'CONVERSATION_REPORT', 'USER_REPORT', 'STORY', 'STORY_REPORT', 'VENUE_STORY', 'VENUE_STORY_REPORT', 'FEED_POST', 'FEED_COMMENT', 'FEED_REPORT', 'COMMENT', 'SETTING', 'BOOST', 'HUNTER'];
+
+/** Um campo que mudou: rótulo, valor antes e depois (já em texto, como a gestão lê). */
+export interface AuditChange {
+  field: string;
+  before: string | null;
+  after: string | null;
+}
 
 export interface AuditRecord {
   id: string;
-  adminId: string;
+  /** Quem fez. Nulo quando foi o sistema. */
+  adminId: string | null;
+  /** Padrão ADMIN (registros antigos). */
+  actorKind?: AuditActorKind;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'COMMENT' | 'SETTING';
+  targetType: AuditTargetType;
   targetId: string;
+  /** Nome do alvo no momento da ação (@usuário, nome do local, título do evento): continua legível se o alvo sumir. */
+  targetLabel?: string | null;
+  /** O que mudou, campo a campo (antes → depois). */
+  changes?: AuditChange[] | null;
   note: string | null;
   createdAt: Date;
 }
 
 export interface AuditRow extends AuditRecord {
+  actorKind: AuditActorKind;
+  targetLabel: string | null;
+  changes: AuditChange[] | null;
+  /** @usuário de quem fez ("sistema" quando não há pessoa). */
   adminUsername: string;
+}
+
+/** Filtros da lista da auditoria. */
+export interface AuditFilter {
+  action?: AuditAction;
+  actorKind?: AuditActorKind;
+  targetType?: AuditTargetType;
+  /** Só o que esta pessoa fez. */
+  actorId?: string;
+  /** Só o que aconteceu com este alvo. */
+  targetId?: string;
+  /** Busca no motivo, no nome do alvo, no id do alvo e no @ de quem fez. */
+  text?: string;
+  from?: Date;
+  to?: Date;
 }
 
 // ---------- Votação de datas ("Encontrar a melhor data") ----------

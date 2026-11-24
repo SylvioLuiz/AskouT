@@ -1,6 +1,6 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
-import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditFilter, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -32,6 +32,10 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Quantas vezes o app já pediu para cadastrar o celular e quando foi a última (vale para todos os aparelhos). */
+  getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }>;
+  /** Registra mais um pedido de cadastro do celular. */
+  markPhonePrompted(userId: string, at: Date): Promise<void>;
   /** Troca os gostos de rolê da pessoa (já validados). */
   setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
@@ -62,9 +66,12 @@ export interface FollowRepository {
   delete(followerId: string, followeeId: string): Promise<boolean>;
   /** Remove o seguimento nos dois sentidos entre a e b. */
   deleteBetween(a: string, b: string): Promise<void>;
-  /** Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue. */
-  list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]>;
-  count(userId: string, direction: Direction, status: FollowStatus): Promise<number>;
+  /**
+   * Mais recentes primeiro. `followers`: quem segue userId; `following`: quem userId segue.
+   * `query` (já em minúsculas) filtra a outra ponta: @ começando com o termo ou nome contendo o termo.
+   */
+  list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]>;
+  count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number>;
   /** Aceita todas as solicitações pendentes recebidas por followeeId. Retorna quantas. */
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */
@@ -914,11 +921,15 @@ export interface AdminRepository {
   findUserReport(id: string): Promise<{ id: string; reportedUserId: string; resolvedAt: Date | null } | undefined>;
   resolveUserReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
   addAudit(record: AuditRecord): Promise<void>;
-  listAudit(page: Page): Promise<AuditRow[]>;
+  /** Mais novo primeiro (ou na ordem pedida), só o que passa no filtro. */
+  listAudit(page: Page, filter?: AuditFilter): Promise<AuditRow[]>;
+  countAudit(filter?: AuditFilter): Promise<number>;
   /** Quantos registros cada lista da gestão tem com o mesmo filtro (para o total embaixo das tabelas). */
   countList(kind: AdminCountKind, filter?: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean }): Promise<number>;
   /** O cadastro inteiro da pessoa e os vínculos (contagens e listas curtas) para o detalhe da gestão. */
   userExtras(userId: string): Promise<AdminUserExtras | undefined>;
+  /** Números da pessoa para a gestão (contagens e datas, sem conteúdo de mensagens). `now` marca as janelas de 7 e 30 dias. */
+  userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined>;
   venueExtras(venueId: string): Promise<AdminVenueExtras | undefined>;
   placeEventExtras(eventId: string): Promise<AdminPlaceEventExtras | undefined>;
   postDetail(postId: string): Promise<AdminPostDetail | undefined>;
@@ -1057,6 +1068,9 @@ export interface NotificationRepository {
   /** O que a pessoa silenciou (tudo falso se nunca mexeu). */
   getMuteSettings(userId: string): Promise<NotificationMuteSettings>;
   setMuteSettings(userId: string, settings: NotificationMuteSettings, at: Date): Promise<void>;
+  /** Som de cada grupo de aviso (tudo `padrao` se nunca mexeu). */
+  getSoundSettings(userId: string): Promise<import('./notification-sounds.ts').NotificationSoundSettings>;
+  setSoundSettings(userId: string, settings: import('./notification-sounds.ts').NotificationSoundSettings, at: Date): Promise<void>;
 }
 
 export interface PushSubscriptionRepository {
@@ -1085,6 +1099,11 @@ export interface PushMessage {
   live?: PushLive;
   /** Foto (https) de quem o aviso fala: o Android mostra redonda no aviso da chegada. */
   image?: string;
+  /**
+   * Som escolhido pela pessoa para esse tipo de aviso (ver notification-sounds.ts). Sem ele, o som padrão do aparelho.
+   * Só vem diferente de `padrao` para aparelhos que têm os sons (o app avisou ao se inscrever) e para o navegador.
+   */
+  sound?: import('./notification-sounds.ts').NotificationSound;
 }
 
 /**
@@ -1099,6 +1118,8 @@ export interface LiveActivityPush {
   attributes?: { name: string; tag: string; url: string; registration: string };
   /** Toca/acende a tela (a primeira e a chegada); as outras trocam em silêncio. */
   alert?: { title: string; body: string };
+  /** Som do `alert`, escolhido pela pessoa para a chegada. Sem ele, o padrão do iPhone. */
+  sound?: import('./notification-sounds.ts').NotificationSound;
   /** Depois disto a atividade aparece como desatualizada (fim do encontro). */
   staleAtMs: number;
   /** Só no `end`: quando some da tela bloqueada. */

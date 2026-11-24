@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { shareOrigin } from '../lib/public-origin.ts';
-import { CameraIcon, ChevronDownIcon, LockIcon, MoreIcon, ShareIcon, UsersIcon } from '../components/icons.tsx';
+import { CameraIcon, ChevronDownIcon, LockIcon, MoreIcon, ShareIcon } from '../components/icons.tsx';
+import { ProfileBadges } from '../components/profile-badges.tsx';
 import { StoryViewer } from '../components/event-story.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { profileLink, profileShareText } from '../lib/share.ts';
@@ -17,7 +18,9 @@ import { useAuthContext } from '../auth.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
-import { useAsync, useTitle } from '../hooks.ts';
+import { useAsync, useDebounced, useTitle } from '../hooks.ts';
+import { PeopleSearch } from '../components/people-search.tsx';
+import { peopleQuery } from '../lib/people-search.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { formatCount, pluralize } from '../lib/format.ts';
@@ -204,12 +207,11 @@ export function ProfileScreen({ username }: { username: string }) {
             ) : null}
           </h1>
           <p className="profile__handle">@{profile.username}</p>
-          {data.referralBadge ? (
-            <p className="profile__badge" title={t('Trouxe {n} amigos para o AskouT', { n: data.referralBadge })}>
-              <UsersIcon />
-              <span>{t('Trouxe a galera')}</span>
-            </p>
-          ) : null}
+          <ProfileBadges
+            badges={data.badges ?? (data.referralBadge ? [{ id: 'REFERRAL', count: data.referralBadge, threshold: data.referralBadge, hidden: false }] : [])}
+            isSelf={relationship.isSelf}
+            onChanged={() => view.reload()}
+          />
           {note ? <p className="profile__note">{note}</p> : null}
         </div>
         {relationship.isSelf ? (
@@ -369,6 +371,12 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
   const [page, setPage] = useState<ConnectionsPage | undefined>();
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
+  const term = peopleQuery(useDebounced(query, 300));
+  // Total sem filtro: decide se a busca aparece (some numa lista vazia, fica enquanto há termo).
+  const [unfilteredTotal, setUnfilteredTotal] = useState<number | undefined>();
+  // Só a resposta da busca mais recente vale; uma lenta não sobrescreve a atual.
+  const latest = useRef(0);
 
   const userId = view.data?.profile.userId;
   const title = direction === 'followers' ? t('Seguidores') : t('Seguindo');
@@ -376,24 +384,32 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
 
   async function load(offset: number) {
     if (!userId) return;
+    const call = ++latest.current;
     setLoading(true);
     setError(undefined);
     try {
       const fetcher = direction === 'followers' ? api.followers : api.following;
-      const next = await fetcher(userId, { limit: PAGE_SIZE, offset });
+      const next = await fetcher(userId, { limit: PAGE_SIZE, offset }, term || undefined);
+      if (call !== latest.current) return;
+      if (!term) setUnfilteredTotal(next.total);
       setPage((current) => (offset === 0 || !current ? next : { ...next, items: [...current.items, ...next.items] }));
     } catch (failure) {
-      setError(toApiError(failure));
+      if (call === latest.current) setError(toApiError(failure));
     } finally {
-      setLoading(false);
+      if (call === latest.current) setLoading(false);
     }
   }
 
+  // Trocar de perfil ou de lista limpa a tela; trocar só o termo mantém a lista atual até a resposta chegar.
   useEffect(() => {
     setPage(undefined);
+    setUnfilteredTotal(undefined);
+  }, [userId, direction]);
+
+  useEffect(() => {
     void load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, direction]);
+  }, [userId, direction, term]);
 
   const back = `/u/${encodeURIComponent(username)}`;
   if (view.loading && !view.data) return (<><PageHeadSkeleton title={title} back={back} subtitle /><Loading /></>);
@@ -411,11 +427,13 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
           <ErrorState message={error.message} onRetry={() => void load(page?.items.length ?? 0)} />
         )
       ) : null}
+      {(unfilteredTotal ?? 0) > 0 || query ? <PeopleSearch value={query} onChange={setQuery} /> : null}
       {!page && loading ? <Loading /> : null}
-      {page && page.items.length === 0 ? <EmptyState title={direction === 'followers' ? t('Ninguém segue este perfil ainda') : t('Não segue ninguém ainda')} /> : null}
+      {page && page.items.length === 0 && term ? <EmptyState title={t('Ninguém encontrado')}>{t('Confira o nome ou o @ digitado.')}</EmptyState> : null}
+      {page && page.items.length === 0 && !term ? <EmptyState title={direction === 'followers' ? t('Ninguém segue este perfil ainda') : t('Não segue ninguém ainda')} /> : null}
       {page && page.items.length > 0 ? (
         <>
-          <p className="muted">{pluralize(page.total, direction === 'followers' ? 'seguidor' : 'pessoa', direction === 'followers' ? 'seguidores' : 'pessoas')}</p>
+          <p className="muted">{term ? pluralize(page.total, t('resultado'), t('resultados')) : pluralize(page.total, direction === 'followers' ? 'seguidor' : 'pessoa', direction === 'followers' ? 'seguidores' : 'pessoas')}</p>
           <ul className="list">
             {page.items.map((profile) => (
               <PersonRow key={profile.userId} profile={profile} />

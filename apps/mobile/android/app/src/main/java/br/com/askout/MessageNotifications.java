@@ -1,7 +1,5 @@
 package br.com.askout;
 
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -38,6 +36,8 @@ final class MessageNotifications {
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body));
+        // Som escolhido pela pessoa para conversas: o servidor manda o canal do som nos dados.
+        NotificationSounds.apply(context, builder, data.get("channel"));
 
         if (token != null && !token.isEmpty()) {
             Intent reply = new Intent(context, ReplyReceiver.class)
@@ -107,17 +107,9 @@ final class MessageNotifications {
         }
     }
 
-    /** O app cria o canal ao abrir; se o push chegar antes disso (instalou e ainda não abriu), cria igual. */
+    /** O app cria os canais ao abrir; se o push chegar antes disso (instalou e ainda não abriu), cria igual. */
     static void ensureChannel(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager == null || manager.getNotificationChannel(CHANNEL_ID) != null) return;
-        NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Notificações", NotificationManager.IMPORTANCE_HIGH);
-        channel.setDescription("Mensagens, convites e eventos do AskouT");
-        channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PRIVATE);
-        channel.enableVibration(true);
-        channel.enableLights(true);
-        manager.createNotificationChannel(channel);
+        NotificationSounds.ensureChannels(context);
     }
 
     /** Ícone pequeno do aviso: silhueta branca do AskouT (o Android pinta só o contorno; o ícone colorido do app viraria um quadrado). */

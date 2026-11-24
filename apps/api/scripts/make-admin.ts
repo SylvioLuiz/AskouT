@@ -30,11 +30,21 @@ try {
   } else {
     const email = process.argv.slice(2).find((a) => !a.startsWith('--'))?.trim().toLowerCase();
     if (!email) throw new Error('Informe o e-mail da conta. Ex.: npm run admin:promote -- voce@exemplo.com');
-    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true, status: true } });
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true, status: true, profile: { select: { username: true } } } });
     if (!user) throw new Error(`Não achei conta com o e-mail ${email}. Cadastre-se no app primeiro.`);
     const remove = process.argv.includes('--remove');
     if (!remove && user.status !== 'ACTIVE') throw new Error('A conta não está ativa; reative antes de torná-la administradora.');
-    await prisma.user.update({ where: { id: user.id }, data: { role: remove ? 'USER' : 'ADMIN' } });
+    const role = remove ? 'USER' : 'ADMIN';
+    await prisma.user.update({ where: { id: user.id }, data: { role } });
+    // Mudança de papel feita fora do painel: fica na auditoria como ação do sistema.
+    if (user.role !== role) {
+      await prisma.adminAudit.create({
+        data: {
+          adminId: null, actorKind: 'SYSTEM', action: 'ROLE_CHANGED', targetType: 'USER', targetId: user.id, targetLabel: user.profile ? `@${user.profile.username}` : null,
+          note: 'Papel trocado pelo script admin:promote', changes: [{ field: 'papel', before: user.role, after: role }],
+        },
+      });
+    }
     console.log(remove ? `${email} voltou a ser conta comum.` : `${email} agora é administradora. Entre em http://localhost:5174 com o mesmo e-mail e senha.`);
   }
 } finally {

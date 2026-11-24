@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { NotificationFilter } from '../../core/notification-categories.ts';
 import type { NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
+import { DEFAULT_SOUNDS, soundOrDefault } from '../../core/notification-sounds.ts';
+import type { NotificationSoundSettings } from '../../core/notification-sounds.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
@@ -72,6 +74,19 @@ export class PrismaNotificationRepository implements NotificationRepository {
     });
   }
 
+  async getSoundSettings(userId: string): Promise<NotificationSoundSettings> {
+    if (!isUuid(userId)) return { ...DEFAULT_SOUNDS };
+    const row = await this.prisma.notificationSetting.findUnique({ where: { userId } });
+    if (!row) return { ...DEFAULT_SOUNDS };
+    return { chats: soundOrDefault(row.soundChats), invites: soundOrDefault(row.soundInvites), arrival: soundOrDefault(row.soundArrival), other: soundOrDefault(row.soundOther) };
+  }
+
+  async setSoundSettings(userId: string, settings: NotificationSoundSettings, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    const data = { soundChats: settings.chats, soundInvites: settings.invites, soundArrival: settings.arrival, soundOther: settings.other, updatedAt: at };
+    await this.prisma.notificationSetting.upsert({ where: { userId }, create: { userId, ...data }, update: data });
+  }
+
   async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {
     if (!isUuid(userId)) return 0;
     const valid = ids?.filter(isUuid);
@@ -91,8 +106,8 @@ export class PrismaPushSubscriptionRepository implements PushSubscriptionReposit
   async upsert(record: PushSubscriptionRecord): Promise<void> {
     await this.prisma.pushSubscription.upsert({
       where: { endpoint: record.endpoint },
-      create: { endpoint: record.endpoint, userId: record.userId, p256dh: record.p256dh, auth: record.auth, createdAt: record.createdAt, replyable: record.replyable === true },
-      update: { userId: record.userId, p256dh: record.p256dh, auth: record.auth, replyable: record.replyable === true },
+      create: { endpoint: record.endpoint, userId: record.userId, p256dh: record.p256dh, auth: record.auth, createdAt: record.createdAt, replyable: record.replyable === true, sounds: record.sounds === true },
+      update: { userId: record.userId, p256dh: record.p256dh, auth: record.auth, replyable: record.replyable === true, sounds: record.sounds === true },
     });
   }
 
@@ -103,6 +118,6 @@ export class PrismaPushSubscriptionRepository implements PushSubscriptionReposit
   async listForUser(userId: string): Promise<PushSubscriptionRecord[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.pushSubscription.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
-    return rows.map((r) => ({ userId: r.userId, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, createdAt: r.createdAt, replyable: r.replyable }));
+    return rows.map((r) => ({ userId: r.userId, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, createdAt: r.createdAt, replyable: r.replyable, sounds: r.sounds }));
   }
 }

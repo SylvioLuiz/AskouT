@@ -15,8 +15,8 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
-import { ADMIN_SORTS, REPORT_RESOLUTIONS } from './types.ts';
+import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditChange, AuditFilter, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
+import { ADMIN_SORTS, AUDIT_ACTOR_KINDS, AUDIT_TARGET_TYPES, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
 export const ADMIN_PAGE_MAX = 100;
@@ -68,7 +68,7 @@ export interface AdminEventDetail {
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
   /** Primeiras pessoas que confirmaram (até 20), na ordem da confirmação. */
-  going: { id: string; username: string; displayName: string; at: string }[];
+  going: { id: string; username: string; displayName: string; avatarUrl: string | null; at: string }[];
   /** Outras datas do mesmo evento: eventos do mesmo local com o mesmo nome (sem contar este), as mais próximas primeiro. */
   sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
   /** Quantos eventos o local tem com o mesmo nome, contando este. */
@@ -118,11 +118,62 @@ function coordOf(value: unknown, current: number, field: 'lat' | 'lng'): number 
   return n;
 }
 
-/** "campo: antes → depois" de cada campo que mudou, para a auditoria. */
-function changesOf(labels: Record<string, string>, before: Record<string, unknown>, after: Record<string, unknown>): string[] {
-  const show = (v: unknown) => (v === null || v === undefined || v === '' ? '(vazio)' : v instanceof Date ? v.toISOString() : Array.isArray(v) ? v.join(', ') || '(vazio)' : String(v).slice(0, 60));
+/** Valor de um campo como a auditoria guarda (texto, até 500 caracteres; nulo quando vazio). */
+function auditValue(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'boolean') return v ? 'sim' : 'não';
+  if (Array.isArray(v)) return v.length ? v.join(', ').slice(0, 500) : null;
+  return String(v).slice(0, 500);
+}
+
+/** Cada campo que mudou, com o valor de antes e o de depois (inteiros, para a auditoria). */
+function diffOf(labels: Record<string, string>, before: Record<string, unknown>, after: Record<string, unknown>): AuditChange[] {
   const same = (a: unknown, b: unknown) => (a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : JSON.stringify(a ?? null) === JSON.stringify(b ?? null));
-  return Object.entries(labels).filter(([k]) => !same(before[k], after[k])).map(([k, label]) => `${label}: ${show(before[k])} → ${show(after[k])}`);
+  return Object.entries(labels).filter(([k]) => !same(before[k], after[k])).map(([k, field]) => ({ field, before: auditValue(before[k]), after: auditValue(after[k]) }));
+}
+
+/** "campo: antes → depois" de cada campo que mudou, para o resumo da auditoria. */
+function changesText(changes: AuditChange[]): string[] {
+  const show = (v: string | null) => (v === null ? '(vazio)' : v.slice(0, 60));
+  return changes.map((c) => `${c.field}: ${show(c.before)} → ${show(c.after)}`);
+}
+
+/** Trecho curto de um texto, para identificar o que foi apagado. */
+function snippet(text: string | null | undefined, max = 80): string | null {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  return Array.from(t).length > max ? `${Array.from(t).slice(0, max - 1).join('')}…` : t;
+}
+
+/** Filtros da auditoria vindos da URL. */
+function auditFilterOf(query: AuditQuery): AuditFilter {
+  const pick = <T extends string>(v: unknown, allowed: readonly T[], field: string): T | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || !(allowed as readonly string[]).includes(v)) throw validationError('Filtro inválido', { [field]: 'Valor inválido' });
+    return v as T;
+  };
+  const id = (v: unknown, field: string): string | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || v.length > 64) throw validationError('Filtro inválido', { [field]: 'Valor inválido' });
+    return v;
+  };
+  const day = (v: unknown, field: string, end: boolean): Date | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw validationError('Filtro inválido', { [field]: 'Use AAAA-MM-DD' });
+    const d = new Date(`${v}T00:00:00-03:00`);
+    if (Number.isNaN(d.getTime())) throw validationError('Filtro inválido', { [field]: 'Data inválida' });
+    return end ? new Date(d.getTime() + 24 * 3600 * 1000) : d;
+  };
+  const text = queryText(query.q);
+  const action = id(query.action, 'action') as AuditAction | undefined;
+  const actorKind = pick(query.actorKind, AUDIT_ACTOR_KINDS, 'actorKind');
+  const targetType = pick(query.targetType, AUDIT_TARGET_TYPES, 'targetType');
+  const actorId = id(query.actorId, 'actorId');
+  const targetId = id(query.targetId, 'targetId');
+  const from = day(query.from, 'from', false);
+  const to = day(query.to, 'to', true);
+  return { ...(action ? { action } : {}), ...(actorKind ? { actorKind } : {}), ...(targetType ? { targetType } : {}), ...(actorId ? { actorId } : {}), ...(targetId ? { targetId } : {}), ...(text ? { text } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
 
 /** Linha da lista de eventos de locais, com quantas pessoas confirmaram presença. */
@@ -151,6 +202,8 @@ export function parseSort(query: { sort?: unknown; dir?: unknown }, keys: readon
 }
 
 type ListQuery = { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown };
+type AuditQuery = ListQuery & { q?: unknown; action?: unknown; actorKind?: unknown; targetType?: unknown; actorId?: unknown; targetId?: unknown; from?: unknown; to?: unknown };
+type AuditExtra = { targetLabel?: string | null; changes?: AuditChange[] | null };
 
 function queryText(value: unknown): string {
   if (value === undefined || value === null) return '';
@@ -179,6 +232,10 @@ function noteText(value: unknown, required: boolean): string | null {
 /** Teto de linhas lidas por consulta do painel. Acima disso, o painel avisa que cortou os dados mais antigos. */
 export const RETENTION_MAX_ROWS = 200_000;
 
+const STATUS_LABEL: Record<UserStatus, string> = { ACTIVE: 'ativa', SUSPENDED: 'suspensa', DELETION_REQUESTED: 'exclusão pedida' };
+const EXTRA_FIELDS = { label: 'nome', icon: 'ícone', type: 'tipo' };
+const TASTE_FIELDS = { label: 'nome', icon: 'ícone', hint: 'dica', keywords: 'palavras-chave', kinds: 'tipos de evento' };
+
 export class AdminService {
   private readonly deps: CoreDeps;
   private readonly venues: VenueService;
@@ -202,12 +259,15 @@ export class AdminService {
     const result = await this.auth.login(input, { requireRole: 'ADMIN' });
     if ('mfaRequired' in result) return result;
     if (result.user.role !== 'ADMIN') throw unauthorized();
+    await this.logLogin(result.user.id, 'senha');
     return result;
   }
 
   /** Segunda etapa da entrada no painel (conta com verificação em duas etapas). */
   async verifyMfaLogin(input: { mfaToken: unknown; code: unknown }): Promise<AuthResult> {
-    return this.auth.verifyMfaLogin(input, { requireRole: 'ADMIN' });
+    const result = await this.auth.verifyMfaLogin(input, { requireRole: 'ADMIN' });
+    await this.logLogin(result.user.id, 'senha + verificação em duas etapas');
+    return result;
   }
 
   /**
@@ -218,21 +278,37 @@ export class AdminService {
     const result = await this.auth.socialLogin({ provider: input.provider, idToken: input.idToken }, { requireRole: 'ADMIN' });
     if ('mfaRequired' in result) return result;
     if ('needsProfile' in result || result.user.role !== 'ADMIN') throw unauthorized('Essa conta não tem acesso à gestão');
+    await this.logLogin(result.user.id, input.provider === 'APPLE' ? 'Apple' : String(input.provider));
     return result;
   }
 
   /** Troca a própria senha pelo painel. */
   async changeOwnPassword(actor: Actor, input: { currentPassword: unknown; newPassword: unknown }): Promise<{ token: string }> {
     this.assertAdmin(actor);
-    return this.auth.changePassword(actor.userId, input);
+    const result = await this.auth.changePassword(actor.userId, input);
+    await this.log(actor.userId, 'ADMIN_PASSWORD_CHANGED', 'USER', actor.userId, null, { targetLabel: await this.userLabel(actor.userId) });
+    return result;
+  }
+
+  private async logLogin(userId: string, how: string): Promise<void> {
+    await this.log(userId, 'ADMIN_LOGIN', 'USER', userId, `Entrou na gestão (${how})`, { targetLabel: await this.userLabel(userId) });
+  }
+
+  /** "@usuário" de uma conta, para o nome do alvo na auditoria. */
+  private async userLabel(userId: string): Promise<string | null> {
+    const profile = await this.deps.users.findProfileById(userId);
+    return profile ? `@${profile.username}` : null;
   }
 
   private assertAdmin(actor: Actor): void {
     if (actor.role !== 'ADMIN') throw forbidden('Acesso restrito a administradores');
   }
 
-  private async log(adminId: string, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null): Promise<void> {
-    await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId, action, targetType, targetId, note, createdAt: this.deps.clock.now() });
+  private async log(adminId: string, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null, extra: AuditExtra = {}): Promise<void> {
+    await this.deps.admin.addAudit({
+      id: this.deps.ids.next(), adminId, actorKind: 'ADMIN', action, targetType, targetId, note, createdAt: this.deps.clock.now(),
+      targetLabel: extra.targetLabel ?? null, changes: extra.changes && extra.changes.length > 0 ? extra.changes : null,
+    });
   }
 
   private async paged<T>(query: ListQuery, fetch: (page: Page) => Promise<T[]>, count: () => Promise<number>, sortKeys: readonly string[] = []): Promise<AdminPage<T>> {
@@ -285,13 +361,22 @@ export class AdminService {
 
   async claimDocument(actor: Actor, claimId: unknown) {
     this.assertAdmin(actor);
-    return this.venues.claimDocument(actor.userId, claimId);
+    const doc = await this.venues.claimDocument(actor.userId, claimId);
+    // Documento pessoal de quem pediu: cada vez que alguém da gestão abre, fica registrado.
+    if (doc && typeof claimId === 'string') {
+      const claim = await this.deps.claims.findById(claimId);
+      const venue = claim ? await this.deps.places.findVenue(claim.venueId) : undefined;
+      await this.log(actor.userId, 'CLAIM_DOCUMENT_VIEWED', 'CLAIM', claimId, null, { targetLabel: venue?.name ?? null });
+    }
+    return doc;
   }
 
   async reviewClaim(actor: Actor, claimId: unknown, decision: unknown, note: unknown) {
     this.assertAdmin(actor);
     const result = await this.venues.reviewClaim(actor.userId, claimId, decision, note);
-    await this.log(actor.userId, result.status === 'APPROVED' ? 'CLAIM_APPROVED' : 'CLAIM_REJECTED', 'CLAIM', result.id, result.reviewNote);
+    await this.log(actor.userId, result.status === 'APPROVED' ? 'CLAIM_APPROVED' : 'CLAIM_REJECTED', 'CLAIM', result.id, result.reviewNote, {
+      targetLabel: result.venue.name, changes: [{ field: 'situação', before: 'em análise', after: result.status === 'APPROVED' ? 'aprovado' : 'recusado' }],
+    });
     return result;
   }
 
@@ -315,7 +400,9 @@ export class AdminService {
     const reason = noteText(note, status === 'SUSPENDED');
     if (target.status === status) throw conflict(status === 'SUSPENDED' ? 'A conta já está suspensa' : 'A conta já está ativa');
     if (!(await this.deps.admin.setUserStatus(target.id, status))) throw notFound('Usuário não encontrado');
-    await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason);
+    await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason, {
+      targetLabel: await this.userLabel(target.id), changes: [{ field: 'situação', before: STATUS_LABEL[target.status], after: STATUS_LABEL[status] }],
+    });
     return { id: target.id, status };
   }
 
@@ -334,7 +421,9 @@ export class AdminService {
     const before = target.birthDate ?? null;
     if (before === parsed.birthDate) throw conflict('Essa já é a data cadastrada');
     await this.deps.users.updateBirthDate(target.id, parsed.birthDate);
-    await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400));
+    await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400), {
+      targetLabel: await this.userLabel(target.id), changes: [{ field: 'data de nascimento', before, after: parsed.birthDate }],
+    });
     return { id: target.id, birthDate: parsed.birthDate };
   }
 
@@ -401,7 +490,10 @@ export class AdminService {
     if (changes.length === 0) throw conflict('Nada mudou');
     if (next.username !== current.username) await this.deps.users.updateUsername(current.userId, next.username);
     await this.deps.users.updateProfile(next);
-    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, (reason ? `${reason} (${changes.join('; ')})` : changes.join('; ')).slice(0, 400));
+    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, (reason ? `${reason} (${changes.join('; ')})` : changes.join('; ')).slice(0, 400), {
+      targetLabel: `@${current.username}`,
+      changes: diffOf({ displayName: 'nome', username: '@usuário', bio: 'biografia' }, { ...current }, { ...next }),
+    });
     return { id: target.id, username: next.username, displayName: next.displayName, bio: next.bio };
   }
 
@@ -416,6 +508,19 @@ export class AdminService {
     const taken = await this.deps.users.findProfileByUsername(username);
     if (taken && taken.userId !== target.id) return { username, available: false, problem: 'Esse @usuário já está em uso' };
     return { username, available: true };
+  }
+
+  /**
+   * Números da pessoa para moderar e gerenciar: último sinal de uso, frequência, vínculos, eventos, NOW, mensagens
+   * (só quantas), denúncias, bloqueios, suspensões e compras. Nunca o conteúdo das conversas.
+   */
+  async userStats(actor: Actor, userId: unknown): Promise<AdminUserStats> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const stats = await this.deps.admin.userStats(target.id, target.createdAt, this.deps.clock.now());
+    if (!stats) throw notFound('Usuário não encontrado');
+    return stats;
   }
 
   /** O registro de atividade de uma pessoa (curtidas, comentários, posts, eventos, quem seguiu), como ela vê no app. */
@@ -449,7 +554,9 @@ export class AdminService {
     if (enabled && !before.canEnable) throw conflict(before.blocker ?? 'Não é possível ligar o pagamento agora');
     if (before.enabled === enabled) throw conflict(enabled ? 'O pagamento já está ligado' : 'O pagamento já está desligado');
     await this.paymentsSwitch.set(enabled, actor.userId);
-    await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason);
+    await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason, {
+      targetLabel: 'Pagamento do impulsionamento', changes: [{ field: 'ligado', before: auditValue(before.enabled), after: auditValue(enabled) }],
+    });
     return this.paymentsSwitch.state();
   }
 
@@ -457,8 +564,11 @@ export class AdminService {
   async setBoostDays(actor: Actor, days: unknown, note: unknown): Promise<PaymentsState> {
     this.assertAdmin(actor);
     const reason = noteText(note, false);
+    const before = await this.paymentsSwitch.offeredDays();
     const chosen = await this.paymentsSwitch.setOfferedDays(days, actor.userId);
-    await this.log(actor.userId, 'BOOST_PACKAGES_UPDATED', 'SETTING', 'boost.days', reason ? `${chosen.join(', ')} dias. ${reason}` : `${chosen.join(', ')} dias`);
+    await this.log(actor.userId, 'BOOST_PACKAGES_UPDATED', 'SETTING', 'boost.days', reason ? `${chosen.join(', ')} dias. ${reason}` : `${chosen.join(', ')} dias`, {
+      targetLabel: 'Pacotes de impulsionamento', changes: diffOf({ days: 'dias à venda' }, { days: before }, { days: chosen }),
+    });
     return this.paymentsSwitch.state();
   }
 
@@ -476,7 +586,9 @@ export class AdminService {
   async createEventExtra(actor: Actor, input: EventExtraInput): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
     const { option, items } = await this.eventExtrasCatalog.create(input, actor.userId);
-    await this.log(actor.userId, 'EVENT_EXTRA_CREATED', 'SETTING', option.id, `${option.label} (${option.type === 'YES_NO' ? 'sim/não' : 'texto'})`);
+    await this.log(actor.userId, 'EVENT_EXTRA_CREATED', 'SETTING', option.id, `${option.label} (${option.type === 'YES_NO' ? 'sim/não' : 'texto'})`, {
+      targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, {}, { ...option }),
+    });
     return { items };
   }
 
@@ -484,20 +596,27 @@ export class AdminService {
     this.assertAdmin(actor);
     const { before, option, items } = await this.eventExtrasCatalog.update(id, input, actor.userId);
     const note = before.label === option.label ? option.label : `${before.label} → ${option.label}`;
-    await this.log(actor.userId, 'EVENT_EXTRA_UPDATED', 'SETTING', option.id, note.slice(0, 300));
+    await this.log(actor.userId, 'EVENT_EXTRA_UPDATED', 'SETTING', option.id, note.slice(0, 300), { targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, { ...before }, { ...option }) });
     return { items };
   }
 
   async moveEventExtra(actor: Actor, id: unknown, direction: unknown): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
-    const { items } = await this.eventExtrasCatalog.move(id, direction, actor.userId);
+    const before = (await this.eventExtrasCatalog.list()).findIndex((o) => o.id === id);
+    const { option, items } = await this.eventExtrasCatalog.move(id, direction, actor.userId);
+    const after = items.findIndex((o) => o.id === option.id);
+    if (after !== before) {
+      await this.log(actor.userId, 'EVENT_EXTRA_MOVED', 'SETTING', option.id, direction === 'up' ? 'Subiu na lista' : 'Desceu na lista', {
+        targetLabel: option.label, changes: [{ field: 'posição', before: String(before + 1), after: String(after + 1) }],
+      });
+    }
     return { items };
   }
 
   async deleteEventExtra(actor: Actor, id: unknown): Promise<{ items: EventExtraOption[] }> {
     this.assertAdmin(actor);
     const { option, items } = await this.eventExtrasCatalog.remove(id, actor.userId);
-    await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label);
+    await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label, { targetLabel: option.label, changes: diffOf(EXTRA_FIELDS, { ...option }, {}) });
     return { items };
   }
 
@@ -515,7 +634,7 @@ export class AdminService {
   async createTaste(actor: Actor, input: TasteInput): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
     const { taste, items } = await this.tastesCatalog.create(input, actor.userId);
-    await this.log(actor.userId, 'TASTE_CREATED', 'SETTING', taste.id, taste.label);
+    await this.log(actor.userId, 'TASTE_CREATED', 'SETTING', taste.id, taste.label, { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, {}, { ...taste }) });
     return { items };
   }
 
@@ -523,20 +642,27 @@ export class AdminService {
     this.assertAdmin(actor);
     const { before, taste, items } = await this.tastesCatalog.update(id, input, actor.userId);
     const note = before.label === taste.label ? taste.label : `${before.label} → ${taste.label}`;
-    await this.log(actor.userId, 'TASTE_UPDATED', 'SETTING', taste.id, note.slice(0, 300));
+    await this.log(actor.userId, 'TASTE_UPDATED', 'SETTING', taste.id, note.slice(0, 300), { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, { ...before }, { ...taste }) });
     return { items };
   }
 
   async moveTaste(actor: Actor, id: unknown, direction: unknown): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
-    const { items } = await this.tastesCatalog.move(id, direction, actor.userId);
+    const before = (await this.tastesCatalog.list()).findIndex((o) => o.id === id);
+    const { taste, items } = await this.tastesCatalog.move(id, direction, actor.userId);
+    const after = items.findIndex((o) => o.id === taste.id);
+    if (after !== before) {
+      await this.log(actor.userId, 'TASTE_MOVED', 'SETTING', taste.id, direction === 'up' ? 'Subiu na lista' : 'Desceu na lista', {
+        targetLabel: taste.label, changes: [{ field: 'posição', before: String(before + 1), after: String(after + 1) }],
+      });
+    }
     return { items };
   }
 
   async deleteTaste(actor: Actor, id: unknown): Promise<{ items: TasteOption[] }> {
     this.assertAdmin(actor);
     const { taste, items } = await this.tastesCatalog.remove(id, actor.userId);
-    await this.log(actor.userId, 'TASTE_REMOVED', 'SETTING', taste.id, taste.label);
+    await this.log(actor.userId, 'TASTE_REMOVED', 'SETTING', taste.id, taste.label, { targetLabel: taste.label, changes: diffOf(TASTE_FIELDS, { ...taste }, {}) });
     return { items };
   }
 
@@ -563,7 +689,10 @@ export class AdminService {
     if (before.enabled === enabled && before.controlPercent === percent) throw conflict(enabled ? 'O teste já está ligado com esse tamanho' : 'O teste já está desligado');
     await this.recoExperiment.set(enabled, percent, actor.userId);
     const action = !enabled ? 'RECO_EXPERIMENT_DISABLED' : before.enabled ? 'RECO_EXPERIMENT_CHANGED' : 'RECO_EXPERIMENT_ENABLED';
-    await this.log(actor.userId, action, 'SETTING', 'reco-experiment', `${enabled ? `controle ${percent}%` : 'desligado'}${reason ? `: ${reason}` : ''}`.slice(0, 400));
+    await this.log(actor.userId, action, 'SETTING', 'reco-experiment', `${enabled ? `controle ${percent}%` : 'desligado'}${reason ? `: ${reason}` : ''}`.slice(0, 400), {
+      targetLabel: 'Teste A/B do “Para você”',
+      changes: diffOf({ enabled: 'ligado', controlPercent: 'grupo de controle (%)' }, { enabled: before.enabled, controlPercent: before.controlPercent }, { enabled, controlPercent: percent }),
+    });
     return this.recoExperiment.state();
   }
 
@@ -636,11 +765,12 @@ export class AdminService {
     const profile: VenueProfileInput = { name: input.name, address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, hours: input.hours, instagram: input.instagram };
     const labels = { name: 'nome', address: 'endereço', category: 'tipo', description: 'descrição', coverUrl: 'capa', logoUrl: 'logo', instagram: 'instagram' };
     const preview = this.venues.checkProfileForAdmin(current, profile);
-    const changes = [...changesOf(labels, { ...current }, { ...current, ...preview }), ...changesOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const diff = [...diffOf(labels, { ...current }, { ...current, ...preview }), ...diffOf({ lat: 'latitude', lng: 'longitude', isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const changes = changesText(diff);
     if (changes.length === 0) throw conflict('Nada mudou');
     await this.venues.adminUpdateProfile(current.id, profile);
     if (!(await this.deps.admin.updateVenueAdminFields(current.id, adminAfter))) throw notFound('Local não encontrado');
-    await this.log(actor.userId, 'VENUE_EDITED', 'VENUE', current.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    await this.log(actor.userId, 'VENUE_EDITED', 'VENUE', current.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400), { targetLabel: current.name, changes: diff });
     return this.venueDetail(actor, current.id);
   }
 
@@ -652,7 +782,9 @@ export class AdminService {
     if (!venue.ownerId) throw conflict('Este local não tem responsável');
     const reason = noteText(note, true);
     await this.deps.places.setVenueOwner(venue.id, null);
-    await this.log(actor.userId, 'VENUE_OWNER_REMOVED', 'VENUE', venue.id, reason);
+    await this.log(actor.userId, 'VENUE_OWNER_REMOVED', 'VENUE', venue.id, reason, {
+      targetLabel: venue.name, changes: [{ field: 'responsável', before: (await this.userLabel(venue.ownerId)) ?? venue.ownerId, after: null }],
+    });
     return { removed: true };
   }
 
@@ -704,7 +836,7 @@ export class AdminService {
       status,
       venue: { id: venue.id, name: venue.name, address: venue.address, owner: venue.ownerId ? { id: venue.ownerId, username: profiles.get(venue.ownerId)?.username ?? '(removido)' } : null },
       goingCount: attendance.length,
-      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
+      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', avatarUrl: profiles.get(a.userId)?.avatarUrl ?? null, at: a.createdAt.toISOString() })),
       sameTitle: others.map((e) => ({ id: e.id, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), upcoming: e.endsAt.getTime() >= now })),
       sameTitleTotal: Math.max(siblings.length, 1),
       extra: (await this.deps.admin.placeEventExtras(event.id)) ?? null,
@@ -729,19 +861,24 @@ export class AdminService {
     const labels = { title: 'nome', description: 'descrição', kind: 'tipo', startsAt: 'início', endsAt: 'fim', isFree: 'grátis', imageUrl: 'capa', tags: 'hashtags', ticketUrl: 'ingresso' };
     // Confere antes de gravar: "nada mudou" não deve tocar no evento.
     const preview = this.venues.checkEventForAdmin(found.event, fields);
-    const changes = [...changesOf(labels, { ...found.event }, { ...found.event, ...preview }), ...changesOf({ isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const diff = [...diffOf(labels, { ...found.event }, { ...found.event, ...preview }), ...diffOf({ isSample: 'teste', feedPolicy: 'feed' }, adminBefore, adminAfter)];
+    const changes = changesText(diff);
     if (changes.length === 0) throw conflict('Nada mudou');
     await this.venues.adminUpdateEvent(found.event.id, fields);
     if (!(await this.deps.admin.updatePlaceEventAdminFields(found.event.id, adminAfter))) throw notFound('Evento não encontrado');
-    await this.log(actor.userId, 'PLACE_EVENT_EDITED', 'PLACE_EVENT', found.event.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    await this.log(actor.userId, 'PLACE_EVENT_EDITED', 'PLACE_EVENT', found.event.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400), { targetLabel: `${found.event.title} · ${found.venue.name}`, changes: diff });
     return this.eventDetail(actor, found.event.id);
   }
 
   async deletePlaceEvent(actor: Actor, eventId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof eventId === 'string' && eventId.length > 0 && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (typeof eventId !== 'string' || eventId.length > 64 || !(await this.deps.admin.deletePlaceEvent(eventId))) throw notFound('Evento não encontrado');
-    await this.log(actor.userId, 'PLACE_EVENT_REMOVED', 'PLACE_EVENT', eventId, reason);
+    await this.log(actor.userId, 'PLACE_EVENT_REMOVED', 'PLACE_EVENT', eventId, reason, {
+      targetLabel: found ? `${found.event.title} · ${found.venue.name}` : null,
+      changes: found ? diffOf({ title: 'nome', startsAt: 'início', venue: 'local' }, { title: found.event.title, startsAt: found.event.startsAt, venue: found.venue.name }, {}) : null,
+    });
     return { deleted: true };
   }
 
@@ -763,8 +900,9 @@ export class AdminService {
   async deletePost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof postId === 'string' && postId.length > 0 && postId.length <= 64 ? await this.deps.posts.findById(postId) : undefined;
     if (typeof postId !== 'string' || postId.length > 64 || !(await this.deps.admin.deletePost(postId))) throw notFound('Post não encontrado');
-    await this.log(actor.userId, 'POST_REMOVED', 'POST', postId, reason);
+    await this.log(actor.userId, 'POST_REMOVED', 'POST', postId, reason, found ? await this.contentExtra(found.post.authorId, found.post.eventTitle ?? found.post.caption) : {});
     return { deleted: true };
   }
 
@@ -775,7 +913,7 @@ export class AdminService {
     const comment = typeof commentId === 'string' && commentId.length <= 64 ? await this.deps.posts.findComment(commentId) : undefined;
     if (!comment) throw notFound('Comentário não encontrado');
     await this.deps.posts.deleteComment(comment.id);
-    await this.log(actor.userId, 'COMMENT_REMOVED', 'COMMENT', comment.id, reason);
+    await this.log(actor.userId, 'COMMENT_REMOVED', 'COMMENT', comment.id, reason, await this.contentExtra(comment.authorId, comment.body));
     return { deleted: true };
   }
 
@@ -838,7 +976,7 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findUserReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.admin.resolveUserReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'USER_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'USER_REPORT', report.id, text, { targetLabel: await this.userLabel(report.reportedUserId) });
     return { resolved: true };
   }
 
@@ -861,7 +999,7 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findConversationReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.admin.resolveConversationReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'CONVERSATION_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'CONVERSATION_REPORT', report.id, text, { targetLabel: report.reportedUserId ? await this.userLabel(report.reportedUserId) : null });
     return { resolved: true };
   }
 
@@ -934,8 +1072,9 @@ export class AdminService {
   async deleteFeedPost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof postId === 'string' && postId.length > 0 && postId.length <= 64 ? await this.deps.feed.findPost(postId) : undefined;
     if (typeof postId !== 'string' || postId.length > 64 || !(await this.deps.feed.deletePost(postId))) throw notFound('Publicação não encontrada');
-    await this.log(actor.userId, 'FEED_POST_REMOVED', 'FEED_POST', postId, reason);
+    await this.log(actor.userId, 'FEED_POST_REMOVED', 'FEED_POST', postId, reason, found ? await this.contentExtra(found.post.authorId, found.post.body) : {});
     return { deleted: true };
   }
 
@@ -943,8 +1082,9 @@ export class AdminService {
   async deleteFeedComment(actor: Actor, commentId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const reason = noteText(note, true);
+    const found = typeof commentId === 'string' && commentId.length > 0 && commentId.length <= 64 ? await this.deps.feed.findComment(commentId) : undefined;
     if (typeof commentId !== 'string' || commentId.length > 64 || !(await this.deps.feed.deleteComment(commentId))) throw notFound('Comentário não encontrado');
-    await this.log(actor.userId, 'FEED_COMMENT_REMOVED', 'FEED_COMMENT', commentId, reason);
+    await this.log(actor.userId, 'FEED_COMMENT_REMOVED', 'FEED_COMMENT', commentId, reason, found ? await this.contentExtra(found.authorId, found.body) : {});
     return { deleted: true };
   }
 
@@ -983,14 +1123,23 @@ export class AdminService {
     const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.feed.findReport(reportId) : undefined;
     if (!report) throw notFound('Denúncia não encontrada');
     if (!(await this.deps.feed.resolveReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
-    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'FEED_REPORT', report.id, text);
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'FEED_REPORT', report.id, text, { targetLabel: await this.userLabel(report.reportedUserId) });
     return { resolved: true };
   }
 
   // ---------- Auditoria ----------
 
-  async audit(actor: Actor, query: ListQuery): Promise<AdminPage<AuditRow>> {
+  /** Filtros: `q` (texto), `action`, `actorKind` (ADMIN/USER/SYSTEM), `targetType`, `actorId`, `targetId`, `from`/`to` (AAAA-MM-DD, horário de Brasília). */
+  async audit(actor: Actor, query: AuditQuery): Promise<AdminPage<AuditRow>> {
     this.assertAdmin(actor);
-    return this.paged(query, (page) => this.deps.admin.listAudit(page), () => this.deps.admin.countList('AUDIT'), ADMIN_SORTS.audit);
+    const filter = auditFilterOf(query);
+    return this.paged(query, (page) => this.deps.admin.listAudit(page, filter), () => this.deps.admin.countAudit(filter), ADMIN_SORTS.audit);
+  }
+
+  /** Autor e trecho do conteúdo apagado: a auditoria continua dizendo o que era depois que some. */
+  private async contentExtra(authorId: string, text: string | null | undefined): Promise<AuditExtra> {
+    const author = (await this.userLabel(authorId)) ?? '(removido)';
+    const excerpt = snippet(text);
+    return { targetLabel: excerpt ? `${author}: “${excerpt}”` : author, changes: diffOf({ author: 'autor', text: 'conteúdo' }, { author, text: snippet(text, 500) }, {}) };
   }
 }

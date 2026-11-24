@@ -2,6 +2,8 @@ import { conflict, unauthorized, validationError } from './errors.ts';
 import { isNotificationCategory, notificationFilter, OVERVIEW_FILTER } from './notification-categories.ts';
 import type { Clock, ConversationRepository, IdGenerator, LiveActivityTokens, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushLive, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from './types.ts';
+import { DEFAULT_SOUNDS, isNotificationSound, SOUND_GROUPS, soundGroup } from './notification-sounds.ts';
+import type { NotificationSound, NotificationSoundSettings, SoundGroup } from './notification-sounds.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
@@ -94,6 +96,30 @@ export function replyConversationOf(type: NotificationType, url: string): string
 
 const isNativeEndpoint = (endpoint: string): boolean => endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) || endpoint.startsWith(FCM_ENDPOINT_PREFIX);
 
+/**
+ * Som que vai para este aparelho. App antigo (não avisou que tem os sons): só o padrão, porque no Android o canal do
+ * som não existiria e o aviso cairia no canal genérico. O navegador recebe o escolhido (só o `silencioso` muda algo).
+ */
+export function soundForSubscription(sub: Pick<PushSubscriptionRecord, 'endpoint' | 'sounds'>, sound: NotificationSound): NotificationSound {
+  if (isNativeEndpoint(sub.endpoint) && sub.sounds !== true) return 'padrao';
+  return sound;
+}
+
+/** Campo `sound` da mensagem: só vai quando não é o padrão (sem ele, cada sistema toca o som de sempre). */
+const soundField = (sub: Pick<PushSubscriptionRecord, 'endpoint' | 'sounds'>, sound: NotificationSound): { sound?: NotificationSound } => {
+  const s = soundForSubscription(sub, sound);
+  return s === 'padrao' ? {} : { sound: s };
+};
+
+/** Som escolhido para o grupo; se não der para ler, o padrão (o aviso sai do mesmo jeito). */
+async function chosenSound(notifications: NotificationRepository, userId: string, group: SoundGroup): Promise<NotificationSound> {
+  try {
+    return (await notifications.getSoundSettings(userId))[group];
+  } catch {
+    return 'padrao';
+  }
+}
+
 /** Guarda o aviso e dispara o push em segundo plano. Falhas aqui nunca chegam a quem executou a ação. */
 export class StoredNotifier implements Notifier {
   private readonly deps: NotifierDeps;
@@ -129,7 +155,7 @@ export class StoredNotifier implements Notifier {
     }
     // Silenciado: o aviso fica no sino, mas o aparelho não recebe push.
     if (muted) return;
-    const job = this.pushTo(input).catch(() => undefined);
+    const job = (async () => this.pushTo({ ...input, sound: await chosenSound(notifications, input.userId, soundGroup(input.type)) }))().catch(() => undefined);
     this.inFlight.add(job);
     void job.finally(() => this.inFlight.delete(job));
   }
@@ -159,9 +185,10 @@ export class StoredNotifier implements Notifier {
       const skipIphone = route === 'activity' || (route === 'dismissed' && input.live.quiet && input.live.state === 'moving');
       const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(skipIphone && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
       const image = input.who?.image;
+      const sound = await chosenSound(notifications, input.userId, 'arrival');
       await Promise.all(
         subs.map(async (sub) => {
-          const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.tag, live: input.live, ...(image ? { image } : {}) });
+          const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.tag, live: input.live, ...(image ? { image } : {}), ...soundField(sub, sound) });
           if (result === 'GONE') await pushSubscriptions.remove(sub.endpoint);
         }),
       );
@@ -202,6 +229,8 @@ export class StoredNotifier implements Notifier {
     }
     const state = { title: input.title, body: input.body, progress: live.progress, arrived: live.state === 'arrived' };
     const alert = live.quiet || live.state === 'stopped' ? undefined : { title: input.title, body: input.body };
+    // Som da chegada escolhido pela pessoa. Num app antigo, sem o arquivo, o iPhone toca o som padrão.
+    const sound = alert ? await chosenSound(this.deps.notifications, input.userId, 'arrival') : 'padrao';
     const send = async (sub: PushSubscriptionRecord, event: 'start' | 'update' | 'end', extra: { attributes?: { name: string; tag: string; url: string; registration: string } } = {}) => {
       const token = sub.endpoint.slice(sub.endpoint.startsWith(LIVE_START_PREFIX) ? LIVE_START_PREFIX.length : LIVE_ACTIVITY_PREFIX.length);
       const result = await push.liveActivity!({
@@ -209,6 +238,7 @@ export class StoredNotifier implements Notifier {
         event,
         state,
         ...(alert ? { alert } : {}),
+        ...(sound !== 'padrao' ? { sound } : {}),
         ...extra,
         staleAtMs: live.untilMs,
         ...(event === 'end' ? { dismissAtMs: Math.min(live.untilMs, nowMs + 60_000) } : {}),
@@ -245,7 +275,7 @@ export class StoredNotifier implements Notifier {
     while (this.inFlight.size > 0) await Promise.all([...this.inFlight]);
   }
 
-  private async pushTo(input: { userId: string; title: string; body: string; url: string; type: NotificationType; dedupeKey?: string }): Promise<void> {
+  private async pushTo(input: { userId: string; title: string; body: string; url: string; type: NotificationType; dedupeKey?: string; sound: NotificationSound }): Promise<void> {
     const { pushSubscriptions, push } = this.deps;
     if (push.publicKey === null && !push.nativeEnabled) return;
     const subs = (await pushSubscriptions.listForUser(input.userId)).filter((s) => !isLiveActivityEndpoint(s.endpoint));
@@ -255,7 +285,7 @@ export class StoredNotifier implements Notifier {
       subs.map(async (sub) => {
         // "Responder" só no app (iPhone/Android), e com um token preso a este aparelho.
         const reply = replies && conversationId && sub.replyable === true && isNativeEndpoint(sub.endpoint) ? replies.issue(input.userId, conversationId, sub.endpoint) : undefined;
-        const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.dedupeKey ?? input.type, ...(reply ? { reply } : {}) });
+        const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.dedupeKey ?? input.type, ...(reply ? { reply } : {}), ...soundField(sub, input.sound) });
         if (result === 'GONE') await pushSubscriptions.remove(sub.endpoint);
       }),
     );
@@ -267,6 +297,8 @@ export interface PushSubscribeInput {
   keys: unknown;
   /** O app do aparelho sabe mostrar "Responder" na notificação (só vale para `apns:`/`fcm:`). */
   reply?: unknown;
+  /** O app do aparelho tem os sons do AskouT (só vale para `apns:`/`fcm:`). */
+  sounds?: unknown;
 }
 
 /** O que a lista usa para descobrir quem causou cada aviso (inclusive nos antigos, gravados sem `actorId`). */
@@ -364,6 +396,24 @@ export class NotificationService {
     return next;
   }
 
+  soundSettings(userId: string): Promise<NotificationSoundSettings> {
+    return this.deps.notifications.getSoundSettings(userId);
+  }
+
+  /** Muda só os grupos que vierem (`chats`, `invites`, `arrival`, `other`), cada um com um som de NOTIFICATION_SOUNDS. */
+  async setSoundSettings(userId: string, patch: unknown): Promise<NotificationSoundSettings> {
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw validationError('Dados inválidos', { sounds: 'Envie o som de cada tipo de aviso' });
+    const p = patch as Record<string, unknown>;
+    for (const key of Object.keys(p)) {
+      if (!(SOUND_GROUPS as readonly string[]).includes(key)) throw validationError('Dados inválidos', { [key]: 'Tipo de aviso desconhecido' });
+      if (!isNotificationSound(p[key])) throw validationError('Dados inválidos', { [key]: 'Som desconhecido' });
+    }
+    const current = await this.deps.notifications.getSoundSettings(userId);
+    const next: NotificationSoundSettings = { ...DEFAULT_SOUNDS, ...current, ...(p as Partial<NotificationSoundSettings>) };
+    await this.deps.notifications.setSoundSettings(userId, next, this.deps.clock.now());
+    return next;
+  }
+
   /** Marca um aviso, vários (lista de ids, da seleção na tela) ou todos (sem `id`) como lidos. */
   async markRead(userId: string, id?: string | string[]): Promise<{ unread: number }> {
     const { notifications, clock } = this.deps;
@@ -382,14 +432,16 @@ export class NotificationService {
    * aceitou. Serve para conferir se o push está chegando no aparelho sem depender de outra pessoa.
    */
   async testPush(userId: string): Promise<{ devices: number; sent: number; failed: number; removed: number; byKind: Record<'ios' | 'android' | 'web', { sent: number; failed: number }> }> {
-    const { pushSubscriptions, push } = this.deps;
+    const { pushSubscriptions, push, notifications } = this.deps;
     const subs = await pushSubscriptions.listForUser(userId);
+    // Toca o som escolhido para "Outros avisos", para a pessoa ouvir no aparelho como vai ficar.
+    const sound = await chosenSound(notifications, userId, 'other');
     const byKind = { ios: { sent: 0, failed: 0 }, android: { sent: 0, failed: 0 }, web: { sent: 0, failed: 0 } };
     let removed = 0;
     await Promise.all(
       subs.map(async (sub) => {
         const kind = sub.endpoint.startsWith(FCM_ENDPOINT_PREFIX) ? 'android' : sub.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) ? 'ios' : 'web';
-        const result = await push.send(sub, { title: 'AskouT', body: 'Aviso de teste: se você está lendo isto, as notificações estão funcionando.', url: '/atividades', tag: 'push-test' }).catch(() => 'FAILED' as const);
+        const result = await push.send(sub, { title: 'AskouT', body: 'Aviso de teste: se você está lendo isto, as notificações estão funcionando.', url: '/atividades', tag: 'push-test', ...soundField(sub, sound) }).catch(() => 'FAILED' as const);
         if (result === 'SENT') byKind[kind].sent += 1;
         else byKind[kind].failed += 1;
         if (result === 'GONE') {
@@ -442,7 +494,8 @@ export class NotificationService {
       throw conflict('Você já tem avisos ligados em muitos aparelhos. Desligue em algum para ligar aqui.');
     }
     const replyable = input.reply === true && isNativeEndpoint(endpoint as string);
-    await pushSubscriptions.upsert({ userId, endpoint: endpoint as string, p256dh: p256dh as string, auth: auth as string, createdAt: clock.now(), replyable });
+    const sounds = input.sounds === true && isNativeEndpoint(endpoint as string);
+    await pushSubscriptions.upsert({ userId, endpoint: endpoint as string, p256dh: p256dh as string, auth: auth as string, createdAt: clock.now(), replyable, sounds });
     return { ok: true };
   }
 

@@ -24,6 +24,8 @@ self.addEventListener('push', (event) => {
       icon: '/favicon.svg',
       badge: '/favicon.svg',
       data: { url },
+      // A pessoa escolheu "Sem som" para esse tipo de aviso (o navegador não deixa trocar o som, só calar).
+      silent: data.silent === true,
       }),
     ]),
   );
