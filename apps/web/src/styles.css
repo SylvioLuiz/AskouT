@@ -4105,6 +4105,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .sharelist__item--danger strong, .sharelist__item--danger > svg { color: var(--danger); }
 .sharelist__item--on { border-color: var(--brand); }
 .sharelist__item--on strong::after { content: 'Ativo'; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 600; vertical-align: 1px; }
+/* Menu de opções do perfil: letra e espaçamento menores, folha com no máximo 70% da tela e rolagem só na lista. */
+.sheet__panel:has(> .sharelist--compact) { display: flex; flex-direction: column; max-height: min(70dvh, calc(92dvh - var(--sa-top))); overflow: hidden; }
+.sheet__panel:has(> .sharelist--compact) > * { flex: none; }
+.sheet__panel > .sharelist--compact { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; gap: 6px; margin-bottom: 0; }
+.sharelist--compact .sharelist__item { padding: 10px 12px; gap: 1px; }
+.sharelist--compact .sharelist__item strong { font-size: 0.9375rem; }
+.sharelist--compact .sharelist__item span { font-size: 0.8125rem; line-height: 1.3; }
 .inlineicon { display: inline-flex; vertical-align: middle; }
 .inlineicon .icon { width: 18px; height: 18px; }
 .reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
