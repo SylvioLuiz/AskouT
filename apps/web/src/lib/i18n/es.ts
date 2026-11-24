@@ -3713,4 +3713,6 @@ export const ES: Readonly<Record<string, string>> = {
   "Sair também do grupo do evento?": "¿Salir también del grupo del evento?",
   "Sair também do grupo “{name}”? Você sai da votação da data junto.": "¿Salir también del grupo “{name}”? También sales de la votación de la fecha.",
   "Ficar no grupo": "Quedarme en el grupo",
+  "Eventos passados": "Eventos pasados",
+  "Eventos do dia": "Eventos del día",
 };
