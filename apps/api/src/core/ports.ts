@@ -592,6 +592,8 @@ export interface PostRepository {
   /** Convites do evento, mais antigos primeiro. */
   listInvites(postId: string): Promise<EventInviteRecord[]>;
   isInvited(postId: string, userId: string): Promise<boolean>;
+  /** Desfaz o convite (e a marcação) de `userId` no evento. Devolve false se não havia convite. */
+  removeInvite(postId: string, userId: string): Promise<boolean>;
   /** Posts em que `userId` foi marcado e ainda não respondeu, mais recentes primeiro. */
   listPendingTags(userId: string, page: Page): Promise<PostWithImages[]>;
   /** Só apaga se `authorId` é o autor. Devolve false se não existia ou era de outra pessoa. */

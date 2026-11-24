@@ -6713,7 +6713,11 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evwho__who span { color: var(--muted); font-size: 0.8125rem; }
 .evwho__who strong, .evwho__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evwho__more { margin: 12px 0 0; text-align: center; }
-.evwho__invite { display: flex; justify-content: center; }
+/* Folha "Convidar pessoas": convites pendentes no topo, com "Cancelar" à direita. */
+.evinvites { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.evinvites .results__h { display: flex; align-items: center; gap: 8px; margin: 0; }
+.evinvites .evwho__who { flex: 1; }
+.evinvites .evwho__item .btn { flex: none; }
 .evwho .evgoing__faces::-webkit-scrollbar { display: none; }
 .evwho .evgoing__faces > li { flex: none; }
 .evwho__person { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; }

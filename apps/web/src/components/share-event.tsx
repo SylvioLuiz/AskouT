@@ -47,7 +47,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
     let cancelled = false;
     api.eventInvites(eventId).then(
       (r) => {
-        if (!cancelled) setInvited(new Set(r.invites.map((i) => i.user.userId)));
+        if (!cancelled) setInvited(new Set(r.invites.filter((i) => i.status !== 'DECLINED').map((i) => i.user.userId)));
       },
       () => undefined,
     );

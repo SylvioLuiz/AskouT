@@ -551,7 +551,8 @@ export class PostService {
 
   /**
    * Convidar mais amigos para o próprio evento depois de criado: como marcar na criação (convite, marcação e aviso).
-   * Quem já foi convidado (na criação, pelo cartão numa conversa ou antes) não é convidado de novo nem recebe outro aviso.
+   * Quem já foi convidado (na criação, pelo cartão numa conversa ou antes) não é convidado de novo nem recebe outro aviso,
+   * a não ser que tenha recusado: aí o convite volta a ficar pendente e a pessoa é avisada de novo.
    */
   async inviteToEvent(actorId: string, postId: unknown, userIds: unknown): Promise<{ invited: string[] }> {
     const { post } = await this.seeable(actorId, postId);
@@ -561,15 +562,32 @@ export class PostService {
     return { invited: await this.inviteFriends(actorId, post.id, post.eventTitle, ids) };
   }
 
-  /** Convida (sem duplicar) e, só para quem é novo, cria a marcação e avisa. */
+  /**
+   * Quem organiza desfaz um convite que ainda não foi aceito (some o convite e a marcação; a pessoa pode ser convidada de novo).
+   * Quem já aceitou não sai por aqui.
+   */
+  async cancelInvite(actorId: string, postId: unknown, userId: unknown): Promise<{ cancelled: true }> {
+    const { post } = await this.seeable(actorId, postId);
+    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento cancela convites');
+    if (typeof userId !== 'string' || userId === '' || userId.length > 64) throw notFound('Convite não encontrado');
+    const tag = (await this.deps.posts.tagsFor([post.id])).find((t) => t.userId === userId);
+    if (tag?.status === 'ACCEPTED') throw conflict('Essa pessoa já aceitou o convite');
+    if (!(await this.deps.posts.removeInvite(post.id, userId))) throw notFound('Convite não encontrado');
+    return { cancelled: true };
+  }
+
+  /** Convida (sem duplicar) e, só para quem é novo, cria a marcação e avisa. Quem tinha recusado volta a ter o convite pendente. */
   private async inviteFriends(actorId: string, postId: string, eventTitle: string, ids: string[]): Promise<string[]> {
     if (ids.length === 0) return [];
     const now = this.deps.clock.now();
     const added = await this.deps.posts.addInvites(postId, ids, actorId, now);
-    if (added.length === 0) return [];
-    await this.deps.posts.createTags(postId, added, now);
-    await this.notifyTagged(actorId, postId, eventTitle, added);
-    return added;
+    const fresh = new Set(added);
+    const declined = (await this.deps.posts.tagsFor([postId])).filter((t) => t.status === 'DECLINED' && !fresh.has(t.userId) && ids.includes(t.userId)).map((t) => t.userId);
+    for (const userId of declined) await this.deps.posts.respondTag(postId, userId, 'PENDING');
+    if (added.length > 0) await this.deps.posts.createTags(postId, added, now);
+    const invited = [...added, ...declined];
+    if (invited.length > 0) await this.notifyTagged(actorId, postId, eventTitle, invited);
+    return invited;
   }
 
   private async notifyTagged(actorId: string, postId: string, eventTitle: string | null, userIds: string[]): Promise<void> {

@@ -931,6 +931,8 @@ export interface EventInvite {
   invitedAt: string;
   /** Também está marcada no evento. */
   tagged: boolean;
+  /** PENDING: ainda não respondeu (dá para cancelar); ACCEPTED: aceitou; DECLINED: recusou (dá para convidar de novo). */
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
 }
 
 export interface EventPage {

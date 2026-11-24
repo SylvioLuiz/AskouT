@@ -620,13 +620,6 @@ export function EventScreen({ eventId }: { eventId: string }) {
           ) : !ended ? (
             <p className="evwho__empty">{e.isOwner ? t('Ninguém confirmou ainda.') : t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
           ) : null}
-          {canInviteFriends ? (
-            <div className="evwho__invite">
-              <Button small variant="secondary" onClick={() => setInvitingFriends(true)}>
-                <PlusIcon /> {t('Convidar mais pessoas')}
-              </Button>
-            </div>
-          ) : null}
           {inviteNote ? <Notice tone="ok">{inviteNote}</Notice> : null}
 
           {whoOpen ? (

@@ -163,6 +163,12 @@ export class PostsController {
     return this.core.posts.inviteToEvent(actor.userId, id, asBody(body).userIds);
   }
 
+  /** Cancela um convite ainda não aceito do próprio evento. */
+  @Delete('posts/:id/invites/:userId')
+  cancelInvite(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.core.posts.cancelInvite(actor.userId, id, userId);
+  }
+
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */
   @Put('posts/:id/images/:imageId')
   async adjustImage(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('imageId') imageId: string, @Body() body: unknown) {
