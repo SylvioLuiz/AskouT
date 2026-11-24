@@ -77,6 +77,19 @@ export class NotificationsController {
     return this.core.notifications.setSoundSettings(actor.userId, body);
   }
 
+  /** Lembretes de evento: `{reminders: ['manha', '30m'], custom: false}` (custom false = o padrão). */
+  @Get('event-reminders')
+  eventReminders(@CurrentActor() actor: Actor) {
+    return this.core.notifications.eventReminderSettings(actor.userId);
+  }
+
+  /** `{reminders: [...] | null, timeZone?}`: a lista escolhida (vazia = nenhum) ou `null` para voltar ao padrão. */
+  @Put('event-reminders')
+  setEventReminders(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.notifications.setEventReminderSettings(actor.userId, { reminders: b.reminders, timeZone: b.timeZone });
+  }
+
   /** Chave pública VAPID (ou `null` se o push não está configurado). */
   @Get('push-key')
   pushKey() {

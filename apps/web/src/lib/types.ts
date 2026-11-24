@@ -863,6 +863,20 @@ export interface NotificationSounds {
   other: NotificationSound;
 }
 
+/** Lembrete de evento: 1 dia antes, de manhã no dia ("É hoje!"), 2 h, 1 h, 30 min ou 15 min antes. */
+export type EventReminderOption = '1d' | 'manha' | '2h' | '1h' | '30m' | '15m';
+
+/** Escolha de lembretes: a que vale e se é personalizada (false = o padrão, ou num evento a escolha geral). */
+export interface EventReminderChoice {
+  reminders: EventReminderOption[];
+  custom: boolean;
+}
+
+export interface EventReminderEventChoice extends EventReminderChoice {
+  /** A escolha geral da pessoa (o padrão enquanto ela não mexer). */
+  general: EventReminderOption[];
+}
+
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';

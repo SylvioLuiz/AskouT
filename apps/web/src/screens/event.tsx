@@ -43,6 +43,7 @@ import { trackTicketClick } from '../components/sponsored-view.tsx';
 import { splitEventTitle } from '../lib/event-title.ts';
 import { LiveTag } from '../components/live-tag.tsx';
 import { GoingChoiceSheet } from '../components/going-choice.tsx';
+import { EventReminderSheet } from '../components/event-reminders.tsx';
 import { EventSkeleton } from '../components/skeletons.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
@@ -203,6 +204,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [choosing, setChoosing] = useState(false);
+  const [editingReminders, setEditingReminders] = useState(false);
   // Cancelou a presença estando no grupo do evento: pergunta se sai do grupo também (e da votação da data dele).
   const [askLeaveGroup, setAskLeaveGroup] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -571,6 +573,16 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {choosing ? <GoingChoiceSheet {...(e.startsAt && e.endsAt ? { event: { id: e.id, startsAt: e.startsAt, endsAt: e.endsAt } } : {})} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
+            {/* Quem vai (ou criou) escolhe os lembretes só deste evento; sem mexer, vale a escolha de Configuração > Notificações. */}
+            {!visitor && e.going && !ended && e.startsAt !== null ? (
+              <p className="evgo__hint">
+                {t('Você recebe lembretes antes de começar.')}{' '}
+                <button type="button" className="linkbtn" onClick={() => setEditingReminders(true)}>
+                  {t('Mudar lembretes')}
+                </button>
+              </p>
+            ) : null}
+            {editingReminders ? <EventReminderSheet eventId={e.id} onClose={() => setEditingReminders(false)} /> : null}
             {askLeaveGroup && e.group ? (
               <div className="evinvites__ask" role="group" aria-label={t('Sair também do grupo do evento?')}>
                 <p>{t('Sair também do grupo “{name}”? Você sai da votação da data junto.', { name: e.group.name })}</p>

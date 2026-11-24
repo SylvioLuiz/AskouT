@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { EventReminderOption } from '../event-reminders.ts';
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
 import { conflict } from '../errors.ts';
@@ -2320,6 +2321,21 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     this.sounds.set(userId, { ...settings });
   }
 
+  readonly eventReminders = new Map<string, import('../ports.ts').EventReminderSettings>();
+
+  async getEventReminderSettings(userIds: string[]): Promise<Map<string, import('../ports.ts').EventReminderSettings>> {
+    const out = new Map<string, import('../ports.ts').EventReminderSettings>();
+    for (const id of userIds) {
+      const saved = this.eventReminders.get(id);
+      if (saved) out.set(id, { reminders: saved.reminders ? [...saved.reminders] : null, timeZone: saved.timeZone });
+    }
+    return out;
+  }
+
+  async setEventReminderSettings(userId: string, settings: import('../ports.ts').EventReminderSettings): Promise<void> {
+    this.eventReminders.set(userId, { reminders: settings.reminders ? [...settings.reminders] : null, timeZone: settings.timeZone });
+  }
+
   async create(record: NotificationRecord): Promise<void> {
     this.rows.push({ ...record });
   }
@@ -2685,11 +2701,15 @@ export class InMemoryPostRepository implements PostRepository {
 
 export class InMemoryEventRoomRepository implements EventRoomRepository {
   private readonly postsRepo: InMemoryPostRepository;
+  /** Para saber quando começam os eventos dos locais (o banco faz isso com um join). */
+  private readonly placesRepo: InMemoryPlaceRepository | undefined;
   readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date; onProfile: boolean }>();
   readonly reminded = new Set<string>();
+  readonly reminderChoices = new Map<string, { ref: EventRef; userId: string; reminders: EventReminderOption[] }>();
 
-  constructor(postsRepo: InMemoryPostRepository) {
+  constructor(postsRepo: InMemoryPostRepository, placesRepo?: InMemoryPlaceRepository) {
     this.postsRepo = postsRepo;
+    this.placesRepo = placesRepo;
   }
 
   private static key(ref: EventRef): string {
@@ -2715,11 +2735,41 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return row && this.alive(ref) ? row.onProfile : undefined;
   }
 
-  async markReminded(ref: EventRef, userId: string): Promise<boolean> {
-    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+  async markReminded(ref: EventRef, userId: string, kind: EventReminderOption): Promise<boolean> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}|${kind}`;
     if (this.reminded.has(key)) return false;
     this.reminded.add(key);
     return true;
+  }
+
+  async listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]> {
+    const out: { ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[] = [];
+    for (const g of this.going.values()) {
+      let startsAt: Date | null | undefined;
+      if (g.ref.source === 'PLACE') startsAt = this.placesRepo?.events.get(g.ref.id)?.startsAt;
+      else {
+        const post = this.postsRepo.posts.get(g.ref.id);
+        startsAt = post && post.archivedAt === null ? post.eventStartsAt : null;
+      }
+      if (startsAt && startsAt > from && startsAt <= to) out.push({ ref: { ...g.ref }, userId: g.userId, createdAt: g.createdAt, startsAt });
+    }
+    return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(0, limit);
+  }
+
+  async listReminderChoices(refs: EventRef[]): Promise<{ ref: EventRef; userId: string; reminders: EventReminderOption[] }[]> {
+    const wanted = new Set(refs.map((r) => InMemoryEventRoomRepository.key(r)));
+    return [...this.reminderChoices.values()].filter((c) => wanted.has(InMemoryEventRoomRepository.key(c.ref))).map((c) => ({ ref: { ...c.ref }, userId: c.userId, reminders: [...c.reminders] }));
+  }
+
+  async getReminderChoice(ref: EventRef, userId: string): Promise<EventReminderOption[] | undefined> {
+    const row = this.reminderChoices.get(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+    return row ? [...row.reminders] : undefined;
+  }
+
+  async setReminderChoice(ref: EventRef, userId: string, reminders: EventReminderOption[] | null): Promise<void> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+    if (reminders === null) this.reminderChoices.delete(key);
+    else this.reminderChoices.set(key, { ref: { ...ref }, userId, reminders: [...reminders] });
   }
 
   async removeGoing(ref: EventRef, userId: string): Promise<boolean> {

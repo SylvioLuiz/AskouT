@@ -97,7 +97,7 @@ export function PushCard({ hideInstallHint = false }: { hideInstallHint?: boolea
 const MUTE_ROWS: { key: 'all' | 'chats' | 'events'; title: string; help: string }[] = [
   { key: 'all', title: t('Todas'), help: t('Nenhum aviso toca no aparelho. Eles continuam aparecendo no sino.') },
   { key: 'chats', title: t('Conversas'), help: t('Sem push de mensagens e avisos de grupos. Continuam no sino.') },
-  { key: 'events', title: t('Eventos'), help: t('Sem push de convites, mudanças e do lembrete de 30 min antes do evento. Continuam no sino.') },
+  { key: 'events', title: t('Eventos'), help: t('Sem push de convites, mudanças e dos lembretes antes do evento. Continuam no sino.') },
 ];
 
 /** Chaves para silenciar avisos: tudo, só conversas ou só eventos. */
