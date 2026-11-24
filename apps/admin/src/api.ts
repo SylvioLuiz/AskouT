@@ -120,6 +120,7 @@ export const api = {
   removeAllHunterEvents: () => request<{ removed: number }>('DELETE', '/admin/hunter/events'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
+  setBoostDays: (days: number[], note: string) => request<PaymentsState>('PUT', '/admin/payments/packages', { days, note }),
   topInviters: (limit = 20) => request<TopInviter[]>('GET', `/admin/referrals/top${query({ limit })}`),
   recoExperiment: () => request<RecoExperimentState>('GET', '/admin/reco-experiment'),
   setRecoExperiment: (enabled: boolean, controlPercent: number, note: string) => request<RecoExperimentState>('PUT', '/admin/reco-experiment', { enabled, controlPercent, note }),
