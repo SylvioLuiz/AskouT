@@ -1375,6 +1375,7 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
       <section className="sharebox" aria-label={t('Sua chegada')}>
         <p className="sharebox__title">{t('Mostrando sua chegada para {name}', { name })}</p>
         <p className="muted">
+          {match.destination ? null : <>{t('Sem lugar combinado, a conta é entre vocês dois: o tempo muda quando você ou {name} se movem.', { name })} </>}
           {background.available
             ? t('{name} vê nas notificações quanto falta para você chegar. Pode bloquear o celular: o AskouT continua mandando sua posição até o encontro acabar ou você parar.', { name })
             : t('{name} vê nas notificações quanto falta para você chegar. Deixe o AskouT aberto no caminho para o tempo ir se atualizando.', { name })}
@@ -1394,8 +1395,7 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
       </section>
     );
   }
-  // Sem local combinado não há para onde "chegar": a opção só aparece depois que um local for escolhido.
-  if (match.meApprox || !match.destination) return theirs ? <section className="sharebox">{theirs}</section> : null;
+  if (match.meApprox) return theirs ? <section className="sharebox">{theirs}</section> : null;
   if (dismissed) {
     return (
       <section className="sharebox" aria-label={t('Sua chegada')}>
@@ -1410,7 +1410,9 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
     <section className="sharebox" aria-label={t('Sua chegada')}>
       <p className="sharebox__title">{t('Mostrar sua chegada para {name}?', { name })}</p>
       <p className="muted">
-        {t('Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado. Só durante este encontro, e você pode parar quando quiser.', { name })}
+        {match.destination
+          ? t('Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado. Só durante este encontro, e você pode parar quando quiser.', { name })
+          : t('Ainda não tem lugar combinado: {name} acompanha nas notificações do celular quanto falta para vocês se encontrarem, pela localização de um e do outro. Só durante este encontro, e você pode parar quando quiser.', { name })}
       </p>
       {theirs}
       <div className="stack">

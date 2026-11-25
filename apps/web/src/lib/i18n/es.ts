@@ -3408,6 +3408,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Mostrar minha chegada para {name}": "Mostrar mi llegada a {name}",
   "Mostrar sua chegada para {name}?": "¿Mostrar tu llegada a {name}?",
   "Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado. Só durante este encontro, e você pode parar quando quiser.": "Como el auto llegando en Uber: {name} sigue en las notificaciones del celular cuánto falta para que llegues al lugar acordado. Solo durante este encuentro, y puedes dejar de mostrarlo cuando quieras.",
+  "Sem lugar combinado, a conta é entre vocês dois: o tempo muda quando você ou {name} se movem.": "Sin lugar acordado, se calcula entre ustedes dos: el tiempo cambia cuando tú o {name} se mueven.",
+  "Ainda não tem lugar combinado: {name} acompanha nas notificações do celular quanto falta para vocês se encontrarem, pela localização de um e do outro. Só durante este encontro, e você pode parar quando quiser.": "Todavía no hay lugar acordado: {name} sigue en las notificaciones del celular cuánto falta para que se encuentren, por la ubicación de cada uno. Solo durante este encuentro, y puedes dejar de mostrarlo cuando quieras.",
   "Mostrar minha chegada": "Mostrar mi llegada",
   "Agora só a sua localização aproximada é mostrada, e sua chegada deixou de ser mostrada.": "Ahora solo se muestra tu ubicación aproximada, y tu llegada dejó de mostrarse.",
   "Usando a capa do evento": "Usando la portada del evento",

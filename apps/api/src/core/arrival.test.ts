@@ -255,3 +255,43 @@ test('chegada: exige posição exata, só quem está no encontro, e "aproximada"
   assert.equal((await w.core.flash.getMatch(ana, inviteId)).meArrival, false, 'aproximada desliga a chegada');
   await rejectsWith(w.core.flash.setArrival(ana, inviteId, true), 'VALIDATION');
 });
+
+test('chegada sem lugar combinado: é medida entre os dois, e atualiza quando quem espera também se move', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(1500));
+  assert.equal((await w.core.flash.getMatch(ana, inviteId)).destination, null);
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+  assert.match(liveSent(w)[0]!.message.body, /1,5 km até você$/);
+
+  // Bia anda na direção da Ana: a chegada da Ana fica mais perto mesmo sem a Ana mandar posição nova.
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(bia, inviteId, north(800));
+  await w.core.flushNotifications();
+  const closer = liveSent(w)[1]!.message;
+  assert.match(closer.body, /700 m até você$/);
+  assert.equal(closer.title, 'ana está a caminho');
+
+  // Os dois se encontram no meio do caminho.
+  w.clock.tick(5_000);
+  await w.core.flash.shareLocation(bia, inviteId, north(1450));
+  await w.core.flushNotifications();
+  const met = liveSent(w).at(-1)!.message;
+  assert.equal(met.live?.state, 'arrived');
+  assert.equal(met.body, 'Está bem perto de você');
+});
+
+test('chegada com lugar combinado: quem espera se mover não muda a chegada do outro', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(1500));
+  await w.core.flash.chooseDestination(bia, inviteId, { name: 'Bar do Zé', ...north(100) });
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+  const before = liveSent(w).length;
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(bia, inviteId, north(600));
+  await w.core.flushNotifications();
+  assert.equal(liveSent(w).length, before);
+});
