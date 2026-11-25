@@ -14,7 +14,7 @@ import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
-import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
 import { AlbumContent } from './albums.tsx';
 import { api, session } from '../client.ts';
 import { useIsVisitor, useOptionalUser } from '../auth.tsx';
@@ -87,12 +87,29 @@ function goBack() {
   routerGoBack(session.get() === undefined ? '/' : '/explorar');
 }
 
-/** Menu ⋯ do evento: editar (quem criou o evento ou é admin dele), compartilhar e adicionar à agenda. */
-function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; onShare: () => void; onEdit: (post: PostView) => void; onClose: () => void }) {
+/** Menu ⋯ do evento: editar e adiar (quem criou o evento ou é admin dele), compartilhar e adicionar à agenda. */
+function EventMenuSheet({ page, onShare, onEdit, onChanged, onClose }: { page: EventPage; onShare: () => void; onEdit: (post: PostView) => void; onChanged: () => void; onClose: () => void }) {
   const [message, setMessage] = useState<string | undefined>();
   const [opening, setOpening] = useState(false);
+  const [askPostpone, setAskPostpone] = useState(false);
+  const [postponing, setPostponing] = useState(false);
   // O evento criado por uma pessoa é um post: edita pelo mesmo formulário de "Editar" do post.
   const canEdit = (page.isOwner || page.isAdmin === true) && page.source === 'USER';
+  // Adiar só vale para evento com data (o que está em votação já está sem data).
+  const canPostpone = canEdit && page.startsAt !== null;
+
+  async function setPostponed(postponed: boolean) {
+    setMessage(undefined);
+    setPostponing(true);
+    try {
+      await api.setEventPostponed(page.id, postponed);
+      onChanged();
+      onClose();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+      setPostponing(false);
+    }
+  }
 
   async function edit() {
     setMessage(undefined);
@@ -113,6 +130,26 @@ function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; o
         <Button full variant="secondary" loading={opening} onClick={() => edit()}>
           <EditIcon /> {t('Editar evento')}
         </Button>
+      ) : null}
+      {canPostpone && page.postponed ? (
+        <Button full variant="secondary" loading={postponing} onClick={() => void setPostponed(false)}>
+          <CalendarIcon /> {t('Tirar o adiado (manter a data)')}
+        </Button>
+      ) : null}
+      {canPostpone && !page.postponed ? (
+        askPostpone ? (
+          <Confirm
+            question={t('Adiar o evento? Ele fica como adiado, sem nova data, e quem vai recebe um aviso. Quando tiver a nova data, é só editar o evento.')}
+            confirmLabel={t('Adiar')}
+            busy={postponing}
+            onConfirm={() => void setPostponed(true)}
+            onCancel={() => setAskPostpone(false)}
+          />
+        ) : (
+          <Button full variant="secondary" onClick={() => setAskPostpone(true)}>
+            <CalendarIcon /> {t('Marcar como adiado')}
+          </Button>
+        )
       ) : null}
       <Button full variant="secondary" onClick={onShare}>
         <ShareIcon /> {t('Compartilhar')}
@@ -350,10 +387,13 @@ export function EventScreen({ eventId }: { eventId: string }) {
         },
       }
     : {};
-  const date = e ? eventDateLabel(e.startsAt, e.endsAt) : null;
-  const time = e ? eventTimeLabel(e.startsAt, e.endsAt) : null;
+  // Adiado: a data guardada é a antiga, então não aparece como certa.
+  const postponed = e?.postponed === true;
+  const date = e ? (postponed ? { main: t('Adiado'), sub: t('nova data a definir') } : eventDateLabel(e.startsAt, e.endsAt)) : null;
+  const time = e ? (postponed ? { main: t('A definir'), sub: null } : eventTimeLabel(e.startsAt, e.endsAt)) : null;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
-  const ended = e?.endsAt ? Date.parse(e.endsAt) <= Date.now() : false;
+  // Evento adiado não "acaba" pela data antiga: continua aberto esperando a nova.
+  const ended = e?.endsAt && !postponed ? Date.parse(e.endsAt) <= Date.now() : false;
   const canStory = e ? e.canStory : false;
   // O botão de postar flash fica sempre à vista enquanto o evento não acabou; quem ainda não marcou que vai vê um aviso.
   const titleParts = splitEventTitle(e?.title ?? '');
@@ -406,7 +446,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <div className="evhero__pills">
-                {e.startsAt && e.endsAt && Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
+                {!postponed && e.startsAt && e.endsAt && Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
+                {postponed ? <span className="evhero__pill evhero__pill--postponed">{t('Adiado')}</span> : null}
                 <span className="evhero__pill">{kindLabel(e.kind)}</span>
                 {e.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
                 {e.isPrivate ? (
@@ -625,7 +666,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               </>
             ) : null}
             {/* Quem vai (ou criou) escolhe os lembretes só deste evento; sem mexer, vale a escolha de Configuração > Notificações. */}
-            {!visitor && e.going && !ended && e.startsAt !== null ? (
+            {!visitor && e.going && !ended && e.startsAt !== null && !postponed ? (
               <p className="evgo__hint">
                 {t('Você recebe lembretes antes de começar.')}{' '}
                 <button type="button" className="linkbtn" onClick={() => setEditingReminders(true)}>
@@ -819,14 +860,23 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="evinfo__icon" aria-hidden="true"><CalendarIcon /></span>
                 <div className="evinfo__main">
                   <h2 className="evinfo__title">{t('Quando')}</h2>
-                  <p className="evinfo__strong">{eventLongDate(e.startsAt, e.endsAt)}</p>
-                  <p className="evinfo__sub">
-                    {time.main}
-                    {time.sub ? ` ${time.sub}` : ''}
-                  </p>
-                  <button type="button" className="evinfo__more" onClick={addToAgenda}>
-                    {t('Adicionar à agenda')}
-                  </button>
+                  {postponed ? (
+                    <>
+                      <p className="evinfo__strong">{t('Adiado: nova data a definir')}</p>
+                      <p className="evinfo__sub evinfo__old">{t('Data anterior: {date}', { date: eventLongDate(e.startsAt, e.endsAt) })}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="evinfo__strong">{eventLongDate(e.startsAt, e.endsAt)}</p>
+                      <p className="evinfo__sub">
+                        {time.main}
+                        {time.sub ? ` ${time.sub}` : ''}
+                      </p>
+                      <button type="button" className="evinfo__more" onClick={addToAgenda}>
+                        {t('Adicionar à agenda')}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               {e.venue.name || e.venue.address ? (
@@ -930,6 +980,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           page={e}
           onShare={() => { setMenu(false); if (visitor) askLogin(t('Entre para mandar o evento para seus amigos.')); else setSharing(true); }}
           onEdit={(post) => { setMenu(false); setEditing(post); }}
+          onChanged={() => loaded.reload()}
           onClose={() => setMenu(false)}
         />
       ) : null}

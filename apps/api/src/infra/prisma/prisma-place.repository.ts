@@ -257,6 +257,12 @@ export class PrismaPlaceRepository implements PlaceRepository {
     return res.count > 0;
   }
 
+  async setEventPostponed(venueId: string, eventId: string, at: Date | null) {
+    if (!isUuid(venueId) || !isUuid(eventId)) return false;
+    const res = await this.prisma.placeEvent.updateMany({ where: { id: eventId, venueId }, data: { postponedAt: at } });
+    return res.count > 0;
+  }
+
   async deleteEvent(venueId: string, eventId: string) {
     if (!isUuid(venueId) || !isUuid(eventId)) return false;
     const res = await this.prisma.placeEvent.deleteMany({ where: { id: eventId, venueId } });
@@ -383,11 +389,11 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 }
 
-interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; ticketUrl: string | null; isSample: boolean }
+interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; ticketUrl: string | null; postponedAt?: Date | null; isSample: boolean }
 interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; logoUrl?: string | null; instagram?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null; isOrganization?: boolean; isUserCreated?: boolean }
 
 function toEvent(r: EventRow): PlaceEventRecord {
-  return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], ticketUrl: r.ticketUrl, isSample: r.isSample };
+  return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], ticketUrl: r.ticketUrl, postponedAt: r.postponedAt ?? null, isSample: r.isSample };
 }
 
 function toVenue(v: VenueRow): VenueRecord {

@@ -706,8 +706,21 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
 
 export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venueId: string; event: VenueEvent; now: Date; onEdit: () => void; onChanged: () => void }) {
   const [asking, setAsking] = useState(false);
+  const [askPostpone, setAskPostpone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
+
+  async function togglePostponed() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api.setVenueEventPostponed(venueId, event.id, !event.postponed);
+      onChanged();
+    } catch (failure) {
+      setError(toApiError(failure).message);
+    }
+    setBusy(false);
+  }
 
   async function remove() {
     setBusy(true);
@@ -726,19 +739,35 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
         <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="vevent__title">
           {event.title}
         </Link>
-        <span className="vevent__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
+        <span className="vevent__when">
+          {event.postponed ? <s>{formatWhen(event.startsAt, event.endsAt, now)}</s> : formatWhen(event.startsAt, event.endsAt, now)}
+          {event.postponed ? <span className="vevent__postponed">{t('Adiado')}</span> : null}
+        </span>
         <span className="vevent__meta">
           {kindLabel(event.kind)} · {event.isFree ? t('Grátis') : t('Pago')} · {phaseLabel(event.phase)}
         </span>
         {event.sample ? <SampleBadge /> : null}
       </div>
-      {asking ? (
+      {askPostpone ? (
+        <Confirm
+          question={t('Adiar este evento? Ele fica como adiado, sem nova data, e quem vai recebe um aviso. Quando tiver a nova data, é só editar o evento.')}
+          confirmLabel={t('Adiar')}
+          busy={busy}
+          onConfirm={() => void togglePostponed().then(() => setAskPostpone(false))}
+          onCancel={() => setAskPostpone(false)}
+        />
+      ) : asking ? (
         <Confirm question={t('Apagar este evento? Quem confirmou presença deixa de vê-lo.')} confirmLabel={t('Apagar')} danger busy={busy} onConfirm={remove} onCancel={() => setAsking(false)} />
       ) : (
         <div className="vevent__actions">
           <Button small variant="secondary" onClick={onEdit}>
             {t('Editar')}
           </Button>
+          {event.phase === 'PAST' && !event.postponed ? null : (
+            <Button small variant="secondary" loading={busy} onClick={() => (event.postponed ? void togglePostponed() : setAskPostpone(true))}>
+              {event.postponed ? t('Tirar adiado') : t('Adiar')}
+            </Button>
+          )}
           {event.phase === 'PAST' ? null : (
             <Link to={`/bares/${encodeURIComponent(venueId)}/eventos/${encodeURIComponent(event.id)}/chapelaria`} className="btn btn--secondary btn--small">
               {t('Chapelaria')}
