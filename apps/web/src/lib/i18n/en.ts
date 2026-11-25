@@ -3635,6 +3635,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Texto: {text}. Toque para mudar ou arraste": "Text: {text}. Tap to change or drag",
   "Editar foto {n}": "Edit photo {n}",
   "Buscar mais no Google": "Search more on Google",
+  "A busca no Google atingiu o limite de hoje. Mostrando só o AskouT e o OpenStreetMap.": "Google search has hit today's limit. Showing only AskouT and OpenStreetMap.",
   "Resultados do OpenStreetMap.": "Results from OpenStreetMap.",
   "Depois de instalar, crie sua conta: o app vai perguntar se foi @{username} quem te chamou.": "After installing, create your account: the app will ask if @{username} invited you.",
   "Digite o @ de quem te convidou.": "Type the @ of who invited you.",

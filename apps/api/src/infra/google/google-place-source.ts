@@ -32,6 +32,10 @@ const CACHE_MAX = 300;
 /** Fotos (640x400, poucas dezenas de KB cada): guardadas por 1 hora, no máximo 150. */
 const PHOTO_TTL_MS = 60 * 60_000;
 const PHOTO_CACHE_MAX = 150;
+/** Depois de um 429 que não é da cota diária (por minuto), espera 1 minuto antes de tentar de novo. */
+const QUOTA_RETRY_MS = 60_000;
+const QUOTA_MARGIN_MS = 5 * 60_000;
+const DAY_MS = 24 * 3600_000;
 
 /** Autocomplete (10.000/mês, e grátis na sessão que termina num detalhe) e detalhe Essentials (10.000/mês) do cadastro pela gestão. */
 export const GOOGLE_DAILY_DEFAULTS: Record<GoogleCallKind, number> = { nearby: 150, search: 150, lookup: 150, photo: 30, autocomplete: 300, essentials: 300 };
@@ -80,8 +84,21 @@ export class GooglePlaceSource implements PlaceSource, GooglePlacePicker {
   private day = '';
   private used: Record<GoogleCallKind, number> = { nearby: 0, search: 0, lookup: 0, photo: 0, autocomplete: 0, essentials: 0 };
   private readonly cache = new Map<string, { at: number; places: ExternalPlace[] }>();
-  /** A busca por texto só existe no Google, e ele cobra: o app só usa quando a pessoa pede. */
-  readonly premiumSearch = true;
+  /** Até quando cada tipo de chamada fica sem ir ao Google, depois de um 429 (cota esgotada). */
+  private readonly pausedUntil: Partial<Record<GoogleCallKind, number>> = {};
+
+  /**
+   * A busca por texto só existe no Google, e ele cobra: o app só usa quando a pessoa pede. Com a cota do dia esgotada
+   * (429 do Google ou o teto daqui), fica desligada: ninguém tenta, o botão some e tudo segue no OpenStreetMap.
+   */
+  get premiumSearch(): boolean {
+    return !this.premiumPaused;
+  }
+
+  /** A busca por texto do Google está sem cota agora (429 ou teto do dia); volta sozinha quando a cota renova. */
+  get premiumPaused(): boolean {
+    return this.blocked('search');
+  }
 
   constructor(options: GoogleOptions) {
     this.apiKey = options.apiKey;
@@ -128,17 +145,38 @@ export class GooglePlaceSource implements PlaceSource, GooglePlacePicker {
   private async fail(kind: GoogleCallKind, response: Response): Promise<void> {
     let detail = '';
     try { detail = (await response.text()).replace(/\s+/g, ' ').slice(0, 240); } catch { /* sem corpo */ }
+    if (response.status === 429) {
+      // Cota esgotada: continuar chamando só gera mais 429 (e deixa a tela esperando). A cota do dia renova à meia-noite
+      // do horário do Pacífico; a por minuto, em um minuto.
+      const until = /per day/i.test(detail) ? nextPacificMidnight(this.now()) : this.now() + QUOTA_RETRY_MS;
+      this.pausedUntil[kind] = Math.max(this.pausedUntil[kind] ?? 0, until);
+      this.warn(`${kind}: HTTP 429 ${detail} — pausado até ${new Date(until).toISOString()}`, `429:${kind}:${until}`);
+      return;
+    }
     this.warn(`${kind}: HTTP ${response.status} ${detail}`, `http:${kind}:${response.status}`);
   }
 
-  private spend(kind: GoogleCallKind): boolean {
+  private rollDay(): string {
     const today = new Date(this.now()).toISOString().slice(0, 10);
     if (today !== this.day) {
       this.day = today;
       this.used = { nearby: 0, search: 0, lookup: 0, photo: 0, autocomplete: 0, essentials: 0 };
     }
-    if (this.used[kind] >= this.limits[kind]) {
-      this.warn(`teto diário de ${kind} atingido (${this.limits[kind]})`, `cap:${kind}:${today}`);
+    return today;
+  }
+
+  /** Sem cota para este tipo agora: o teto daqui acabou ou o Google respondeu 429 há pouco. */
+  private blocked(kind: GoogleCallKind): boolean {
+    this.rollDay();
+    const paused = this.pausedUntil[kind];
+    if (paused !== undefined && this.now() >= paused) delete this.pausedUntil[kind];
+    return this.pausedUntil[kind] !== undefined || this.used[kind] >= this.limits[kind];
+  }
+
+  private spend(kind: GoogleCallKind): boolean {
+    const today = this.rollDay();
+    if (this.blocked(kind)) {
+      if (this.pausedUntil[kind] === undefined) this.warn(`teto diário de ${kind} atingido (${this.limits[kind]})`, `cap:${kind}:${today}`);
       return false;
     }
     this.used[kind] += 1;
@@ -191,6 +229,17 @@ export class GooglePlaceSource implements PlaceSource, GooglePlacePicker {
     const key = `search|${text.trim().toLowerCase().replace(/\s+/g, ' ')}|${at}|${size}`;
     const hit = this.cached(key);
     if (hit) return { available: true, places: hit };
+    // Pedidos iguais ao mesmo tempo (filtros trocados enquanto a busca anda) dividem uma chamada só.
+    const pending = this.searchPending.get(key);
+    if (pending) return pending.then((r) => ({ available: r.available, places: r.places.map((p) => ({ ...p })) }));
+    const run = this.fetchSearch(text, center, size, key).finally(() => this.searchPending.delete(key));
+    this.searchPending.set(key, run);
+    return run;
+  }
+
+  private readonly searchPending = new Map<string, Promise<{ available: boolean; places: ExternalPlace[] }>>();
+
+  private async fetchSearch(text: string, center: { lat: number; lng: number } | undefined, size: number, key: string): Promise<{ available: boolean; places: ExternalPlace[] }> {
     if (!this.spend('search')) return { available: false, places: [] };
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/places:searchText`, {
@@ -344,6 +393,20 @@ export class GooglePlaceSource implements PlaceSource, GooglePlacePicker {
       return undefined;
     }
   }
+}
+
+/**
+ * Próxima meia-noite no horário do Pacífico (quando as cotas diárias do Google renovam), com 5 minutos de folga.
+ * Em dia de troca de horário de verão erra no máximo 1 hora, o que só adianta ou atrasa uma tentativa.
+ */
+export function nextPacificMidnight(nowMs: number): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(new Date(nowMs))
+      .map((p) => [p.type, p.value]),
+  );
+  const sinceMidnight = ((Number(parts.hour) * 60 + Number(parts.minute)) * 60 + Number(parts.second)) * 1000 + (nowMs % 1000);
+  return nowMs - sinceMidnight + DAY_MS + QUOTA_MARGIN_MS;
 }
 
 function parse(places: GooglePlace[] | undefined): ExternalPlace[] {

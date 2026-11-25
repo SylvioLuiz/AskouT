@@ -880,10 +880,12 @@ export class AdminService {
    * Posição de um endereço: primeiro a busca gratuita (OpenStreetMap); só se ela não achar e houver Google, a paga.
    * Devolve até 5 opções, a mais provável primeiro.
    */
-  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[] }> {
+  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]; googlePaused?: true }> {
     this.assertAdmin(actor);
     if (typeof address !== 'string' || address.trim().length < 3) throw validationError('Dados inválidos', { address: 'Escreva o endereço para buscar a posição' });
-    return { items: await this.locate(address.trim().slice(0, 200), 5) };
+    const items = await this.locate(address.trim().slice(0, 200), 5);
+    // Sem resultado grátis e o Google sem cota hoje: a gestão vê o motivo em vez de "endereço não existe".
+    return { items, ...(items.length === 0 && this.deps.placeSource.premiumPaused === true ? { googlePaused: true as const } : {}) };
   }
 
   private async locate(address: string, limit: number): Promise<{ name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]> {
@@ -958,7 +960,10 @@ export class AdminService {
     } else {
       if (!checked.address) throw validationError('Dados inválidos', { address: 'Informe o endereço (ou a latitude e a longitude)' });
       const [first] = await this.locate(checked.address, 1);
-      if (!first) throw validationError('Dados inválidos', { address: 'Não achamos esse endereço no mapa. Confira ou informe latitude e longitude' });
+      if (!first) {
+        const why = this.deps.placeSource.premiumPaused === true ? ' (a busca do Google atingiu o limite de hoje)' : '';
+        throw validationError('Dados inválidos', { address: `Não achamos esse endereço no mapa${why}. Confira ou informe latitude e longitude` });
+      }
       lat = first.lat;
       lng = first.lng;
       located = first.source;

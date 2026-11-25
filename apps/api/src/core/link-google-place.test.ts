@@ -133,3 +133,19 @@ test('rua sem número: o número informado entra no nome, no endereço e no pont
   assert.notEqual(plain.venueId, venueId);
   await rejectsWith(w.core.venues.openExternal({ key: 'osm:way/42', lat: RUA.lat, lng: RUA.lng, number: 'abc' }), 'VALIDATION');
 });
+
+test('Google sem cota hoje: nada de chamada paga, sem botão e com aviso do motivo', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  w.placeSource.premiumOnly = [{ externalId: 'ChIJBuxixo', source: 'GOOGLE' as const, name: 'Buxixo Bar', category: 'bar', lat: -23.5225, lng: -46.1883 }];
+  // É assim que a fonte do Google fica depois de um 429: sem busca paga e marcada como pausada.
+  w.placeSource.premiumSearch = false;
+  w.placeSource.premiumPaused = true;
+  const r = await w.core.explore.searchPlaces(ana!, { q: 'buxixo', lat: HERE.lat, lng: HERE.lng });
+  assert.equal(w.placeSource.premiumCalls, 0);
+  assert.deepEqual([r.places.length, r.canSearchGoogle, r.googlePaused], [0, false, true]);
+  // Com cota de volta, o aviso some.
+  w.placeSource.premiumSearch = true;
+  w.placeSource.premiumPaused = false;
+  assert.equal((await w.core.explore.searchPlaces(ana!, { q: 'buxixo', lat: HERE.lat, lng: HERE.lng })).googlePaused, undefined);
+});

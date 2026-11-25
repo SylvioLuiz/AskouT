@@ -2269,6 +2269,8 @@ export class FakePlaceSource implements PlaceSource {
   searchCalls = 0;
   /** Finge ter uma fonte paga (Google) para a busca: o app mostra o botão "buscar mais no Google". */
   premiumSearch = false;
+  /** Finge que o Google está sem cota hoje (a pessoa vê o aviso; `premiumSearch` deve estar `false` junto). */
+  premiumPaused = false;
   premiumCalls = 0;
   /** Lugares que só a busca paga (Google) acha; a gratuita (OSM) não os vê. */
   premiumOnly: ExternalPlace[] = [];

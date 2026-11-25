@@ -996,6 +996,11 @@ export interface PlaceSource {
   search?(text: string, center: { lat: number; lng: number } | undefined, limit: number, opts?: { premium?: boolean }): Promise<{ available: boolean; places: ExternalPlace[] }>;
   /** Há uma fonte paga (Google) para a busca por texto, que o app oferece num botão à parte. */
   readonly premiumSearch?: boolean;
+  /**
+   * A fonte paga existe mas está sem cota agora (o Google respondeu 429 ou o teto do dia acabou). Enquanto isso
+   * `premiumSearch` fica `false`; este campo só serve para avisar a pessoa por que o Google não entra.
+   */
+  readonly premiumPaused?: boolean;
   /** Um lugar pelo id na fonte, para confirmar que existe. */
   lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }

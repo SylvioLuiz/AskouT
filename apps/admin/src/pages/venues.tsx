@@ -381,9 +381,10 @@ function GeocodeField({ editor }: { editor: RecordEditor<VenueDraft> }) {
     setProblem(undefined);
     setHits(undefined);
     try {
-      const { items } = await api.geocode(address);
+      const { items, googlePaused } = await api.geocode(address);
       setHits(items);
-      if (items.length === 0) setProblem('Não achamos esse endereço no mapa. Confira o texto ou informe latitude e longitude.');
+      if (items.length === 0 && googlePaused) setProblem('Não achamos esse endereço no mapa gratuito, e a busca do Google atingiu o limite de hoje (volta amanhã). Confira o texto ou informe latitude e longitude.');
+      else if (items.length === 0) setProblem('Não achamos esse endereço no mapa. Confira o texto ou informe latitude e longitude.');
       else if (items.length === 1) pickHit(items[0]!);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : 'Não foi possível buscar agora.');

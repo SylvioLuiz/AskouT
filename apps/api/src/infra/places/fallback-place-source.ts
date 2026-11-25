@@ -23,6 +23,11 @@ export class FallbackPlaceSource implements PlaceSource {
     return this.primary.premiumSearch === true && typeof this.primary.search === 'function';
   }
 
+  /** A principal (Google) está sem cota agora: a busca segue só na reserva gratuita. */
+  get premiumPaused(): boolean {
+    return this.primary.premiumPaused === true;
+  }
+
   /**
    * Busca por texto. Sem `premium`, só a reserva gratuita (OpenStreetMap). Com `premium` (a pessoa pediu "buscar no
    * Google"), a principal; se ela não responder ou bater no teto do dia, cai na reserva.

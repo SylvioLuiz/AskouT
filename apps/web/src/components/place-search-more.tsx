@@ -17,6 +17,7 @@ export function PlaceSearchMore({ data, google, busy, onGoogle }: { data: PlaceS
           {t('Buscar mais no Google')}
         </Button>
       ) : null}
+      {data.googlePaused && !fromGoogle ? <p className="muted">{t('A busca no Google atingiu o limite de hoje. Mostrando só o AskouT e o OpenStreetMap.')}</p> : null}
       {fromGoogle ? <p className="muted">{t('Resultados do Google.')}</p> : null}
       {fromOsm ? <p className="muted">{t('Resultados do OpenStreetMap.')}</p> : null}
     </>

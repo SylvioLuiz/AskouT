@@ -3,6 +3,7 @@ import { ratingView } from './venue-service.ts';
 import { notFound, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
 import { distanceMeters } from './geo.ts';
+import { VISITOR_ID } from './visitor.ts';
 import type { CoreDeps } from './ports.ts';
 import type { BoostService } from './boost-service.ts';
 import type { ProfileService } from './profile-service.ts';
@@ -443,7 +444,8 @@ export class ExploreService {
         let byName = await placeSource.search(typed, center, 10);
         let hits = matches(byName.places);
         const nearby = placeItems.some((i) => i.distanceM !== null && i.distanceM <= NEAR_ENOUGH_M) || [...extra.map((e) => e.d), ...hits.map((h) => distanceMeters(center, { lat: h.lat, lng: h.lng }))].some((d) => d <= NEAR_ENOUGH_M);
-        if (!nearby && placeSource.premiumSearch === true) {
+        // Visitante (site público, sem conta) não gasta o Google sozinho: a busca segue nas fontes gratuitas.
+        if (!nearby && placeSource.premiumSearch === true && actorId !== VISITOR_ID) {
           byName = await placeSource.search(typed, center, 10, { premium: true });
           hits = matches(byName.places);
         }
@@ -499,7 +501,7 @@ export class ExploreService {
    * Vincular um rolê: busca pelo nome ou endereço os locais do AskouT (em qualquer lugar) e, na fonte externa (Google),
    * qualquer lugar que combine, mesmo longe ou fora dos tipos de bar. Com posição, o que está perto vem primeiro.
    */
-  async searchPlaces(actorId: string, input: { q?: unknown; lat?: unknown; lng?: unknown; google?: unknown }): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean; canSearchGoogle: boolean }> {
+  async searchPlaces(actorId: string, input: { q?: unknown; lat?: unknown; lng?: unknown; google?: unknown }): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean; canSearchGoogle: boolean; googlePaused?: true }> {
     const text = typeof input.q === 'string' ? input.q.trim() : '';
     // eslint-disable-next-line no-control-regex
     if (text.length < 2 || text.length > EXPLORE_QUERY_MAX || /[\u0000-\u001f\u007f]/.test(text)) throw validationError('Busca inválida', { q: `De 2 a ${EXPLORE_QUERY_MAX} caracteres` });
@@ -561,7 +563,9 @@ export class ExploreService {
         ...(p.street ? { street: true } : {}),
       });
     }
-    return { places: placeItems, placesAvailable: ext.available, canSearchGoogle: canSearchGoogle && !autoGoogle };
+    // Google sem cota hoje: o app avisa por que o botão sumiu (ou por que "buscar no Google" trouxe só o OpenStreetMap).
+    const googlePaused = source.premiumPaused === true && text.length >= GOOGLE_SEARCH_MIN_CHARS;
+    return { places: placeItems, placesAvailable: ext.available, canSearchGoogle: canSearchGoogle && !autoGoogle, ...(googlePaused ? { googlePaused: true as const } : {}) };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */
