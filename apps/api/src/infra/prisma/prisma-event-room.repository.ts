@@ -44,12 +44,13 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
 
   async listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]> {
     const rows = await this.prisma.eventAttendance.findMany({
-      where: { OR: [{ placeEvent: { startsAt: { gt: from, lte: to } } }, { post: { archivedAt: null, eventStartsAt: { gt: from, lte: to } } }] },
+      // Evento adiado não manda lembrete: a data guardada é a antiga.
+      where: { OR: [{ placeEvent: { postponedAt: null, startsAt: { gt: from, lte: to } } }, { post: { archivedAt: null, eventPostponedAt: null, eventStartsAt: { gt: from, lte: to } } }] },
       select: { userId: true, createdAt: true, placeEventId: true, postId: true, placeEvent: { select: { startsAt: true } }, post: { select: { eventStartsAt: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });
-    return rows.flatMap((r) => {
+    return rows.flatMap((r): { ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[] => {
       if (r.placeEventId && r.placeEvent) return [{ ref: { source: 'PLACE' as const, id: r.placeEventId }, userId: r.userId, createdAt: r.createdAt, startsAt: r.placeEvent.startsAt }];
       if (r.postId && r.post?.eventStartsAt) return [{ ref: { source: 'USER' as const, id: r.postId }, userId: r.userId, createdAt: r.createdAt, startsAt: r.post.eventStartsAt }];
       return [];

@@ -126,6 +126,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           </button>
         </header>
         {message ? <Notice tone="error">{message}</Notice> : null}
+        {event.postponed ? <Notice>{t('Este evento está adiado. Ao salvar uma nova data, ele deixa de estar adiado e quem vai recebe um aviso.')}</Notice> : null}
 
         <input
           ref={coverInput}

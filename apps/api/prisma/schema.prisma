@@ -1032,6 +1032,8 @@ model PlaceEvent {
   ticketUrl   String?
   /// Quem pode publicar no feed do evento (o moderador é quem administra o local).
   feedPolicy  FeedPolicy @default(OWNER_ONLY)
+  /// Adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
+  postponedAt DateTime?
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1073,6 +1075,8 @@ model Post {
   eventPrivate     Boolean @default(false)
   /// Respostas às configurações de evento da gestão: `[{optionId, value}]` (value é true/false ou texto).
   eventExtras      Json    @default("[]")
+  /// Evento adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
+  eventPostponedAt DateTime?
   archivedAt    DateTime?
   editedAt      DateTime?
   createdAt    DateTime @default(now())

@@ -42,6 +42,7 @@ function categoryOf(type: NotificationType): Category {
     case 'VENUE_CALENDAR':
     case 'VENUE_EVENT':
     case 'EVENT_ADMIN':
+    case 'EVENT_UPDATE':
       return 'event';
     case 'FOLLOW_REQUEST':
     case 'FOLLOW_ACCEPTED':
@@ -71,6 +72,7 @@ function CategoryIcon({ type }: { type: NotificationType }) {
     case 'MEETUP_CANCELLED':
     case 'VENUE_CALENDAR':
     case 'VENUE_EVENT':
+    case 'EVENT_UPDATE':
       return <CalendarIcon />;
     case 'FOLLOW_REQUEST':
     case 'FOLLOW_ACCEPTED':

@@ -232,6 +232,12 @@ export class VenuesController {
     return this.core.venues.updateEvent(actor.userId, id, eventId, asBody(body));
   }
 
+  /** Marca ou tira o "Adiado" do evento: `{postponed: boolean}`. A nova data vem pela edição (que tira o adiado). */
+  @Put('me/venues/:id/events/:eventId/postponed')
+  setEventPostponed(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('eventId') eventId: string, @Body() body: unknown) {
+    return this.core.venues.setEventPostponed(actor.userId, id, eventId, asBody(body).postponed);
+  }
+
   @Delete('me/venues/:id/events/:eventId')
   deleteEvent(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('eventId') eventId: string) {
     return this.core.venues.deleteEvent(actor.userId, id, eventId);

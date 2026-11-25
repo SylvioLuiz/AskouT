@@ -395,6 +395,8 @@ export function createApi(deps: ApiDeps) {
     inviteToEvent: (postId: string, userIds: string[]) => request<{ invited: string[] }>('POST', `/posts/${id(postId)}/invites`, { body: { userIds } }),
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
     /** O dono torna admin do evento quem vai ou aceitou o convite. */
+    /** Marca ou tira o "Adiado" do evento (dono ou admin). A nova data vem pela edição, que tira o adiado. */
+    setEventPostponed: (postId: string, postponed: boolean) => request<PostView>('PUT', `/posts/${id(postId)}/postponed`, { body: { postponed } }),
     addEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('POST', `/posts/${id(postId)}/admins`, { body: { userId } }),
     /** O dono tira um admin; o próprio admin também pode sair. */
     removeEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('DELETE', `/posts/${id(postId)}/admins/${id(userId)}`),
@@ -812,6 +814,7 @@ export function createApi(deps: ApiDeps) {
     cloakroomLookup: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/lookup`, { body: { code } }),
     cloakroomReceive: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/receive`, { body: { code } }),
     cloakroomReturn: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/return`, { body: { code } }),
+    setVenueEventPostponed: (venueId: string, eventId: string, postponed: boolean) => request<VenueEvent>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/postponed`, { body: { postponed } }),
     deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas

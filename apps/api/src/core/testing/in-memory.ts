@@ -1951,7 +1951,14 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async updateEvent(venueId: string, event: PlaceEventRecord) {
     const current = this.events.get(event.id);
     if (!current || current.venueId !== venueId) return false;
-    this.events.set(event.id, { ...event, venueId, isSample: current.isSample, tags: [...event.tags] });
+    this.events.set(event.id, { ...event, venueId, isSample: current.isSample, postponedAt: event.postponedAt === undefined ? (current.postponedAt ?? null) : event.postponedAt, tags: [...event.tags] });
+    return true;
+  }
+
+  async setEventPostponed(venueId: string, eventId: string, at: Date | null) {
+    const current = this.events.get(eventId);
+    if (!current || current.venueId !== venueId) return false;
+    current.postponedAt = at;
     return true;
   }
 
@@ -2617,6 +2624,13 @@ export class InMemoryPostRepository implements PostRepository {
     return this.eventAdmins.has(`${postId}|${userId}`);
   }
 
+  async setEventPostponed(postId: string, at: Date | null): Promise<boolean> {
+    const post = this.posts.get(postId);
+    if (!post) return false;
+    post.eventPostponedAt = at;
+    return true;
+  }
+
   async addEventAdmin(postId: string, userId: string, addedById: string, at: Date): Promise<boolean> {
     const key = `${postId}|${userId}`;
     if (this.eventAdmins.has(key) || !this.posts.has(postId)) return false;
@@ -2832,10 +2846,12 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     const out: { ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[] = [];
     for (const g of this.going.values()) {
       let startsAt: Date | null | undefined;
-      if (g.ref.source === 'PLACE') startsAt = this.placesRepo?.events.get(g.ref.id)?.startsAt;
-      else {
+      if (g.ref.source === 'PLACE') {
+        const event = this.placesRepo?.events.get(g.ref.id);
+        startsAt = event && !event.postponedAt ? event.startsAt : null;
+      } else {
         const post = this.postsRepo.posts.get(g.ref.id);
-        startsAt = post && post.archivedAt === null ? post.eventStartsAt : null;
+        startsAt = post && post.archivedAt === null && !post.eventPostponedAt ? post.eventStartsAt : null;
       }
       if (startsAt && startsAt > from && startsAt <= to) out.push({ ref: { ...g.ref }, userId: g.userId, createdAt: g.createdAt, startsAt });
     }
