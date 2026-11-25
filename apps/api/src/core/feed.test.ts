@@ -284,3 +284,71 @@ test('denúncias: publicação e comentário vão para a gestão, somem para que
   await rejectsWith(w.core.admin.deleteFeedPost(A, post.id, 'spam'), 'NOT_FOUND');
   assert.deepEqual((await w.core.admin.audit(A, {})).items.map((a) => a.action).sort(), ['FEED_COMMENT_REMOVED', 'FEED_POST_REMOVED', 'REPORT_DISMISSED']);
 });
+
+test('sininho do evento: liga e desliga; avisa cada publicação nova de outra pessoa, uma vez só', async () => {
+  const { w, ana, bia, caio, duda, ev } = await setup();
+  assert.equal((await w.core.feed.list(bia, 'event', ev.id)).bell, false, 'nasce desligado');
+  assert.equal((await w.core.feed.list(bia, 'venue', 'v1')).bell, null, 'rolê não tem sininho de feed');
+  await rejectsWith(w.core.feed.setBell(bia, 'event', ev.id, 'sim'), 'VALIDATION');
+  await rejectsWith(w.core.feed.setBell(bia, 'venue', 'v1', true), 'NOT_FOUND');
+  await rejectsWith(w.core.feed.setBell(bia, 'event', 'nao-existe', true), 'NOT_FOUND');
+  assert.equal((await w.core.feed.setBell(bia, 'event', ev.id, true)).bell, true);
+  assert.equal((await w.core.feed.setBell(bia, 'event', ev.id, true)).bell, true, 'ligar de novo não duplica');
+  assert.equal((await w.core.feed.list(bia, 'event', ev.id)).bell, true);
+  await w.core.feed.setBell(caio, 'event', ev.id, true);
+  await w.core.feed.setBell(ana, 'event', ev.id, true);
+  await w.core.feed.setPolicy(ana, 'event', ev.id, 'OPEN');
+
+  // Publicação da ana: bia e caio são avisados; ela mesma não.
+  const p1 = await w.core.feed.create(ana, 'event', ev.id, { body: 'Larguem às 7h' });
+  const got = await news(w, bia, 'FEED_NEW_POST');
+  assert.equal(got.length, 1);
+  assert.match(got[0]!.title, /ana postou uma publicação em Corrida/);
+  assert.equal(got[0]!.url, `/eventos/${ev.id}?post=${p1.id}`);
+  assert.equal((await news(w, caio, 'FEED_NEW_POST')).length, 1);
+  assert.equal((await news(w, ana, 'FEED_NEW_POST')).length, 0, 'a própria publicação não avisa');
+  // Só foto: o título fala de fotos. Cada publicação é um aviso.
+  await w.core.feed.create(caio, 'event', ev.id, { images: [JPEG()] });
+  const fromCaio = await news(w, bia, 'FEED_NEW_POST');
+  assert.equal(fromCaio.length, 2);
+  assert.match(fromCaio[0]!.title, /caio postou fotos em Corrida/);
+  assert.equal((await news(w, ana, 'FEED_NEW_POST')).length, 1);
+  // Marcado com @ recebe só a menção, não os dois avisos.
+  await w.core.feed.create(ana, 'event', ev.id, { body: 'Valeu @bia' });
+  assert.equal((await news(w, bia, 'FEED_NEW_POST')).length, 2);
+  assert.equal((await news(w, bia, 'FEED_MENTION')).length, 1);
+  // Desligado: volta ao normal.
+  assert.equal((await w.core.feed.setBell(bia, 'event', ev.id, false)).bell, false);
+  await w.core.feed.create(caio, 'event', ev.id, { body: 'Mais uma' });
+  assert.equal((await news(w, bia, 'FEED_NEW_POST')).length, 2);
+  // Quem não liga não recebe nada.
+  assert.equal((await news(w, duda, 'FEED_NEW_POST')).length, 0);
+});
+
+test('sininho do evento: pendente só avisa depois de aprovada; bloqueio e perder acesso cortam o aviso', async () => {
+  const { w, ana, bia, caio, duda, ev } = await setup();
+  await w.core.feed.setBell(bia, 'event', ev.id, true);
+  await w.core.feed.setBell(duda, 'event', ev.id, true);
+  await w.core.feed.setPolicy(ana, 'event', ev.id, 'MODERATED');
+  const pending = await w.core.feed.create(caio, 'event', ev.id, { body: 'Carona?' });
+  assert.equal((await news(w, bia, 'FEED_NEW_POST')).length, 0, 'pendente não avisa');
+  await w.core.feed.approve(ana, pending.id);
+  assert.equal((await news(w, bia, 'FEED_NEW_POST')).length, 1, 'aprovada avisa');
+  await w.core.blocks.block(bia, ana);
+  await w.core.profiles.setPrivacy(ana, true);
+  await w.core.feed.create(ana, 'event', ev.id, { body: 'Aviso geral' });
+  assert.equal((await news(w, bia, 'FEED_NEW_POST')).length, 1, 'bloqueio corta');
+  assert.equal((await news(w, duda, 'FEED_NEW_POST')).length, 1, 'quem não vê mais o evento não recebe');
+});
+
+test('sininho do evento do local: aviso de quem organiza chega uma vez só para quem vai e ligou o sininho', async () => {
+  const { w, bia, caio, edu } = await setup();
+  await w.core.eventPages.go(bia, 'e1');
+  await w.core.feed.setBell(bia, 'event', 'e1', true);
+  await w.core.feed.setBell(caio, 'event', 'e1', true);
+  await w.core.feed.create(edu, 'event', 'e1', { kind: 'NOTICE', body: 'Portas às 20h' });
+  assert.deepEqual([(await news(w, bia, 'FEED_NOTICE')).length, (await news(w, bia, 'FEED_NEW_POST')).length], [1, 0]);
+  const toCaio = await news(w, caio, 'FEED_NEW_POST');
+  assert.equal(toCaio.length, 1);
+  assert.match(toCaio[0]!.title, /Bar do Edu postou um aviso em Samba/);
+});

@@ -3901,4 +3901,8 @@ export const ES: Readonly<Record<string, string>> = {
   "O evento não será criado. Sua publicação continua como estava.": "El evento no se creará. Tu publicación sigue como estaba.",
   "Descartar evento": "Descartar evento",
   "Continuar criando": "Seguir creando",
+  "Pronto! Você recebe um aviso a cada publicação nova aqui.": "¡Listo! Recibirás un aviso por cada publicación nueva aquí.",
+  "Avisos de publicações novas desligados.": "Avisos de publicaciones nuevas desactivados.",
+  "Avisos de publicações ligados": "Avisos de publicaciones activados",
+  "Avisar publicações novas": "Avisarme de publicaciones nuevas",
 };

@@ -43,7 +43,7 @@ const FCM_TOKEN = /^[A-Za-z0-9:_-]{50,400}$/;
 /** A que grupo de silenciar cada tipo de aviso pertence. Os demais (curtidas, seguidores, Flash...) só calam com "todas". */
 export function muteGroup(type: NotificationType): 'chats' | 'events' | null {
   if (type === 'MESSAGE' || type === 'GROUP_REMOVED') return 'chats';
-  if (type === 'MEETUP_INVITE' || type === 'MEETUP_ACCEPTED' || type === 'MEETUP_CANCELLED' || type === 'EVENT_REMINDER' || type === 'ALBUM_SUMMARY' || type === 'VENUE_CALENDAR' || type === 'VENUE_EVENT' || type === 'FEED_NOTICE' || type === 'GUEST_LIST' || type === 'EVENT_ADMIN') return 'events';
+  if (type === 'MEETUP_INVITE' || type === 'MEETUP_ACCEPTED' || type === 'MEETUP_CANCELLED' || type === 'EVENT_REMINDER' || type === 'ALBUM_SUMMARY' || type === 'VENUE_CALENDAR' || type === 'VENUE_EVENT' || type === 'FEED_NOTICE' || type === 'FEED_NEW_POST' || type === 'GUEST_LIST' || type === 'EVENT_ADMIN') return 'events';
   return null;
 }
 

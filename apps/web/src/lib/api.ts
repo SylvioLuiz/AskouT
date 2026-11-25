@@ -697,6 +697,7 @@ export function createApi(deps: ApiDeps) {
       request<FeedPage>('GET', `/${where}/${id(targetId)}/feed${toQuery({ cursor: query.cursor ?? undefined, limit: query.limit })}`),
     createFeedPost: (where: FeedWhere, targetId: string, input: { kind: 'POST' | 'NOTICE'; body?: string; images?: string[] }) => request<FeedPost>('POST', `/${where}/${id(targetId)}/feed`, { body: input }),
     setFeedPolicy: (where: FeedWhere, targetId: string, policy: FeedPolicy) => request<FeedSettings>('PUT', `/${where}/${id(targetId)}/feed/policy`, { body: { policy } }),
+    setFeedBell: (eventId: string, on: boolean) => request<FeedSettings>('PUT', `/events/${id(eventId)}/feed/bell`, { body: { on } }),
     feedPending: (where: FeedWhere, targetId: string) => request<{ items: FeedPost[] }>('GET', `/${where}/${id(targetId)}/feed/pending`),
     feedPost: (postId: string) => request<FeedPost>('GET', `/feed/posts/${id(postId)}`),
     deleteFeedPost: (postId: string) => request<{ deleted: true }>('DELETE', `/feed/posts/${id(postId)}`),

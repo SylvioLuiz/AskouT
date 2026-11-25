@@ -23,7 +23,7 @@ const FILTERS: Record<Exclude<NotificationCategory, 'all'>, NotificationFilter> 
   likes: [{ types: ['POST_LIKE', 'FEED_REACTION'] }],
   follows: [{ types: ['FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW'] }],
   invites: [{ types: ['MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'FLASH_INVITE'] }],
-  events: [{ types: ['EVENT_REMINDER', 'ALBUM_SUMMARY', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_NOTICE', 'GUEST_LIST', 'EVENT_ADMIN'] }],
+  events: [{ types: ['EVENT_REMINDER', 'ALBUM_SUMMARY', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_NOTICE', 'FEED_NEW_POST', 'GUEST_LIST', 'EVENT_ADMIN'] }],
   messages: [{ types: ['MESSAGE', 'GROUP_REMOVED'] }],
 };
 
@@ -32,7 +32,7 @@ export function isNotificationCategory(value: unknown): value is NotificationCat
 }
 
 /** Todos os tipos de aviso (conferido pelo TypeScript: tipo novo sem entrar aqui não compila). */
-const ALL_TYPES = ['MESSAGE', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'GROUP_REMOVED', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW', 'FLASH_INVITE', 'POST_TAG', 'POST_LIKE', 'POST_COMMENT', 'VENUE_CLAIM', 'EVENT_REMINDER', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_PENDING', 'FEED_APPROVED', 'FEED_REJECTED', 'FEED_COMMENT', 'FEED_MENTION', 'FEED_REACTION', 'FEED_NOTICE', 'VENUE_TEAM', 'ALBUM_SUMMARY', 'GUEST_LIST', 'EVENT_ADMIN'] as const satisfies readonly NotificationType[];
+const ALL_TYPES = ['MESSAGE', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'GROUP_REMOVED', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW', 'FLASH_INVITE', 'POST_TAG', 'POST_LIKE', 'POST_COMMENT', 'VENUE_CLAIM', 'EVENT_REMINDER', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_PENDING', 'FEED_APPROVED', 'FEED_REJECTED', 'FEED_COMMENT', 'FEED_MENTION', 'FEED_REACTION', 'FEED_NOTICE', 'FEED_NEW_POST', 'VENUE_TEAM', 'ALBUM_SUMMARY', 'GUEST_LIST', 'EVENT_ADMIN'] as const satisfies readonly NotificationType[];
 type MissingType = Exclude<NotificationType, (typeof ALL_TYPES)[number]>;
 const _allTypesCovered: MissingType extends never ? true : MissingType = true;
 void _allTypesCovered;

@@ -3248,6 +3248,27 @@ export class InMemoryFeedRepository implements FeedRepository {
   async countAllPosts(status: FeedPostStatus): Promise<number> {
     return [...this.posts.values()].filter((p) => this.exists(p.target) && p.status === status).length;
   }
+
+  /** Sininho por evento: quem ligou, na ordem em que ligou. */
+  readonly bells = new Map<string, string[]>();
+
+  async setBell(target: FeedTarget, userId: string, on: boolean): Promise<boolean> {
+    if (target.type === 'VENUE' || !this.exists(target)) return false;
+    const key = InMemoryFeedRepository.key(target);
+    const users = (this.bells.get(key) ?? []).filter((u) => u !== userId);
+    if (on) users.push(userId);
+    this.bells.set(key, users);
+    return true;
+  }
+
+  async hasBell(target: FeedTarget, userId: string): Promise<boolean> {
+    return this.exists(target) && (this.bells.get(InMemoryFeedRepository.key(target)) ?? []).includes(userId);
+  }
+
+  async listBellUsers(target: FeedTarget, limit: number): Promise<string[]> {
+    if (!this.exists(target)) return [];
+    return (this.bells.get(InMemoryFeedRepository.key(target)) ?? []).slice(0, limit);
+  }
 }
 
 /** Gestão em memória: lê e age direto nos outros repositórios em memória. */

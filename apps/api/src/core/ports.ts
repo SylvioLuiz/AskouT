@@ -1331,6 +1331,12 @@ export interface FeedRepository {
   /** Quantas denúncias (abertas ou decididas) existem. */
   countReports(open: boolean): Promise<number>;
   countAllPosts(status: FeedPostStatus): Promise<number>;
+  // ---------- Sininho do evento ----------
+  /** Liga ou desliga o sininho do feed de um evento (só PLACE_EVENT e USER_EVENT). false se o evento não existe. */
+  setBell(target: FeedTarget, userId: string, on: boolean, at: Date): Promise<boolean>;
+  hasBell(target: FeedTarget, userId: string): Promise<boolean>;
+  /** Quem ligou o sininho do evento, dos mais antigos para os mais novos, até `limit`. */
+  listBellUsers(target: FeedTarget, limit: number): Promise<string[]>;
 }
 
 /** Registro de atividades: o que a própria pessoa fez (curtidas, comentários, posts, presença, quem passou a seguir). */
