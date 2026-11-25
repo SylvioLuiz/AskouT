@@ -1098,6 +1098,8 @@ export interface PlaceSearchResult {
   placesAvailable: boolean;
   /** Dá para buscar mais no Google (pago): o app mostra o botão. */
   canSearchGoogle?: boolean;
+  /** O Google está sem cota hoje: o botão some e o app avisa. */
+  googlePaused?: boolean;
 }
 
 export interface ExplorePlace {

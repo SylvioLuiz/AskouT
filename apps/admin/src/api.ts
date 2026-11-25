@@ -122,6 +122,10 @@ export const api = {
     session.set(token);
   },
   me: () => request<SessionUser>('GET', '/auth/me'),
+  /** Verificação em duas etapas da própria conta (a mesma rota do app). */
+  myMfa: () => request<{ enabled: boolean; pendingSetup: boolean; recoveryCodesLeft: number }>('GET', '/auth/mfa'),
+  /** Desliga a verificação em duas etapas de uma conta (ou da própria); apaga o segredo e os códigos de recuperação. */
+  disableUserMfa: (id: string, note: string) => request<{ id: string; mfaEnabled: false }>('POST', `/admin/users/${encodeURIComponent(id)}/mfa/disable`, { note }),
   stats: () => request<Stats>('GET', '/admin/stats'),
   hunter: (limit = 50, offset = 0) => request<HunterOverview>('GET', `/admin/hunter?limit=${limit}&offset=${offset}`),
   setHunter: (enabled: boolean) => request<{ enabled: boolean }>('POST', '/admin/hunter/enabled', { enabled }),
@@ -161,7 +165,7 @@ export const api = {
   createVenue: (body: VenueEdit, note: string) => request<VenueDetail>('POST', '/admin/venues', { ...body, note }),
   googleSuggest: (text: string, sessionToken: string) => request<{ available: boolean; items: GoogleSuggestion[] }>('POST', '/admin/venues/google/suggest', { text, sessionToken }),
   googlePlace: (placeId: string, name: string, sessionToken: string) => request<GooglePlaceFill>('POST', '/admin/venues/google/place', { placeId, name, sessionToken }),
-  geocode: (address: string) => request<{ items: GeocodeHit[] }>('POST', '/admin/venues/geocode', { address }),
+  geocode: (address: string) => request<{ items: GeocodeHit[]; googlePaused?: true }>('POST', '/admin/venues/geocode', { address }),
   importVenues: (body: { rows: Record<string, string>[]; dryRun: boolean; fileName?: string; note?: string }) => request<VenueImportResult>('POST', '/admin/venues/import', body),
   editVenue: (id: string, body: VenueEdit, note: string) => request<VenueDetail>('PUT', `/admin/venues/${encodeURIComponent(id)}`, { ...body, note }),
   removeOwner: (venueId: string, note: string) => request<unknown>('DELETE', `/admin/venues/${encodeURIComponent(venueId)}/owner`, { note }),

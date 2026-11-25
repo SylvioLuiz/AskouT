@@ -1312,6 +1312,8 @@ export type AuditAction =
   | 'MFA_ENABLED'
   | 'MFA_DISABLED'
   | 'MFA_RECOVERY_REGENERATED'
+  /** Alguém da gestão desligou a verificação em duas etapas de uma conta (ou da própria). */
+  | 'MFA_DISABLED_BY_ADMIN'
   | 'BOOST_ORDERED'
   | 'BOOST_CANCELLED'
   // Sistema

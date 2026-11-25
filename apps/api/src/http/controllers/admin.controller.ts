@@ -198,6 +198,13 @@ export class AdminController {
     return this.core.admin.setUserBirthDate(actor, id, b.birthDate, b.note);
   }
 
+  /** `{note}`: desliga a verificação em duas etapas da conta (motivo obrigatório, exceto na própria). Apaga segredo e códigos de recuperação. */
+  @Post('users/:id/mfa/disable')
+  @HttpCode(200)
+  disableUserMfa(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.disableUserMfa(actor, id, asBody(body).note);
+  }
+
   /** Uma pessoa inteira: cadastro, configurações, vínculos (amigos, seguidores, eventos, posts, locais) e contagens. */
   @Get('users/:id')
   user(@CurrentActor() actor: Actor, @Param('id') id: string) {

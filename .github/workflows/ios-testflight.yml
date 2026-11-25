@@ -36,6 +36,22 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Chave da API da Apple
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Conferir se a versão ainda aceita builds
+        # Falha em segundos se a MARKETING_VERSION já foi enviada para revisão ou aprovada (a Apple fecha a versão),
+        # em vez de só no envio, no fim. Se a Apple não responder, só avisa e segue.
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node .github/scripts/ios-check-version.mjs
+
       - name: Escolher o Xcode mais novo
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
 
@@ -45,14 +61,6 @@ jobs:
       - name: Gerar o site e copiar para o iOS
         working-directory: apps/mobile
         run: npm run build:web && npx cap sync ios
-
-      - name: Chave da API da Apple
-        env:
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/asc"
-          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
-          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
 
       - name: Certificado fixo (sempre o mesmo .p12)
         env:

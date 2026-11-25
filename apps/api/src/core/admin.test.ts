@@ -693,3 +693,15 @@ test('cadastrar local a partir do Google: sugestões, detalhe só com campos gr�
   off.users.users.set(ou['adm']!, { ...off.users.users.get(ou['adm']!)!, role: 'ADMIN' });
   assert.deepEqual(await off.core.admin.googleSuggest({ userId: ou['adm']!, role: 'ADMIN' }, { text: 'bar', sessionToken: 'sess-1234' }), { available: false, items: [] });
 });
+
+test('gestão: endereço que a busca gratuita não acha com o Google sem cota hoje diz o motivo', async () => {
+  const { w, A } = await setup();
+  w.placeSource.premiumSearch = false;
+  w.placeSource.premiumPaused = true;
+  assert.deepEqual(await w.core.admin.geocodeAddress(A, 'Av. Sem Mapa, 9'), { items: [], googlePaused: true });
+  const err = await w.core.admin.createVenue(A, { name: 'Casa Nova', address: 'Av. Sem Mapa, 9' }).then(() => undefined, (e: unknown) => e);
+  assert.match(JSON.stringify(err), /limite de hoje/);
+  assert.equal(w.placeSource.premiumCalls, 0);
+  w.placeSource.premiumPaused = false;
+  assert.deepEqual(await w.core.admin.geocodeAddress(A, 'Av. Sem Mapa, 9'), { items: [] });
+});

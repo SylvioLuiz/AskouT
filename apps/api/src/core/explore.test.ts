@@ -241,3 +241,14 @@ test('busca por nome no Explorar acha o bar pequeno que a busca por perto não t
   const v = await w.core.explore.search(ana!, { q: 'buxixo', lat: HERE.lat, lng: HERE.lng, radiusKm: 30 });
   assert.deepEqual(v.places.map((p) => [p.source, p.name]), [['GOOGLE', 'Buxixo Bar']]);
 });
+
+test('visitante (site público) não gasta o Google sozinho na busca do Explorar', async () => {
+  const w = makeWorld();
+  await seed(w);
+  w.placeSource.places = [];
+  w.placeSource.premiumSearch = true;
+  w.placeSource.premiumOnly = [{ externalId: 'gbux', source: 'GOOGLE', name: 'Buxixo Bar', category: 'bar', lat: HERE.lat + 0.02, lng: HERE.lng }];
+  const v = await w.core.publicReads.search({ q: 'buxixo', lat: HERE.lat, lng: HERE.lng, radiusKm: 30 });
+  assert.equal(w.placeSource.premiumCalls, 0);
+  assert.deepEqual(v.places, []);
+});

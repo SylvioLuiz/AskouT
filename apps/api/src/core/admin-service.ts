@@ -490,6 +490,31 @@ export class AdminService {
     return { id: target.id, birthDate: parsed.birthDate };
   }
 
+  /**
+   * Desliga a verificação em duas etapas de uma conta (ex.: a pessoa perdeu o celular e os códigos de recuperação), inclusive
+   * a de quem está logado. Apaga o segredo e os códigos de recuperação; o próximo login volta a ser só senha (ou Google/Apple).
+   * As sessões abertas continuam: elas já passaram pela verificação, e desligar não dá acesso a mais ninguém (conta invadida
+   * se resolve suspendendo). Na conta de outra pessoa o motivo é obrigatório; tudo fica na auditoria.
+   */
+  async disableUserMfa(actor: Actor, userId: unknown, note: unknown): Promise<{ id: string; mfaEnabled: false }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const own = target.id === actor.userId;
+    const reason = noteText(note, !own);
+    const record = await this.deps.mfa.find(target.id);
+    if (!record?.enabledAt) throw conflict('A verificação em duas etapas já está desligada nessa conta');
+    await this.deps.mfa.delete(target.id);
+    await this.log(actor.userId, 'MFA_DISABLED_BY_ADMIN', 'USER', target.id, reason ?? (own ? 'Desligou na própria conta' : null), {
+      targetLabel: await this.userLabel(target.id),
+      changes: [
+        { field: 'verificação em duas etapas', before: 'ligada', after: 'desligada' },
+        { field: 'códigos de recuperação', before: String(record.recoveryCodeHashes.length), after: '0' },
+      ],
+    });
+    return { id: target.id, mfaEnabled: false };
+  }
+
   /** Uma pessoa inteira: o que a gestão pode editar, o resto do cadastro e os vínculos (amigos, seguidores, eventos, posts, locais). */
   async userDetail(actor: Actor, userId: unknown): Promise<AdminUserDetail> {
     this.assertAdmin(actor);
@@ -855,10 +880,12 @@ export class AdminService {
    * Posição de um endereço: primeiro a busca gratuita (OpenStreetMap); só se ela não achar e houver Google, a paga.
    * Devolve até 5 opções, a mais provável primeiro.
    */
-  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[] }> {
+  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]; googlePaused?: true }> {
     this.assertAdmin(actor);
     if (typeof address !== 'string' || address.trim().length < 3) throw validationError('Dados inválidos', { address: 'Escreva o endereço para buscar a posição' });
-    return { items: await this.locate(address.trim().slice(0, 200), 5) };
+    const items = await this.locate(address.trim().slice(0, 200), 5);
+    // Sem resultado grátis e o Google sem cota hoje: a gestão vê o motivo em vez de "endereço não existe".
+    return { items, ...(items.length === 0 && this.deps.placeSource.premiumPaused === true ? { googlePaused: true as const } : {}) };
   }
 
   private async locate(address: string, limit: number): Promise<{ name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]> {
@@ -933,7 +960,10 @@ export class AdminService {
     } else {
       if (!checked.address) throw validationError('Dados inválidos', { address: 'Informe o endereço (ou a latitude e a longitude)' });
       const [first] = await this.locate(checked.address, 1);
-      if (!first) throw validationError('Dados inválidos', { address: 'Não achamos esse endereço no mapa. Confira ou informe latitude e longitude' });
+      if (!first) {
+        const why = this.deps.placeSource.premiumPaused === true ? ' (a busca do Google atingiu o limite de hoje)' : '';
+        throw validationError('Dados inválidos', { address: `Não achamos esse endereço no mapa${why}. Confira ou informe latitude e longitude` });
+      }
       lat = first.lat;
       lng = first.lng;
       located = first.source;

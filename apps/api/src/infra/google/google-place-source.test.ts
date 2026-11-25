@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { FallbackPlaceSource } from '../places/fallback-place-source.ts';
-import { GooglePlaceSource, PHOTO_REF_RE } from './google-place-source.ts';
+import { GooglePlaceSource, PHOTO_REF_RE, nextPacificMidnight } from './google-place-source.ts';
 
 const C = { lat: -23.55, lng: -46.63 };
 const body = {
@@ -157,4 +157,66 @@ test('cadastro pela gestão: Autocomplete com sessão e detalhe só com campos E
   assert.equal(mask, 'id,formattedAddress,location,types');
   for (const paid of ['displayName', 'photos', 'rating', 'phone', 'website', 'Hours', 'googleMapsUri', 'primaryType']) assert.ok(!mask.includes(paid), `${paid} é pago`);
   assert.equal(await g.essentials('ChIJa'), undefined, 'teto do dia');
+});
+
+const QUOTA_DAY = '{"error":{"code":429,"message":"Quota exceeded for quota metric \'SearchTextRequest\' and limit \'SearchTextRequest per day\' of service \'places.googleapis.com\'","status":"RESOURCE_EXHAUSTED"}}';
+
+test('429 da cota diária: para de chamar o Google até a meia-noite do Pacífico e a busca paga some', async () => {
+  // 12:00 UTC = 05:00 em Los Angeles (horário de verão, UTC-7): a cota renova 19 horas depois.
+  let t = Date.parse('2026-10-13T12:00:00Z');
+  let quota = true;
+  const f = fake(() => (quota ? new Response(QUOTA_DAY, { status: 429 }) : Response.json(body)));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, now: () => t });
+  assert.equal(src.premiumSearch, true);
+  assert.deepEqual(await src.search('bar', C, 10), { available: false, places: [] });
+  assert.deepEqual([src.premiumSearch, src.premiumPaused], [false, true]);
+  await src.search('outro bar', C, 10);
+  await src.search('mais um', undefined, 10);
+  assert.equal(f.calls.length, 1, 'depois do 429 nem tenta');
+  // Outros tipos de chamada têm cota própria no Google e seguem.
+  assert.equal((await src.nearby(C, 3000, 10)).available, false);
+  assert.equal(f.calls.length, 2);
+  quota = false;
+  t = Date.parse('2026-10-14T06:59:00Z');
+  assert.equal((await src.search('bar', C, 10)).available, false, 'ainda antes da meia-noite do Pacífico');
+  t = Date.parse('2026-10-14T07:06:00Z');
+  assert.deepEqual([src.premiumSearch, src.premiumPaused], [true, false]);
+  assert.equal((await src.search('bar', C, 10)).available, true);
+});
+
+test('429 que não é da cota diária (por minuto) pausa só 1 minuto', async () => {
+  let t = Date.parse('2026-10-13T12:00:00Z');
+  let quota = true;
+  const f = fake(() => (quota ? new Response('{"error":{"message":"SearchTextRequest per minute"}}', { status: 429 }) : Response.json(body)));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, now: () => t });
+  await src.search('bar', C, 10);
+  assert.equal(src.premiumPaused, true);
+  quota = false;
+  t += 61_000;
+  assert.equal((await src.search('bar', C, 10)).available, true);
+  assert.equal(f.calls.length, 2);
+});
+
+test('buscas iguais ao mesmo tempo dividem uma chamada só ao Google', async () => {
+  const f = fake(() => Response.json(body));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl });
+  const [a, b] = await Promise.all([src.search('Bar do Zé', C, 10), src.search('bar do zé', C, 10)]);
+  assert.equal(f.calls.length, 1);
+  assert.equal(a.places[0]!.name, 'Bar do Zé');
+  assert.notEqual(a.places[0], b.places[0], 'cada um recebe a sua cópia');
+});
+
+test('a pausa do Google chega ao fallback: busca paga desligada e marcada como pausada', async () => {
+  const f = fake(() => new Response(QUOTA_DAY, { status: 429 }));
+  const google = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl });
+  const osm = { nearby: async () => ({ available: true, places: [] }), search: async () => ({ available: true, places: [{ externalId: 'o', source: 'OSM' as const, name: 'O', category: null, lat: 0, lng: 0 }] }) };
+  const both = new FallbackPlaceSource(google, osm);
+  assert.equal((await both.search('x', undefined, 5, { premium: true })).places[0]!.name, 'O', 'o 429 cai no OpenStreetMap');
+  assert.deepEqual([both.premiumSearch, both.premiumPaused], [false, true]);
+});
+
+test('meia-noite do Pacífico, com e sem horário de verão', () => {
+  assert.equal(new Date(nextPacificMidnight(Date.parse('2026-10-13T12:00:00Z'))).toISOString(), '2026-10-14T07:05:00.000Z');
+  assert.equal(new Date(nextPacificMidnight(Date.parse('2026-12-01T23:30:00Z'))).toISOString(), '2026-12-02T08:05:00.000Z');
+  assert.equal(new Date(nextPacificMidnight(Date.parse('2026-12-02T07:30:00Z'))).toISOString(), '2026-12-02T08:05:00.000Z');
 });
