@@ -477,8 +477,10 @@ export interface PlaceEventRecord {
   tags: string[];
   /** Link https para comprar ingresso (site do próprio local ou de uma bilheteria). Ausente/nulo: sem link. */
   ticketUrl?: string | null;
-  /** Adiado sem nova data: quando foi marcado. Nulo/ausente: não está adiado. */
+  /** Adiado: quando foi marcado. Nulo/ausente: não está adiado. */
   postponedAt?: Date | null;
+  /** Adiado com nova data: o início de antes. Nulo com `postponedAt`: nova data a definir (o início guardado é o antigo). */
+  postponedFrom?: Date | null;
   isSample: boolean;
 }
 
@@ -598,8 +600,10 @@ export interface PostRecord {
   eventPrivate?: boolean;
   /** Respostas às configurações de evento da gestão ("Pode fumar?": sim). Só vale quando o post é um evento. */
   eventExtras?: EventExtraAnswer[];
-  /** Evento adiado sem nova data: quando foi marcado. Nulo/ausente: não está adiado. */
+  /** Evento adiado: quando foi marcado. Nulo/ausente: não está adiado. */
   eventPostponedAt?: Date | null;
+  /** Adiado com nova data: o início de antes. Nulo com `eventPostponedAt`: nova data a definir (o início guardado é o antigo). */
+  eventPostponedFrom?: Date | null;
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
   archivedAt: Date | null;
   editedAt: Date | null;
@@ -835,6 +839,7 @@ export interface PostPatch {
   eventPrivate?: boolean;
   /** Sem o campo, o adiado não muda. */
   eventPostponedAt?: Date | null;
+  eventPostponedFrom?: Date | null;
   editedAt: Date;
 }
 

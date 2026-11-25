@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
-import { EventDates } from '../components/event-dates.tsx';
+import { EventDates, PostponeQuestion } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { PlaceSearchMore } from '../components/place-search-more.tsx';
@@ -651,6 +651,9 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
   const set = <K extends keyof VenueEventDraft>(key: K, value: VenueEventDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  // Editando um evento do local e a data de início mudou: pergunta se é adiamento.
+  const [postponed, setPostponed] = useState<boolean | undefined>();
+  const dateMoved = !custom && event !== undefined && draft.starts !== '' && draft.starts !== isoToLocalInput(event.startsAt);
 
   async function save() {
     const problem = venueEventProblem(draft, new Date(), event !== undefined || custom !== undefined);
@@ -658,10 +661,14 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
       setMessage(problem);
       return;
     }
+    if (dateMoved && postponed === undefined) {
+      setMessage(t('A data mudou: diga se é um adiamento antes de salvar.'));
+      return;
+    }
     setBusy(true);
     setMessage(undefined);
     try {
-      const body = venueEventBody(draft);
+      const body = { ...venueEventBody(draft), ...(dateMoved && postponed !== undefined ? { postponed } : {}) };
       if (custom) await custom.submit(body);
       else if (event) await api.updateVenueEvent(venueId, event.id, body);
       else await api.createVenueEvent(venueId, body);
@@ -679,6 +686,7 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
         <Field label={t('Nome do evento')} value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
         <EventKindPicker value={draft.kind} onChange={(k) => set('kind', k)} />
         <EventDates starts={draft.starts} ends={draft.ends} onStarts={(v) => set('starts', v)} onEnds={(v) => set('ends', v)} />
+        {dateMoved ? <PostponeQuestion value={postponed} onChange={setPostponed} /> : null}
         <label className="check">
           <input type="checkbox" checked={draft.isFree} onChange={(e) => set('isFree', e.target.checked)} />
           <span>{t('Entrada grátis')}</span>
@@ -740,7 +748,7 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
           {event.title}
         </Link>
         <span className="vevent__when">
-          {event.postponed ? <s>{formatWhen(event.startsAt, event.endsAt, now)}</s> : formatWhen(event.startsAt, event.endsAt, now)}
+          {event.postponed && !event.postponedFrom ? <s>{formatWhen(event.startsAt, event.endsAt, now)}</s> : formatWhen(event.startsAt, event.endsAt, now)}
           {event.postponed ? <span className="vevent__postponed">{t('Adiado')}</span> : null}
         </span>
         <span className="vevent__meta">

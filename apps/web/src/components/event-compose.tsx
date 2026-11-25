@@ -4,7 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { ChevronRightIcon, EventKindIcon, GlobeIcon, LockIcon } from './icons.tsx';
 import { Button, Field } from './ui.tsx';
 import { KINDS } from '../lib/explore.ts';
-import { addHoursLocal, joinLocal, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
+import { addHoursLocal, followStart, joinLocal, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
 import type { EventKind } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -52,6 +52,13 @@ export function EventWhenSheet({ starts, ends, dateByPoll = false, allowPoll = f
   const [withEnd, setWithEnd] = useState(ends !== '');
   const [byPoll, setByPoll] = useState(dateByPoll);
   const start = joinLocal(date, time);
+  // Mudar o dia ou a hora de início leva o término junto (mesma duração); o término continua editável à parte.
+  function moveStart(nextDate: string, nextTime: string) {
+    const next = joinLocal(nextDate, nextTime);
+    if (withEnd && end && start && next) setEnd(followStart(start, next, end));
+    setDate(nextDate);
+    setTime(nextTime);
+  }
 
   function addEnd() {
     setWithEnd(true);
@@ -76,24 +83,24 @@ export function EventWhenSheet({ starts, ends, dateByPoll = false, allowPoll = f
           <>
         <div className="evwhen__days" role="group" aria-label={t('Dia')}>
           {days.map((d) => (
-            <button key={d.value} type="button" className={`evday${date === d.value ? ' evday--on' : ''}`} aria-pressed={date === d.value} aria-label={d.label} onClick={() => setDate(d.value)}>
+            <button key={d.value} type="button" className={`evday${date === d.value ? ' evday--on' : ''}`} aria-pressed={date === d.value} aria-label={d.label} onClick={() => moveStart(d.value, time)}>
               <span className="evday__top">{d.top}</span>
               <span className="evday__n">{d.day}</span>
             </button>
           ))}
         </div>
-        <Field label={t('Outra data')} type="date" value={date} onChange={setDate} />
+        <Field label={t('Outra data')} type="date" value={date} onChange={(v) => moveStart(v, time)} />
         <div className="evwhen__label" id="evwhen-times">
           {t('Começa às')}
         </div>
         <div className="evwhen__times" role="group" aria-labelledby="evwhen-times">
           {QUICK_TIMES.map((h) => (
-            <button key={h} type="button" className={`evchip${time === h ? ' evchip--on' : ''}`} aria-pressed={time === h} onClick={() => setTime(h)}>
+            <button key={h} type="button" className={`evchip${time === h ? ' evchip--on' : ''}`} aria-pressed={time === h} onClick={() => moveStart(date, h)}>
               {h}
             </button>
           ))}
         </div>
-        <Field label={t('Outro horário')} type="time" value={time} onChange={setTime} />
+        <Field label={t('Outro horário')} type="time" value={time} onChange={(v) => moveStart(date, v)} />
         {withEnd ? (
           <div className="evwhen__end">
             <Field label={t('Termina')} type="datetime-local" value={end} onChange={setEnd} />

@@ -387,13 +387,14 @@ export function EventScreen({ eventId }: { eventId: string }) {
         },
       }
     : {};
-  // Adiado: a data guardada é a antiga, então não aparece como certa.
+  // Adiado com nova data mostra a data nova (e a de antes riscada); sem nova data, a guardada é a antiga e não aparece como certa.
   const postponed = e?.postponed === true;
-  const date = e ? (postponed ? { main: t('Adiado'), sub: t('nova data a definir') } : eventDateLabel(e.startsAt, e.endsAt)) : null;
-  const time = e ? (postponed ? { main: t('A definir'), sub: null } : eventTimeLabel(e.startsAt, e.endsAt)) : null;
+  const dateTbd = postponed && !e?.postponedFrom;
+  const date = e ? (dateTbd ? { main: t('Adiado'), sub: t('nova data a definir') } : eventDateLabel(e.startsAt, e.endsAt)) : null;
+  const time = e ? (dateTbd ? { main: t('A definir'), sub: null } : eventTimeLabel(e.startsAt, e.endsAt)) : null;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
-  // Evento adiado não "acaba" pela data antiga: continua aberto esperando a nova.
-  const ended = e?.endsAt && !postponed ? Date.parse(e.endsAt) <= Date.now() : false;
+  // Evento adiado sem nova data não "acaba" pela data antiga: continua aberto esperando a nova.
+  const ended = e?.endsAt && !dateTbd ? Date.parse(e.endsAt) <= Date.now() : false;
   const canStory = e ? e.canStory : false;
   // O botão de postar flash fica sempre à vista enquanto o evento não acabou; quem ainda não marcou que vai vê um aviso.
   const titleParts = splitEventTitle(e?.title ?? '');
@@ -446,7 +447,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <div className="evhero__pills">
-                {!postponed && e.startsAt && e.endsAt && Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
+                {!dateTbd && e.startsAt && e.endsAt && Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
                 {postponed ? <span className="evhero__pill evhero__pill--postponed">{t('Adiado')}</span> : null}
                 <span className="evhero__pill">{kindLabel(e.kind)}</span>
                 {e.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
@@ -666,7 +667,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               </>
             ) : null}
             {/* Quem vai (ou criou) escolhe os lembretes só deste evento; sem mexer, vale a escolha de Configuração > Notificações. */}
-            {!visitor && e.going && !ended && e.startsAt !== null && !postponed ? (
+            {!visitor && e.going && !ended && e.startsAt !== null && !dateTbd ? (
               <p className="evgo__hint">
                 {t('Você recebe lembretes antes de começar.')}{' '}
                 <button type="button" className="linkbtn" onClick={() => setEditingReminders(true)}>
@@ -860,18 +861,20 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="evinfo__icon" aria-hidden="true"><CalendarIcon /></span>
                 <div className="evinfo__main">
                   <h2 className="evinfo__title">{t('Quando')}</h2>
-                  {postponed ? (
+                  {dateTbd ? (
                     <>
                       <p className="evinfo__strong">{t('Adiado: nova data a definir')}</p>
                       <p className="evinfo__sub evinfo__old">{t('Data anterior: {date}', { date: eventLongDate(e.startsAt, e.endsAt) })}</p>
                     </>
                   ) : (
                     <>
+                      {postponed ? <p className="evinfo__postponed">{t('Adiado para')}</p> : null}
                       <p className="evinfo__strong">{eventLongDate(e.startsAt, e.endsAt)}</p>
                       <p className="evinfo__sub">
                         {time.main}
                         {time.sub ? ` ${time.sub}` : ''}
                       </p>
+                      {postponed && e.postponedFrom ? <p className="evinfo__sub evinfo__old">{t('Data anterior: {date}', { date: eventLongDate(e.postponedFrom, null) })}</p> : null}
                       <button type="button" className="evinfo__more" onClick={addToAgenda}>
                         {t('Adicionar à agenda')}
                       </button>

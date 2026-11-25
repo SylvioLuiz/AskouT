@@ -1,7 +1,7 @@
 import { communityForEvent, shareGroupEvent } from './community-service.ts';
 import { canOpenByInvite } from './event-invites.ts';
 import { EVENT_ADMINS_MAX, canManageEvent } from './event-admins.ts';
-import { notifyEventChange } from './event-changes.ts';
+import { decidePostponed, notifyEventChange, samePostponed, type EventChange, type PostponedState } from './event-changes.ts';
 import { canManageVenue, managedVenueIds } from './venue-access.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
@@ -85,8 +85,10 @@ export interface PostEventView {
   private: boolean;
   /** Respostas às configurações de evento (para preencher a edição). */
   extras: EventExtraAnswer[];
-  /** Adiado sem nova data (a data guardada é a antiga). */
+  /** Adiado. Sem `postponedFrom`, a nova data ainda vai ser definida (a data guardada é a antiga). */
   postponed: boolean;
+  /** Adiado com nova data: o início de antes. */
+  postponedFrom: string | null;
 }
 
 export interface PostTagView {
@@ -554,12 +556,21 @@ export class PostService {
     // Convidados novos: conferidos antes de salvar, para um erro não deixar a edição pela metade.
     const inviteIds = event === null ? [] : await this.validTags(actorId, input.inviteUserIds, 'inviteUserIds');
     const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, ...(eventPrivate === undefined ? {} : { eventPrivate }), editedAt: this.deps.clock.now() };
-    // Nova data num evento que já tinha data: tira o adiado e avisa quem vai.
-    const rescheduled = event !== null && post.eventTitle !== null && post.eventStartsAt !== null && event.startsAt !== null && event.startsAt.getTime() !== post.eventStartsAt.getTime();
-    if (rescheduled) patch.eventPostponedAt = null;
+    // Data de um evento que já tinha data: `event.postponed` diz se a mudança é um adiamento (ver event-changes.ts).
+    let change: EventChange | null = null;
+    if (event !== null && post.eventTitle !== null && post.eventStartsAt !== null && event.startsAt !== null) {
+      const rawPostponed = input.event ? (input.event as { postponed?: unknown }).postponed : undefined;
+      if (rawPostponed !== undefined && rawPostponed !== null && typeof rawPostponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
+      const current = postponedOf(post);
+      const decided = decidePostponed({ startsAt: post.eventStartsAt, postponed: current }, { startsAt: event.startsAt, ...(typeof rawPostponed === 'boolean' ? { postponed: rawPostponed } : {}) }, this.deps.clock.now());
+      if (!samePostponed(current, decided.state)) Object.assign(patch, { eventPostponedAt: decided.state.at, eventPostponedFrom: decided.state.from });
+      change = decided.change;
+    } else if (event === null || event.startsAt === null) {
+      Object.assign(patch, { eventPostponedAt: null, eventPostponedFrom: null });
+    }
     if (!(await this.deps.posts.update(post.id, post.authorId, patch))) throw notFound('Post não encontrado');
     if (event) {
-      if (rescheduled && event.startsAt) await notifyEventChange(this.deps, { ref: { source: 'USER', id: post.id }, title: event.title, ownerId: post.authorId, actorId, change: { kind: 'RESCHEDULED', startsAt: event.startsAt } });
+      if (change) await notifyEventChange(this.deps, { ref: { source: 'USER', id: post.id }, title: event.title, ownerId: post.authorId, actorId, change });
       await this.syncPollTitle(post.id, event.title);
       await this.deps.meetups.renameForEventPost(post.id, event.title);
       await this.inviteFriends(actorId, post.id, event.title, inviteIds);
@@ -568,8 +579,8 @@ export class PostService {
   }
 
   /**
-   * Marca ou tira o "Adiado" do evento (dono ou admin). Adiado é sem nova data: a data antiga fica guardada e os lembretes param.
-   * Para dar a nova data, edita-se o evento (o adiado sai sozinho). Avisa quem vai nas duas direções.
+   * Marca ou tira o "Adiado" do evento (dono ou admin) sem mudar a data. Marcar aqui é adiado sem nova data: a data antiga
+   * fica guardada e os lembretes param. A nova data vem pela edição. Avisa quem vai nas duas direções.
    */
   async setPostponed(actorId: string, postId: unknown, postponed: unknown): Promise<PostView> {
     const { post } = await this.seeable(actorId, postId);
@@ -577,11 +588,12 @@ export class PostService {
     if (!(await canManageEvent(this.deps, actorId, post))) throw forbidden('Só quem organiza o evento pode adiar');
     if (typeof postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
     if (!post.eventStartsAt) throw conflict('O evento ainda está sem data: a votação decide quando vai ser');
-    const was = Boolean(post.eventPostponedAt);
-    if (was !== postponed) {
-      if (!(await this.deps.posts.setEventPostponed(post.id, postponed ? this.deps.clock.now() : null))) throw notFound('Evento não encontrado');
-      await notifyEventChange(this.deps, { ref: { source: 'USER', id: post.id }, title: post.eventTitle, ownerId: post.authorId, actorId, change: postponed ? { kind: 'POSTPONED' } : { kind: 'UNPOSTPONED', startsAt: post.eventStartsAt } });
+    const current = postponedOf(post);
+    const decided = decidePostponed({ startsAt: post.eventStartsAt, postponed: current }, { startsAt: post.eventStartsAt, postponed }, this.deps.clock.now());
+    if (!samePostponed(current, decided.state)) {
+      if (!(await this.deps.posts.setEventPostponed(post.id, decided.state))) throw notFound('Evento não encontrado');
     }
+    if (decided.change) await notifyEventChange(this.deps, { ref: { source: 'USER', id: post.id }, title: post.eventTitle, ownerId: post.authorId, actorId, change: decided.change });
     return this.get(actorId, post.id);
   }
 
@@ -1086,7 +1098,7 @@ export class PostService {
           placeName: post.placeName,
           placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
-          event: post.eventTitle ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null, endsAt: post.eventEndsAt ? post.eventEndsAt.toISOString() : null, private: post.eventPrivate === true, extras: post.eventExtras ?? [], postponed: Boolean(post.eventPostponedAt) } : null,
+          event: post.eventTitle ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null, endsAt: post.eventEndsAt ? post.eventEndsAt.toISOString() : null, private: post.eventPrivate === true, extras: post.eventExtras ?? [], postponed: Boolean(post.eventPostponedAt), postponedFrom: post.eventPostponedAt && post.eventPostponedFrom ? post.eventPostponedFrom.toISOString() : null } : null,
           linkedEvent: (post.linkedEventId && !post.eventTitle ? linked.get(post.linkedEventId) : undefined) ?? null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
@@ -1109,4 +1121,8 @@ export class PostService {
       ];
     });
   }
+}
+
+function postponedOf(post: { eventPostponedAt?: Date | null; eventPostponedFrom?: Date | null }): PostponedState {
+  return post.eventPostponedAt ? { at: post.eventPostponedAt, from: post.eventPostponedFrom ?? null } : { at: null, from: null };
 }

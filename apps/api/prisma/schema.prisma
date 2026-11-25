@@ -1033,6 +1033,8 @@ model PlaceEvent {
   feedPolicy  FeedPolicy @default(OWNER_ONLY)
   /// Adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
   postponedAt DateTime?
+  /// Adiado com nova data: a data de antes (o início antigo). Nulo com `postponedAt`: nova data ainda a definir.
+  postponedFrom DateTime?
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1075,6 +1077,8 @@ model Post {
   eventExtras      Json    @default("[]")
   /// Evento adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
   eventPostponedAt DateTime?
+  /// Adiado com nova data: a data de antes (o início antigo). Nulo com `eventPostponedAt`: nova data ainda a definir.
+  eventPostponedFrom DateTime?
   archivedAt    DateTime?
   editedAt      DateTime?
   createdAt    DateTime @default(now())

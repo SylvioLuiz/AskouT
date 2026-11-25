@@ -1049,8 +1049,10 @@ export interface EventPage {
   /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
   startsAt: string | null;
   endsAt: string | null;
-  /** Adiado sem nova data: a data guardada é a antiga (não mostrar como certa). */
+  /** Adiado. Sem `postponedFrom`, a nova data ainda vai ser definida: a data guardada é a antiga (não mostrar como certa). */
   postponed?: boolean;
+  /** Adiado com nova data: o início de antes. */
+  postponedFrom?: string | null;
   isFree: boolean;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
@@ -1181,7 +1183,7 @@ export interface PostView {
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
   /** `startsAt`/`endsAt` nulos: a data ainda vai ser decidida numa votação. */
-  event: { title: string; kind: EventKind; startsAt: string | null; endsAt: string | null; private?: boolean; extras?: EventExtraAnswer[]; postponed?: boolean } | null;
+  event: { title: string; kind: EventKind; startsAt: string | null; endsAt: string | null; private?: boolean; extras?: EventExtraAnswer[]; postponed?: boolean; postponedFrom?: string | null } | null;
   /** Evento ao qual o post (foto, vídeo ou só texto) está vinculado; o nome leva à página do evento. */
   linkedEvent?: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string | null } | null;
   createdAt: string;
@@ -1233,7 +1235,7 @@ export interface PostEdit {
   placeName?: string | null;
   placeAddress?: string | null;
   placeVenueId?: string | null;
-  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] } | null;
+  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[]; postponed?: boolean } | null;
   /** Amigos para convidar ao salvar (só evento); quem já foi convidado não recebe de novo. */
   inviteUserIds?: string[];
 }
@@ -1367,8 +1369,10 @@ export interface VenueEvent {
   /** Link https para comprar ingresso, se foi informado. */
   ticketUrl?: string | null;
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
-  /** Adiado sem nova data (a data guardada é a antiga). */
+  /** Adiado. Sem `postponedFrom`, a nova data ainda vai ser definida (a data guardada é a antiga). */
   postponed?: boolean;
+  /** Adiado com nova data: o início de antes. */
+  postponedFrom?: string | null;
   sample: boolean;
 }
 
@@ -1505,6 +1509,8 @@ export interface VenueEventBody {
   tags: string[];
   /** Vazio/nulo remove o link; ausente mantém. */
   ticketUrl?: string | null;
+  /** Só na edição: a mudança de data é um adiamento. */
+  postponed?: boolean;
 }
 
 // ---------- Impulsionamento ----------

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { PostponedState } from '../event-changes.ts';
 import type { EventReminderOption } from '../event-reminders.ts';
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
@@ -1951,14 +1952,15 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async updateEvent(venueId: string, event: PlaceEventRecord) {
     const current = this.events.get(event.id);
     if (!current || current.venueId !== venueId) return false;
-    this.events.set(event.id, { ...event, venueId, isSample: current.isSample, postponedAt: event.postponedAt === undefined ? (current.postponedAt ?? null) : event.postponedAt, tags: [...event.tags] });
+    this.events.set(event.id, { ...event, venueId, isSample: current.isSample, postponedAt: event.postponedAt === undefined ? (current.postponedAt ?? null) : event.postponedAt, postponedFrom: event.postponedFrom === undefined ? (current.postponedFrom ?? null) : event.postponedFrom, tags: [...event.tags] });
     return true;
   }
 
-  async setEventPostponed(venueId: string, eventId: string, at: Date | null) {
+  async setEventPostponed(venueId: string, eventId: string, state: PostponedState) {
     const current = this.events.get(eventId);
     if (!current || current.venueId !== venueId) return false;
-    current.postponedAt = at;
+    current.postponedAt = state.at;
+    current.postponedFrom = state.at ? state.from : null;
     return true;
   }
 
@@ -2624,10 +2626,11 @@ export class InMemoryPostRepository implements PostRepository {
     return this.eventAdmins.has(`${postId}|${userId}`);
   }
 
-  async setEventPostponed(postId: string, at: Date | null): Promise<boolean> {
+  async setEventPostponed(postId: string, state: PostponedState): Promise<boolean> {
     const post = this.posts.get(postId);
     if (!post) return false;
-    post.eventPostponedAt = at;
+    post.eventPostponedAt = state.at;
+    post.eventPostponedFrom = state.at ? state.from : null;
     return true;
   }
 
@@ -2848,10 +2851,10 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
       let startsAt: Date | null | undefined;
       if (g.ref.source === 'PLACE') {
         const event = this.placesRepo?.events.get(g.ref.id);
-        startsAt = event && !event.postponedAt ? event.startsAt : null;
+        startsAt = event && !(event.postponedAt && !event.postponedFrom) ? event.startsAt : null;
       } else {
         const post = this.postsRepo.posts.get(g.ref.id);
-        startsAt = post && post.archivedAt === null && !post.eventPostponedAt ? post.eventStartsAt : null;
+        startsAt = post && post.archivedAt === null && !(post.eventPostponedAt && !post.eventPostponedFrom) ? post.eventStartsAt : null;
       }
       if (startsAt && startsAt > from && startsAt <= to) out.push({ ref: { ...g.ref }, userId: g.userId, createdAt: g.createdAt, startsAt });
     }

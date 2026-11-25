@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { decodeImageDataUrl } from './image.ts';
 import { DomainError, conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
-import { notifyEventChange } from './event-changes.ts';
+import { decidePostponed, notifyEventChange, samePostponed, type PostponedState } from './event-changes.ts';
 import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
@@ -153,8 +153,10 @@ export interface VenueEventView {
   ticketUrl: string | null;
   /** Para a lista do painel: ainda vai acontecer, está acontecendo ou já passou. */
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
-  /** Adiado sem nova data (a data guardada é a antiga). */
+  /** Adiado. Sem `postponedFrom`, a nova data ainda vai ser definida (a data guardada é a antiga). */
   postponed: boolean;
+  /** Adiado com nova data: o início de antes. */
+  postponedFrom: string | null;
   sample: boolean;
 }
 
@@ -366,6 +368,8 @@ export interface VenueEventInput {
   tags?: unknown;
   /** Link https para comprar ingresso; vazio/nulo remove; ausente mantém o atual. */
   ticketUrl?: unknown;
+  /** Só na edição: a mudança de data é um adiamento (true), não é (false) ou ausente (mudar a data tira o adiado). */
+  postponed?: unknown;
 }
 
 export interface ClaimInput {
@@ -577,8 +581,8 @@ export class VenueService {
   }
 
   /**
-   * Marca ou tira o "Adiado" de um evento do local (quem administra). Adiado é sem nova data: a data antiga fica guardada
-   * e os lembretes param. A nova data vem pela edição (o adiado sai sozinho). Avisa quem vai.
+   * Marca ou tira o "Adiado" de um evento do local (quem administra) sem mudar a data. Marcar aqui é adiado sem nova data:
+   * a data antiga fica guardada e os lembretes param. A nova data vem pela edição. Avisa quem vai.
    */
   async setEventPostponed(userId: string, venueId: unknown, eventId: unknown, postponed: unknown): Promise<VenueEventView> {
     const venue = await this.managedOrThrow(userId, venueId);
@@ -586,12 +590,14 @@ export class VenueService {
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
     if (typeof postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
     const event = current.event;
-    if (Boolean(event.postponedAt) !== postponed) {
-      const at = postponed ? this.deps.clock.now() : null;
-      if (!(await this.deps.places.setEventPostponed(venue.id, event.id, at))) throw notFound('Evento não encontrado');
-      event.postponedAt = at;
-      await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId: userId, change: postponed ? { kind: 'POSTPONED' } : { kind: 'UNPOSTPONED', startsAt: event.startsAt } });
+    const was = placePostponed(event);
+    const decided = decidePostponed({ startsAt: event.startsAt, postponed: was }, { startsAt: event.startsAt, postponed }, this.deps.clock.now());
+    if (!samePostponed(was, decided.state)) {
+      if (!(await this.deps.places.setEventPostponed(venue.id, event.id, decided.state))) throw notFound('Evento não encontrado');
+      event.postponedAt = decided.state.at;
+      event.postponedFrom = decided.state.from;
     }
+    if (decided.change) await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId: userId, change: decided.change });
     return this.eventView(event);
   }
 
@@ -605,6 +611,7 @@ export class VenueService {
   private async applyEventUpdate(currentEvent: PlaceEventRecord, input: VenueEventInput, actorId: string | null = null): Promise<PlaceEventRecord> {
     const venue = { id: currentEvent.venueId };
     const current = { event: currentEvent };
+    if (input.postponed !== undefined && input.postponed !== null && typeof input.postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
     const { cover, ...fields } = this.parseEvent(input, current.event.startsAt, current.event);
     const event: PlaceEventRecord = { ...current.event, ...fields };
     if (cover.mode === 'url') event.imageUrl = cover.url;
@@ -613,14 +620,13 @@ export class VenueService {
     if (!(await this.deps.places.updateEvent(venue.id, event))) throw notFound('Evento não encontrado');
     if (cover.mode === 'upload') await this.deps.places.setEventCover(event.id, cover.mime, cover.bytes);
     else if (cover.mode === 'url' || cover.mode === 'none') await this.deps.places.clearEventCover(event.id);
-    // Nova data: tira o adiado e avisa quem vai.
-    if (event.startsAt.getTime() !== currentEvent.startsAt.getTime()) {
-      if (currentEvent.postponedAt) {
-        await this.deps.places.setEventPostponed(venue.id, event.id, null);
-        event.postponedAt = null;
-      }
-      await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId, change: { kind: 'RESCHEDULED', startsAt: event.startsAt } });
-    }
+    // Data: `postponed` diz se a mudança é um adiamento (ver event-changes.ts). Avisa quem vai.
+    const was = placePostponed(currentEvent);
+    const decided = decidePostponed({ startsAt: currentEvent.startsAt, postponed: was }, { startsAt: event.startsAt, ...(typeof input.postponed === 'boolean' ? { postponed: input.postponed } : {}) }, this.deps.clock.now());
+    if (!samePostponed(was, decided.state)) await this.deps.places.setEventPostponed(venue.id, event.id, decided.state);
+    event.postponedAt = decided.state.at;
+    event.postponedFrom = decided.state.from;
+    if (decided.change) await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId, change: decided.change });
     return event;
   }
 
@@ -1107,7 +1113,7 @@ export class VenueService {
   private eventView(e: PlaceEventRecord): VenueEventView {
     const now = this.deps.clock.now().getTime();
     const phase = e.endsAt.getTime() <= now ? 'PAST' : e.startsAt.getTime() <= now ? 'LIVE' : 'UPCOMING';
-    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, phase, postponed: Boolean(e.postponedAt), sample: e.isSample };
+    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, phase, postponed: Boolean(e.postponedAt), postponedFrom: e.postponedAt && e.postponedFrom ? e.postponedFrom.toISOString() : null, sample: e.isSample };
   }
 
   private parseEvent(input: VenueEventInput, keepStart?: Date, current?: PlaceEventRecord): Omit<PlaceEventRecord, 'id' | 'venueId' | 'isSample' | 'imageUrl'> & { cover: CoverChange } {
@@ -1171,4 +1177,8 @@ function withHouseNumber(street: ExternalPlace, houseNumber: string): string {
 function addressRest(street: ExternalPlace): string[] {
   const own = streetKey(street.name);
   return (street.address ?? '').split(' - ').map((part) => part.trim()).filter((part) => part !== '' && streetKey(part) !== own);
+}
+
+function placePostponed(e: PlaceEventRecord): PostponedState {
+  return e.postponedAt ? { at: e.postponedAt, from: e.postponedFrom ?? null } : { at: null, from: null };
 }
