@@ -96,8 +96,9 @@ export function GifPicker({ onPick, onClose }: { onPick: (gif: CommentGif) => vo
 /**
  * Botões de emoji e GIF do campo de comentário. `onEmoji` acrescenta ao texto; `onGif` já publica o comentário.
  * `closeKey`: quando muda (ex.: a mensagem foi enviada), a bandeja de emojis fecha.
+ * `combined`: um botão só (😊) e, no painel, as abas Emoji / GIF, como no WhatsApp.
  */
-export function CommentTools({ onEmoji, onGif, disabled, closeKey }: { onEmoji: (emoji: string) => void; onGif: (gif: CommentGif) => void; disabled?: boolean; closeKey?: number }) {
+export function CommentTools({ onEmoji, onGif, disabled, closeKey, combined }: { onEmoji: (emoji: string) => void; onGif: (gif: CommentGif) => void; disabled?: boolean; closeKey?: number; combined?: boolean }) {
   const gifs = useGifEnabled();
   const [panel, setPanel] = useState<'emoji' | 'gif' | undefined>();
   useEffect(() => {
@@ -107,6 +108,16 @@ export function CommentTools({ onEmoji, onGif, disabled, closeKey }: { onEmoji: 
     <>
       {panel === 'emoji' ? (
         <div className="emojipanel" role="group" aria-label={t('Emojis')}>
+          {combined && gifs ? (
+            <div className="emojipanel__tabs" role="tablist">
+              <button type="button" role="tab" aria-selected="true" className="emojipanel__tab emojipanel__tab--on">
+                {t('Emoji')}
+              </button>
+              <button type="button" role="tab" aria-selected="false" className="emojipanel__tab" onClick={() => setPanel('gif')}>
+                {t('GIF')}
+              </button>
+            </div>
+          ) : null}
           {COMMENT_EMOJIS.map((emoji) => (
             <button key={emoji} type="button" className="emojipanel__item" onClick={() => onEmoji(emoji)}>
               {emoji}
@@ -115,10 +126,10 @@ export function CommentTools({ onEmoji, onGif, disabled, closeKey }: { onEmoji: 
         </div>
       ) : null}
       <div className="commenttools">
-        <button type="button" className={`commenttools__btn${panel === 'emoji' ? ' commenttools__btn--on' : ''}`} aria-pressed={panel === 'emoji'} aria-label={t('Emojis')} disabled={disabled} onClick={() => setPanel((p) => (p === 'emoji' ? undefined : 'emoji'))}>
+        <button type="button" className={`commenttools__btn${panel === 'emoji' ? ' commenttools__btn--on' : ''}`} aria-pressed={panel === 'emoji'} aria-label={combined && gifs ? t('Emojis e GIFs') : t('Emojis')} disabled={disabled} onClick={() => setPanel((p) => (p === 'emoji' ? undefined : 'emoji'))}>
           <span aria-hidden="true">😊</span>
         </button>
-        {gifs ? (
+        {gifs && !combined ? (
           <button type="button" className="commenttools__btn commenttools__btn--gif" aria-label={t('Adicionar um GIF')} disabled={disabled} onClick={() => setPanel('gif')}>
             GIF
           </button>

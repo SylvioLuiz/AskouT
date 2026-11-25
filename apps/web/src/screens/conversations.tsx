@@ -1687,7 +1687,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     }}
                   />
                   {/* Emoji e GIF sempre à mão, como a figurinha do Instagram: dá para mandar um GIF sem escrever nada. */}
-                  <CommentTools disabled={sending} closeKey={sentCount} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                  <CommentTools combined disabled={sending} closeKey={sentCount} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
                   {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
                     <>
                       {/* Escrevendo (ou com foto/GIF na fila): o canto vira o botão de enviar, como no Instagram. */}
@@ -1707,14 +1707,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     </>
                   ) : (
                     <span className="composer__tools">
-                      <button type="button" className="composer__tool" aria-label={t('Enviar arquivo (PDF, documento, planilha)')} disabled={sending} onClick={() => fileRef.current?.click()}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M20.5 11.5 12.6 19.4a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
-                        </svg>
-                      </button>
-                      <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
-                        <PhotoIcon />
-                      </button>
+                      <AttachMenu disabled={sending} onFile={() => fileRef.current?.click()} onGallery={() => galleryRef.current?.click()} />
                       <button
                         type="button"
                         className="composer__tool composer__mic"
@@ -1844,5 +1837,58 @@ function LeftGroupBar({ conversationId }: { conversationId: string }) {
         </Button>
       )}
     </div>
+  );
+}
+
+/** Um clipe só na barra de mensagem: toca e escolhe, num menu em cima, documento ou fotos e vídeos (como no WhatsApp). */
+function AttachMenu({ disabled, onFile, onGallery }: { disabled?: boolean; onFile: () => void; onGallery: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const esc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const choose = (pick: () => void) => {
+    setOpen(false);
+    pick();
+  };
+  return (
+    <span ref={rootRef} className="attachmenu">
+      <button type="button" className={`composer__tool${open ? ' composer__tool--on' : ''}`} aria-label={t('Anexar')} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20.5 11.5 12.6 19.4a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
+        </svg>
+      </button>
+      {open ? (
+        <span className="attachmenu__list" role="menu">
+          <button type="button" role="menuitem" className="attachmenu__item" onClick={() => choose(onFile)}>
+            <span className="attachmenu__icon attachmenu__icon--doc" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                <path d="M14 3v5h5M9 13h6M9 17h6" />
+              </svg>
+            </span>
+            {t('Documento')}
+          </button>
+          <button type="button" role="menuitem" className="attachmenu__item" onClick={() => choose(onGallery)}>
+            <span className="attachmenu__icon attachmenu__icon--media" aria-hidden="true">
+              <PhotoIcon />
+            </span>
+            {t('Fotos e vídeos')}
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }
