@@ -342,4 +342,47 @@ export class PrismaFeedRepository implements FeedRepository {
   async countAllPosts(status: FeedPostStatus): Promise<number> {
     return this.prisma.feedPost.count({ where: { status } });
   }
+
+  /** A coluna do evento na tabela FeedBell (local não tem sininho de feed). */
+  private static bellWhere(target: FeedTarget): Prisma.FeedBellWhereInput | undefined {
+    if (!isUuid(target.id)) return undefined;
+    if (target.type === 'PLACE_EVENT') return { placeEventId: target.id };
+    if (target.type === 'USER_EVENT') return { userEventId: target.id };
+    return undefined;
+  }
+
+  async setBell(target: FeedTarget, userId: string, on: boolean, at: Date): Promise<boolean> {
+    const where = PrismaFeedRepository.bellWhere(target);
+    if (!where || !isUuid(userId)) return false;
+    const exists =
+      target.type === 'PLACE_EVENT'
+        ? (await this.prisma.placeEvent.count({ where: { id: target.id } })) > 0
+        : (await this.prisma.post.count({ where: { id: target.id, eventTitle: { not: null } } })) > 0;
+    if (!exists) return false;
+    if (!on) {
+      await this.prisma.feedBell.deleteMany({ where: { ...where, userId } });
+      return true;
+    }
+    if ((await this.prisma.feedBell.count({ where: { ...where, userId } })) > 0) return true;
+    try {
+      await this.prisma.feedBell.create({ data: { ...(where as { placeEventId?: string; userEventId?: string }), userId, createdAt: at } });
+    } catch (failure) {
+      // Dois toques ao mesmo tempo: a linha já existe, e é isso que se queria.
+      if ((failure as { code?: string }).code !== 'P2002') throw failure;
+    }
+    return true;
+  }
+
+  async hasBell(target: FeedTarget, userId: string): Promise<boolean> {
+    const where = PrismaFeedRepository.bellWhere(target);
+    if (!where || !isUuid(userId)) return false;
+    return (await this.prisma.feedBell.count({ where: { ...where, userId } })) > 0;
+  }
+
+  async listBellUsers(target: FeedTarget, limit: number): Promise<string[]> {
+    const where = PrismaFeedRepository.bellWhere(target);
+    if (!where) return [];
+    const rows = await this.prisma.feedBell.findMany({ where, select: { userId: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: limit });
+    return rows.map((r) => r.userId);
+  }
 }

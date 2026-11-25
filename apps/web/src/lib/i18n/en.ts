@@ -3918,4 +3918,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Este evento está adiado.": "This event is postponed.",
   "Este evento está adiado, sem nova data. Escolha a nova data em Quando.": "This event is postponed, with no new date. Pick the new date under When.",
   "Adiado para": "Postponed to",
+  "Pronto! Você recebe um aviso a cada publicação nova aqui.": "Done! You'll get a notification for every new post here.",
+  "Avisos de publicações novas desligados.": "New post notifications turned off.",
+  "Avisos de publicações ligados": "Post notifications on",
+  "Avisar publicações novas": "Notify me of new posts",
 };

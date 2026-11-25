@@ -24,6 +24,8 @@ export const FEED_COMMENTS_PAGE_MAX = 50;
 export const FEED_PENDING_MAX = 50;
 /** Até quantas pessoas um aviso do dono avisa (quem vai ao evento ou ligou o sininho do rolê). */
 export const FEED_NOTICE_FANOUT_MAX = 500;
+/** Até quantas pessoas com o sininho do evento ligado uma publicação nova avisa. */
+export const FEED_BELL_FANOUT_MAX = 500;
 export const FEED_POLICIES: readonly FeedPolicy[] = ['OPEN', 'MODERATED', 'OWNER_ONLY'];
 
 /** Onde o feed fica, do jeito que o app chama: a página de um evento ou a de um rolê. */
@@ -91,6 +93,8 @@ export interface FeedSettingsView {
   needsApproval: boolean;
   /** Só para quem modera: quantas esperam aprovação. */
   pendingCount: number;
+  /** Sininho do evento ligado: aviso a cada publicação nova de outra pessoa. Nulo no feed de rolê (lá o sininho é o de eventos novos). */
+  bell: boolean | null;
 }
 
 export interface FeedPageView extends FeedSettingsView {
@@ -230,6 +234,7 @@ export class FeedService {
       canPost,
       needsApproval: canPost && !isModerator && policy === 'MODERATED',
       pendingCount: isModerator ? await this.deps.feed.countPosts(ctx.target, 'PENDING') : 0,
+      bell: ctx.target.type === 'VENUE' ? null : await this.deps.feed.hasBell(ctx.target, viewerId),
     };
   }
 
@@ -342,6 +347,15 @@ export class FeedService {
     return this.settings(viewerId, ctx);
   }
 
+  /** Liga ou desliga o sininho do evento: um aviso a cada publicação nova de outra pessoa no feed. */
+  async setBell(viewerId: string, place: unknown, rawId: unknown, on: unknown): Promise<FeedSettingsView> {
+    if (typeof on !== 'boolean') throw validationError('Dados inválidos', { on: 'Use true ou false' });
+    const ctx = await this.ctx(viewerId, place, rawId);
+    if (ctx.target.type === 'VENUE') throw notFound('Página não encontrada');
+    if (!(await this.deps.feed.setBell(ctx.target, viewerId, on, this.deps.clock.now()))) throw notFound('Evento não encontrado');
+    return this.settings(viewerId, ctx);
+  }
+
   async create(viewerId: string, place: unknown, rawId: unknown, input: FeedPostInput): Promise<FeedPostView> {
     const ctx = await this.ctx(viewerId, place, rawId);
     const settings = await this.settings(viewerId, ctx);
@@ -372,10 +386,39 @@ export class FeedService {
     return (await this.views(viewerId, ctx, [{ post: record, imageIds: images.map((i) => i.id) }]))[0]!;
   }
 
-  /** Publicada: avisa quem foi marcado com @ e, num aviso de quem modera, quem vai ao evento (ou ligou o sininho do rolê). */
+  /**
+   * Publicada: avisa quem foi marcado com @, num aviso de quem modera quem vai ao evento (ou ligou o sininho do rolê)
+   * e, por fim, quem ligou o sininho do evento. Cada pessoa recebe um aviso só.
+   */
   private async afterPublished(post: FeedPostRecord, ctx: Ctx, authorName: string): Promise<void> {
     const url = `${ctx.url}?post=${post.id}`;
-    const mentioned = post.body ? await this.notifyMentions(post.authorId, authorName, ctx, post.body, url, `feed-mention:${post.id}`, 'numa publicação') : new Set<string>();
+    const notified = post.body ? await this.notifyMentions(post.authorId, authorName, ctx, post.body, url, `feed-mention:${post.id}`, 'numa publicação') : new Set<string>();
+    await this.notifyNotice(post, ctx, authorName, url, notified);
+    await this.notifyBell(post, ctx, authorName, url, notified);
+  }
+
+  /** Sininho do evento: quem ligou (e ainda pode abrir o evento) fica sabendo de cada publicação nova de outra pessoa. */
+  private async notifyBell(post: FeedPostRecord, ctx: Ctx, authorName: string, url: string, notified: Set<string>): Promise<void> {
+    if (ctx.target.type === 'VENUE') return;
+    const audience = await this.deps.feed.listBellUsers(ctx.target, FEED_BELL_FANOUT_MAX);
+    if (audience.length === 0) return;
+    const blocked = new Set(await this.deps.blocks.listRelatedIds(post.authorId));
+    const what = post.kind === 'NOTICE' ? 'um aviso' : post.body ? 'uma publicação' : 'fotos';
+    for (const userId of audience) {
+      if (userId === post.authorId || notified.has(userId) || blocked.has(userId)) continue;
+      try {
+        await this.ctxOfTarget(userId, ctx.target);
+      } catch (failure) {
+        if (failure instanceof DomainError) continue;
+        throw failure;
+      }
+      await this.deps.notifier.notify({ userId, type: 'FEED_NEW_POST', title: `${authorName} postou ${what} em ${ctx.title}`, body: snippet(post.body, 'Toque para ver'), url, dedupeKey: `feed-bell:${post.id}` });
+      notified.add(userId);
+    }
+  }
+
+  /** Aviso de quem modera: vai para quem vai ao evento (ou ligou o sininho do rolê). */
+  private async notifyNotice(post: FeedPostRecord, ctx: Ctx, authorName: string, url: string, mentioned: Set<string>): Promise<void> {
     if (post.kind !== 'NOTICE' || post.authorId !== ctx.moderatorId) return;
     let audience: string[];
     if (ctx.target.type === 'VENUE') {
@@ -387,6 +430,7 @@ export class FeedService {
     for (const userId of audience.slice(0, FEED_NOTICE_FANOUT_MAX)) {
       if (userId === post.authorId || mentioned.has(userId) || blocked.has(userId)) continue;
       await this.deps.notifier.notify({ userId, type: 'FEED_NOTICE', title: `Aviso de ${authorName} em ${ctx.title}`, body: snippet(post.body, 'Toque para ver'), url, dedupeKey: `feed-notice:${post.id}` });
+      mentioned.add(userId);
     }
   }
 

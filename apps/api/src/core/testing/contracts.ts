@@ -2520,8 +2520,21 @@ export function defineRepositoryContract(
         assert.equal(await h.feed.findComment(c1.id), undefined);
         await h.feed.createPost(mk(randomUUID(), userT, 6), []);
         assert.equal(await h.feed.countPosts(userT, 'PUBLISHED'), 1);
+        // sininho: só em evento, sem repetir, na ordem em que ligaram; apagar o evento leva junto
+        assert.equal(await h.feed.setBell(userT, bia, true, at(50)), true);
+        assert.equal(await h.feed.setBell(userT, bia, true, at(51)), true);
+        assert.equal(await h.feed.setBell(userT, caio, true, at(52)), true);
+        assert.equal(await h.feed.setBell(placeT, caio, true, at(53)), true);
+        assert.equal(await h.feed.setBell(venueT, caio, true, at(54)), false);
+        assert.equal(await h.feed.setBell({ type: 'PLACE_EVENT', id: randomUUID() }, caio, true, at(55)), false);
+        assert.deepEqual(await h.feed.listBellUsers(userT, 10), [bia, caio]);
+        assert.deepEqual(await h.feed.listBellUsers(userT, 1), [bia]);
+        assert.deepEqual([await h.feed.hasBell(userT, bia), await h.feed.hasBell(placeT, bia), await h.feed.hasBell(placeT, caio)], [true, false, true]);
+        assert.equal(await h.feed.setBell(userT, bia, false, at(56)), true);
+        assert.deepEqual(await h.feed.listBellUsers(userT, 10), [caio]);
         assert.equal(await h.posts.delete(userEventId, ana), true);
         assert.equal(await h.feed.countPosts(userT, 'PUBLISHED'), 0);
+        assert.deepEqual(await h.feed.listBellUsers(userT, 10), []);
         assert.equal(await h.feed.findPost('nao-e-uuid'), undefined);
       });
 

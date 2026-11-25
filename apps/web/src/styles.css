@@ -6289,6 +6289,11 @@ button.reactlist__row { cursor: pointer; }
 .feedcompose__photo { flex: none; color: var(--brand-text); }
 .feedmod { display: flex; flex-wrap: wrap; gap: 8px; }
 .feedmod__chip { min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; }
+.feedbell { display: flex; }
+.feedbell__chip { display: inline-flex; align-items: center; gap: 6px; }
+.feedbell__chip svg { width: 16px; height: 16px; }
+.feedbell__chip--on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-text); }
+.feedbell__chip:disabled { opacity: 0.6; cursor: default; }
 .feedmod__chip--alert { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-text); }
 .feedpost { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 6px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
 .feedpost .pcarousel { margin: 0 -14px; }
