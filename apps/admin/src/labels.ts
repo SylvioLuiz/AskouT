@@ -73,6 +73,7 @@ export const ACTION_LABEL: Record<string, string> = {
   MFA_ENABLED: 'Ligou a verificação em duas etapas',
   MFA_DISABLED: 'Desligou a verificação em duas etapas',
   MFA_RECOVERY_REGENERATED: 'Gerou novos códigos de recuperação',
+  MFA_DISABLED_BY_ADMIN: 'Desligou a verificação em duas etapas (pela gestão)',
   BOOST_ORDERED: 'Pediu um impulsionamento',
   BOOST_CANCELLED: 'Cancelou um impulsionamento não pago',
   BOOST_PAID: 'Impulsionamento pago',
@@ -82,7 +83,7 @@ export const ACTION_LABEL: Record<string, string> = {
 
 /** Grupos do filtro "O que" da auditoria (na ordem do menu). */
 export const ACTION_GROUPS: { label: string; actions: string[] }[] = [
-  { label: 'Contas', actions: ['USER_SUSPENDED', 'USER_REACTIVATED', 'USER_PROFILE_EDITED', 'USER_BIRTHDATE_CHANGED', 'ROLE_CHANGED', 'ACCOUNT_DELETED', 'ACCOUNT_DATA_EXPORTED', 'MFA_ENABLED', 'MFA_DISABLED', 'MFA_RECOVERY_REGENERATED'] },
+  { label: 'Contas', actions: ['USER_SUSPENDED', 'USER_REACTIVATED', 'USER_PROFILE_EDITED', 'USER_BIRTHDATE_CHANGED', 'ROLE_CHANGED', 'ACCOUNT_DELETED', 'ACCOUNT_DATA_EXPORTED', 'MFA_ENABLED', 'MFA_DISABLED', 'MFA_RECOVERY_REGENERATED', 'MFA_DISABLED_BY_ADMIN'] },
   { label: 'Moderação', actions: ['POST_REMOVED', 'COMMENT_REMOVED', 'STORY_REMOVED', 'FEED_POST_REMOVED', 'FEED_COMMENT_REMOVED', 'PLACE_EVENT_REMOVED', 'REPORT_DISMISSED', 'REPORT_ACTIONED'] },
   { label: 'Locais e eventos', actions: ['CLAIM_APPROVED', 'CLAIM_REJECTED', 'CLAIM_DOCUMENT_VIEWED', 'VENUE_CREATED', 'VENUES_IMPORTED', 'VENUE_EDITED', 'VENUE_OWNER_REMOVED', 'PLACE_EVENT_EDITED'] },
   { label: 'Impulsionamento', actions: ['BOOST_ORDERED', 'BOOST_CANCELLED', 'BOOST_PAID', 'BOOST_PAYMENT_REFUSED', 'PAYMENTS_ENABLED', 'PAYMENTS_DISABLED', 'BOOST_PACKAGES_UPDATED'] },

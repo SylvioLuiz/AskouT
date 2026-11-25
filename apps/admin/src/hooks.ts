@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ApiError } from './api.ts';
 import { usePageSize } from './page-size.ts';
 
@@ -55,4 +55,11 @@ export function useDesktop(min: number): boolean {
     return () => window.removeEventListener('resize', on);
   }, [min]);
   return ok;
+}
+
+/** Id da conta logada na gestão (para saber quando a ação é na própria conta). */
+export const MeContext = createContext<string | undefined>(undefined);
+
+export function useMeId(): string | undefined {
+  return useContext(MeContext);
 }

@@ -122,6 +122,10 @@ export const api = {
     session.set(token);
   },
   me: () => request<SessionUser>('GET', '/auth/me'),
+  /** Verificação em duas etapas da própria conta (a mesma rota do app). */
+  myMfa: () => request<{ enabled: boolean; pendingSetup: boolean; recoveryCodesLeft: number }>('GET', '/auth/mfa'),
+  /** Desliga a verificação em duas etapas de uma conta (ou da própria); apaga o segredo e os códigos de recuperação. */
+  disableUserMfa: (id: string, note: string) => request<{ id: string; mfaEnabled: false }>('POST', `/admin/users/${encodeURIComponent(id)}/mfa/disable`, { note }),
   stats: () => request<Stats>('GET', '/admin/stats'),
   hunter: (limit = 50, offset = 0) => request<HunterOverview>('GET', `/admin/hunter?limit=${limit}&offset=${offset}`),
   setHunter: (enabled: boolean) => request<{ enabled: boolean }>('POST', '/admin/hunter/enabled', { enabled }),

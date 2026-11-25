@@ -490,6 +490,31 @@ export class AdminService {
     return { id: target.id, birthDate: parsed.birthDate };
   }
 
+  /**
+   * Desliga a verificação em duas etapas de uma conta (ex.: a pessoa perdeu o celular e os códigos de recuperação), inclusive
+   * a de quem está logado. Apaga o segredo e os códigos de recuperação; o próximo login volta a ser só senha (ou Google/Apple).
+   * As sessões abertas continuam: elas já passaram pela verificação, e desligar não dá acesso a mais ninguém (conta invadida
+   * se resolve suspendendo). Na conta de outra pessoa o motivo é obrigatório; tudo fica na auditoria.
+   */
+  async disableUserMfa(actor: Actor, userId: unknown, note: unknown): Promise<{ id: string; mfaEnabled: false }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const own = target.id === actor.userId;
+    const reason = noteText(note, !own);
+    const record = await this.deps.mfa.find(target.id);
+    if (!record?.enabledAt) throw conflict('A verificação em duas etapas já está desligada nessa conta');
+    await this.deps.mfa.delete(target.id);
+    await this.log(actor.userId, 'MFA_DISABLED_BY_ADMIN', 'USER', target.id, reason ?? (own ? 'Desligou na própria conta' : null), {
+      targetLabel: await this.userLabel(target.id),
+      changes: [
+        { field: 'verificação em duas etapas', before: 'ligada', after: 'desligada' },
+        { field: 'códigos de recuperação', before: String(record.recoveryCodeHashes.length), after: '0' },
+      ],
+    });
+    return { id: target.id, mfaEnabled: false };
+  }
+
   /** Uma pessoa inteira: o que a gestão pode editar, o resto do cadastro e os vínculos (amigos, seguidores, eventos, posts, locais). */
   async userDetail(actor: Actor, userId: unknown): Promise<AdminUserDetail> {
     this.assertAdmin(actor);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, api, session, setUnauthorizedHandler } from './api.ts';
 import { APPLE_BUTTON_URL, appleIdToken } from './apple-login.ts';
-import { useDesktop } from './hooks.ts';
+import { MeContext, useDesktop } from './hooks.ts';
 import { MIN_DESKTOP_WIDTH } from './labels.ts';
 import { AuditPage } from './pages/audit.tsx';
 import { ClaimsPage } from './pages/claims.tsx';
@@ -19,9 +19,9 @@ import { ReferralsPage } from './pages/referrals.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
-import { CHANGED_EVENT, Modal } from './ui.tsx';
+import { ActionDialog, CHANGED_EVENT, Modal } from './ui.tsx';
 import { RecordsProvider } from './record.tsx';
-import { UserDetail } from './pages/user-dialogs.tsx';
+import { UserDetail, disableMfaAction } from './pages/user-dialogs.tsx';
 import { VenueDetail } from './pages/venues.tsx';
 import { EventDetailModal } from './pages/events.tsx';
 import { PostDetail } from './pages/posts.tsx';
@@ -307,6 +307,17 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
   const [pending, setPending] = useState<{ claims: number; reports: number }>({ claims: 0, reports: 0 });
   const [changingPassword, setChangingPassword] = useState(false);
   const closePassword = useCallback(() => setChangingPassword(false), []);
+  // Verificação em duas etapas da própria conta: o botão de desligar só aparece quando está ligada.
+  const [myMfa, setMyMfa] = useState(false);
+  const [disablingMfa, setDisablingMfa] = useState(false);
+  const loadMyMfa = useCallback(() => {
+    api.myMfa().then((s) => setMyMfa(s.enabled), () => {});
+  }, []);
+  useEffect(() => {
+    loadMyMfa();
+    window.addEventListener(CHANGED_EVENT, loadMyMfa);
+    return () => window.removeEventListener(CHANGED_EVENT, loadMyMfa);
+  }, [loadMyMfa]);
 
   useEffect(() => {
     let alive = true;
@@ -361,6 +372,11 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
             <button type="button" className="btn btn--small" onClick={() => setChangingPassword(true)}>
               Trocar senha
             </button>
+            {myMfa ? (
+              <button type="button" className="btn btn--small" onClick={() => setDisablingMfa(true)}>
+                Desligar 2 etapas
+              </button>
+            ) : null}
             <button type="button" className="btn btn--small" onClick={onLogout}>
               Sair
             </button>
@@ -368,11 +384,14 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
         </div>
       </aside>
       <main className="main">
-        <RecordsProvider renderers={RECORD_RENDERERS}>
-          <Page route={route} />
-        </RecordsProvider>
+        <MeContext.Provider value={admin.id}>
+          <RecordsProvider renderers={RECORD_RENDERERS}>
+            <Page route={route} />
+          </RecordsProvider>
+        </MeContext.Provider>
       </main>
       {changingPassword ? <ChangePasswordDialog onClose={closePassword} /> : null}
+      {disablingMfa ? <ActionDialog spec={disableMfaAction({ id: admin.id, username: admin.profile.username }, true)} onClose={() => setDisablingMfa(false)} onDone={loadMyMfa} /> : null}
     </div>
   );
 }

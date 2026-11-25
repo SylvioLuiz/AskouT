@@ -91,3 +91,45 @@ test('MFA: painel de gestão também pede o código', async () => {
   const s = await w.core.admin.verifyMfaLogin({ mfaToken: c.mfaToken, code: nextCode(secret) });
   assert.equal(s.user.role, 'ADMIN');
 });
+
+test('MFA: gestão desliga a verificação de outra pessoa com motivo; apaga segredo e códigos e registra na auditoria', async () => {
+  const { w, ana, username, enable } = await setup();
+  await enable();
+  const bia = (await w.signUpMany('adm'))['adm']!;
+  w.users.users.set(bia, { ...w.users.users.get(bia)!, role: 'ADMIN' });
+  const A = { userId: bia, role: 'ADMIN' as const };
+
+  await rejectsWith(w.core.admin.disableUserMfa({ userId: ana, role: 'USER' }, ana, 'x'), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.disableUserMfa(A, ana, ''), 'VALIDATION');
+  await rejectsWith(w.core.admin.disableUserMfa(A, 'nao-existe', 'Perdeu o celular'), 'NOT_FOUND');
+  assert.equal((await w.core.auth.mfa.status(ana)).enabled, true, 'sem motivo não desliga');
+
+  assert.deepEqual(await w.core.admin.disableUserMfa(A, ana, 'Perdeu o celular e os códigos'), { id: ana, mfaEnabled: false });
+  assert.equal(w.mfa.rows.has(ana), false, 'segredo e códigos de recuperação apagados');
+  const s = await w.core.auth.login({ identifier: username, password: PASSWORD });
+  assert.ok(!('mfaRequired' in s), 'login volta a ser só senha');
+  await rejectsWith(w.core.admin.disableUserMfa(A, ana, 'De novo'), 'CONFLICT');
+
+  const [row] = (await w.core.admin.audit(A, { action: 'MFA_DISABLED_BY_ADMIN' })).items;
+  assert.deepEqual([row!.adminId, row!.actorKind, row!.targetId, row!.targetLabel, row!.note], [bia, 'ADMIN', ana, '@ana', 'Perdeu o celular e os códigos']);
+  assert.deepEqual(row!.changes, [
+    { field: 'verificação em duas etapas', before: 'ligada', after: 'desligada' },
+    { field: 'códigos de recuperação', before: '10', after: '0' },
+  ]);
+});
+
+test('MFA: quem está na gestão desliga a própria verificação sem motivo e continua logado', async () => {
+  const { w, ana, username, enable, nextCode } = await setup();
+  const { secret } = await enable();
+  w.users.users.set(ana, { ...w.users.users.get(ana)!, role: 'ADMIN' });
+  const c = await w.core.admin.login({ identifier: username, password: PASSWORD });
+  if (!('mfaRequired' in c)) throw new Error('esperava desafio');
+  const { token } = await w.core.admin.verifyMfaLogin({ mfaToken: c.mfaToken, code: nextCode(secret) });
+  const me = await w.core.auth.authenticate(token);
+
+  await w.core.admin.disableUserMfa(me, ana, '');
+  assert.equal((await w.core.auth.mfa.status(ana)).enabled, false);
+  assert.equal((await w.core.auth.authenticate(token)).userId, ana, 'a sessão aberta continua valendo');
+  const [row] = (await w.core.admin.audit(me, { action: 'MFA_DISABLED_BY_ADMIN' })).items;
+  assert.deepEqual([row!.adminId, row!.targetId, row!.note], [ana, ana, 'Desligou na própria conta']);
+});

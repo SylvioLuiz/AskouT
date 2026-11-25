@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ApiError, api, avatarSrc } from '../api.ts';
-import { useAsync, useDebounced } from '../hooks.ts';
+import { useAsync, useDebounced, useMeId } from '../hooks.ts';
 import type { ReactNode } from 'react';
 import { CLAIM_LABEL, STATUS_LABEL, formatBirthDate, formatCents, formatDate, formatDateTime, plural } from '../labels.ts';
 import type { PersonRef, UserActivityItem, UserDetail as UserDetailData, UserRow, UserStats as UserStatsData } from '../types.ts';
@@ -40,6 +40,30 @@ export function reactivateAction(u: { id: string; username: string }): ActionSpe
   };
 }
 
+/**
+ * Desligar a verificação em duas etapas (ex.: a pessoa perdeu o celular e os códigos de recuperação). Na conta de outra pessoa
+ * pede motivo; na própria, só a confirmação. Fica na auditoria.
+ */
+export function disableMfaAction(u: { id: string; username: string }, own = false): ActionSpec {
+  return {
+    title: own ? 'Desligar a sua verificação em duas etapas' : `Desligar a verificação em duas etapas de @${u.username}`,
+    description: (
+      <>
+        <p>
+          {own ? 'O app autenticador e os códigos de recuperação da sua conta deixam de valer.' : 'O app autenticador e os códigos de recuperação dessa conta deixam de valer.'} A
+          próxima entrada pede só a senha (ou Google/Apple). As sessões já abertas continuam.
+        </p>
+        <p>{own ? 'Dá para ligar de novo pelo app, em Configurações.' : 'Confira antes que é mesmo a pessoa pedindo. Ela pode ligar de novo pelo app, em Configurações.'}</p>
+      </>
+    ),
+    confirmLabel: 'Desligar',
+    danger: true,
+    noteLabel: own ? 'Nota' : 'Motivo',
+    noteRequired: !own,
+    run: (note) => api.disableUserMfa(u.id, note),
+  };
+}
+
 function People({ items, total, empty }: { items: PersonRef[]; total: number; empty: string }) {
   return (
     <LinkedList
@@ -69,6 +93,7 @@ export function UserDetail({ id, onClose }: { id: string; onClose: () => void })
 
 function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => void; reload: () => void }) {
   const x = u.extra;
+  const meId = useMeId();
   // O @ novo é conferido enquanto se digita: livre, já em uso ou fora do formato.
   const [check, setCheck] = useState<{ username: string; available: boolean; problem?: string }>();
   const problemOf = (typedName: string) => {
@@ -107,6 +132,7 @@ function UserRecord({ u, onClose, reload }: { u: UserDetailData; onClose: () => 
   const actions: RecordAction[] = [
     { label: 'Suspender', confirm: suspendAction(u), danger: true, hidden: isAdmin || u.status === 'SUSPENDED' },
     { label: 'Reativar', confirm: reactivateAction(u), hidden: isAdmin || u.status !== 'SUSPENDED' },
+    { label: 'Desligar verificação em 2 etapas', confirm: disableMfaAction(u, u.id === meId), danger: true, hidden: x?.mfaEnabled !== true },
   ];
   const c = x?.counts;
 
