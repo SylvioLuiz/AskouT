@@ -434,7 +434,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN' | 'EVENT_UPDATE';
 
 export interface NotificationItem {
   id: string;
@@ -1049,6 +1049,8 @@ export interface EventPage {
   /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
   startsAt: string | null;
   endsAt: string | null;
+  /** Adiado sem nova data: a data guardada é a antiga (não mostrar como certa). */
+  postponed?: boolean;
   isFree: boolean;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
@@ -1179,7 +1181,7 @@ export interface PostView {
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
   /** `startsAt`/`endsAt` nulos: a data ainda vai ser decidida numa votação. */
-  event: { title: string; kind: EventKind; startsAt: string | null; endsAt: string | null; private?: boolean; extras?: EventExtraAnswer[] } | null;
+  event: { title: string; kind: EventKind; startsAt: string | null; endsAt: string | null; private?: boolean; extras?: EventExtraAnswer[]; postponed?: boolean } | null;
   /** Evento ao qual o post (foto, vídeo ou só texto) está vinculado; o nome leva à página do evento. */
   linkedEvent?: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string | null } | null;
   createdAt: string;
@@ -1365,6 +1367,8 @@ export interface VenueEvent {
   /** Link https para comprar ingresso, se foi informado. */
   ticketUrl?: string | null;
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
+  /** Adiado sem nova data (a data guardada é a antiga). */
+  postponed?: boolean;
   sample: boolean;
 }
 

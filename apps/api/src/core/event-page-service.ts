@@ -119,6 +119,8 @@ export interface EventPageView {
   /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
   startsAt: string | null;
   endsAt: string | null;
+  /** Adiado sem nova data: a data guardada é a antiga (o app não a mostra como certa). */
+  postponed: boolean;
   isFree: boolean;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
@@ -463,6 +465,7 @@ export class EventPageService {
           kind: event.kind,
           startsAt: event.startsAt.toISOString(),
           endsAt: event.endsAt.toISOString(),
+          postponed: Boolean(event.postponedAt),
           isFree: event.isFree,
           sample: event.isSample || venue.isSample,
           cover: event.imageUrl ? { kind: 'URL', url: event.imageUrl } : null,
@@ -495,6 +498,7 @@ export class EventPageService {
         kind: post.eventKind,
         startsAt: startsAt ? startsAt.toISOString() : null,
         endsAt: endsAt ? endsAt.toISOString() : null,
+        postponed: Boolean(post.eventPostponedAt),
         isFree: false,
         sample: false,
         cover,

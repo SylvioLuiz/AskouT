@@ -2,6 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { decodeImageDataUrl } from './image.ts';
 import { DomainError, conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
+import { notifyEventChange } from './event-changes.ts';
 import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
@@ -152,6 +153,8 @@ export interface VenueEventView {
   ticketUrl: string | null;
   /** Para a lista do painel: ainda vai acontecer, está acontecendo ou já passou. */
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
+  /** Adiado sem nova data (a data guardada é a antiga). */
+  postponed: boolean;
   sample: boolean;
 }
 
@@ -570,7 +573,26 @@ export class VenueService {
     const venue = await this.managedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
-    return this.eventView(await this.applyEventUpdate(current.event, input));
+    return this.eventView(await this.applyEventUpdate(current.event, input, userId));
+  }
+
+  /**
+   * Marca ou tira o "Adiado" de um evento do local (quem administra). Adiado é sem nova data: a data antiga fica guardada
+   * e os lembretes param. A nova data vem pela edição (o adiado sai sozinho). Avisa quem vai.
+   */
+  async setEventPostponed(userId: string, venueId: unknown, eventId: unknown, postponed: unknown): Promise<VenueEventView> {
+    const venue = await this.managedOrThrow(userId, venueId);
+    const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
+    if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
+    if (typeof postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
+    const event = current.event;
+    if (Boolean(event.postponedAt) !== postponed) {
+      const at = postponed ? this.deps.clock.now() : null;
+      if (!(await this.deps.places.setEventPostponed(venue.id, event.id, at))) throw notFound('Evento não encontrado');
+      event.postponedAt = at;
+      await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId: userId, change: postponed ? { kind: 'POSTPONED' } : { kind: 'UNPOSTPONED', startsAt: event.startsAt } });
+    }
+    return this.eventView(event);
   }
 
   /** Gestão: edita qualquer evento de local, com as mesmas regras de quem administra. Devolve o antes e o depois. */
@@ -580,7 +602,7 @@ export class VenueService {
     return { before: current.event, after: await this.applyEventUpdate(current.event, input) };
   }
 
-  private async applyEventUpdate(currentEvent: PlaceEventRecord, input: VenueEventInput): Promise<PlaceEventRecord> {
+  private async applyEventUpdate(currentEvent: PlaceEventRecord, input: VenueEventInput, actorId: string | null = null): Promise<PlaceEventRecord> {
     const venue = { id: currentEvent.venueId };
     const current = { event: currentEvent };
     const { cover, ...fields } = this.parseEvent(input, current.event.startsAt, current.event);
@@ -591,6 +613,14 @@ export class VenueService {
     if (!(await this.deps.places.updateEvent(venue.id, event))) throw notFound('Evento não encontrado');
     if (cover.mode === 'upload') await this.deps.places.setEventCover(event.id, cover.mime, cover.bytes);
     else if (cover.mode === 'url' || cover.mode === 'none') await this.deps.places.clearEventCover(event.id);
+    // Nova data: tira o adiado e avisa quem vai.
+    if (event.startsAt.getTime() !== currentEvent.startsAt.getTime()) {
+      if (currentEvent.postponedAt) {
+        await this.deps.places.setEventPostponed(venue.id, event.id, null);
+        event.postponedAt = null;
+      }
+      await notifyEventChange(this.deps, { ref: { source: 'PLACE', id: event.id }, title: event.title, ownerId: null, actorId, change: { kind: 'RESCHEDULED', startsAt: event.startsAt } });
+    }
     return event;
   }
 
@@ -1077,7 +1107,7 @@ export class VenueService {
   private eventView(e: PlaceEventRecord): VenueEventView {
     const now = this.deps.clock.now().getTime();
     const phase = e.endsAt.getTime() <= now ? 'PAST' : e.startsAt.getTime() <= now ? 'LIVE' : 'UPCOMING';
-    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, phase, sample: e.isSample };
+    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, phase, postponed: Boolean(e.postponedAt), sample: e.isSample };
   }
 
   private parseEvent(input: VenueEventInput, keepStart?: Date, current?: PlaceEventRecord): Omit<PlaceEventRecord, 'id' | 'venueId' | 'isSample' | 'imageUrl'> & { cover: CoverChange } {

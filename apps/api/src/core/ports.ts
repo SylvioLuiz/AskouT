@@ -630,6 +630,8 @@ export interface PostRepository {
   /** Admins do evento (sem o dono), mais antigos primeiro. */
   listEventAdmins(postId: string): Promise<EventAdminRecord[]>;
   isEventAdmin(postId: string, userId: string): Promise<boolean>;
+  /** Marca (`at`) ou tira (`null`) o adiado do evento, sem contar como edição. Devolve false se o post não existe. */
+  setEventPostponed(postId: string, at: Date | null): Promise<boolean>;
   /** Torna `userId` admin do evento. Devolve false se já era. */
   addEventAdmin(postId: string, userId: string, addedById: string, at: Date): Promise<boolean>;
   /** Tira `userId` dos admins do evento. Devolve false se não era. */
@@ -718,6 +720,8 @@ export interface PlaceRepository {
   listVenueEvents(venueId: string): Promise<PlaceEventRecord[]>;
   /** Troca os campos editáveis; false se o evento não é do local. */
   updateEvent(venueId: string, event: PlaceEventRecord): Promise<boolean>;
+  /** Marca (`at`) ou tira (`null`) o adiado do evento do local. Devolve false se o evento não é do local. */
+  setEventPostponed(venueId: string, eventId: string, at: Date | null): Promise<boolean>;
   deleteEvent(venueId: string, eventId: string): Promise<boolean>;
   /** Capa enviada pelo dono do local (bytes no banco). */
   setEventCover(eventId: string, mime: string, data: Uint8Array): Promise<void>;
