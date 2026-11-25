@@ -6784,6 +6784,9 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evwho__who { display: flex; flex-direction: column; min-width: 0; color: var(--ink); text-decoration: none; line-height: 1.25; }
 .evwho__who span { color: var(--muted); font-size: 0.8125rem; }
 .evwho__who strong, .evwho__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evwho__item .evwho__who { flex: 1; }
+.evwho__item > .btn { flex: none; }
+.evwho__adminhint { margin: 0 0 12px; font-size: 0.8125rem; }
 .evwho__more { margin: 12px 0 0; text-align: center; }
 /* "Convidar mais pessoas" no fim da lista de quem vai: com respiro do último nome. */
 .evwho__invite { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -7986,3 +7989,49 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 :root .evcover.evcover--sport:not(.evtone) { background: linear-gradient(150deg, var(--cover-sport-red-a), var(--cover-sport-red-b)); }
 :root .evcover.evcover--other:not(.evtone) { background: linear-gradient(150deg, var(--cover-other-a), var(--cover-other-b)); }
 .evcover:not(.evcover--compose) .evcover__kind { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.35); }
+
+/* ---------- Grupos de amigos ---------- */
+
+/* Nome do grupo e botão de criar: com respiro entre eles e sempre à vista no fim da folha (a lista de amigos rola acima). */
+.newgroup__foot {
+  position: sticky;
+  bottom: calc(-20px - var(--sa-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0 -16px;
+  padding: 12px 16px calc(20px + var(--sa-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.sheet__panel:has(.newgroup__foot) .friendpick { max-height: none; overflow: visible; margin-bottom: 8px; }
+
+.groupslink { margin-bottom: 12px; }
+.grouplist { display: flex; flex-direction: column; gap: 10px; margin: 0 0 20px; padding: 0; list-style: none; }
+.grouprow { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface, var(--bg)); color: inherit; text-decoration: none; }
+.grouprow__body { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.grouprow__body strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grouprow__body .muted { font-size: 0.8125rem; }
+.grouprow__actions { display: flex; gap: 8px; margin-top: 8px; }
+.groupscreen__create { margin: 4px 0 20px; }
+.groupscreen__h { margin: 18px 0 10px; }
+.groupevent-create { margin: 4px 0 16px; }
+.leftbar { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px calc(14px + var(--sa-bottom)); border-top: 1px solid var(--line); background: var(--bg); }
+.leftbar p { margin: 0; }
+.originlink { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 0.875rem; }
+.groupevent-create p { margin: 10px 0 0; }
+
+/* Chat: um clipe só, que abre o menu de anexos em cima (como no WhatsApp) */
+.attachmenu { position: relative; display: flex; }
+.composer__tool--on { background: var(--bg); }
+.attachmenu__list { position: absolute; right: 0; bottom: calc(100% + 12px); z-index: 5; display: flex; flex-direction: column; gap: 2px; min-width: 200px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, .18); animation: msgpop-in 160ms ease-out; }
+.attachmenu__item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px 6px 6px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.attachmenu__item:hover, .attachmenu__item:focus-visible { background: var(--bg); }
+.attachmenu__icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; color: #fff; }
+.attachmenu__icon svg { width: 20px; height: 20px; }
+.attachmenu__icon--doc { background: #7f66ff; }
+.attachmenu__icon--media { background: #2f8cf0; }
+@media (prefers-reduced-motion: reduce) { .attachmenu__list { animation: none; } }
+.emojipanel__tabs { position: sticky; top: -6px; z-index: 1; margin-top: -6px; padding-top: 6px; background: var(--surface); grid-column: 1 / -1; display: flex; gap: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.emojipanel__tab { flex: 1; min-height: 32px; border: 0; border-radius: 10px; background: transparent; color: var(--muted, var(--ink)); font: inherit; font-weight: 600; cursor: pointer; }
+.emojipanel__tab--on { background: var(--brand-soft); color: var(--ink); }

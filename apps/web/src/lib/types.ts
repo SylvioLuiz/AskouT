@@ -434,7 +434,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN';
 
 export interface NotificationItem {
   id: string;
@@ -574,6 +574,8 @@ export interface GroupDetails {
   canManage: boolean;
   meetups: MeetupView[];
   mediaAvailable: true;
+  /** Grupo de amigos: pessoas entram por convite aceito e há eventos do grupo. */
+  community?: boolean;
 }
 
 export interface ChatReply {
@@ -674,6 +676,10 @@ export interface ConversationItem {
   venue?: VenueChat | null;
   pinned: boolean;
   muted: boolean;
+  /** Você saiu do grupo (ou ele foi excluído): só leitura, até excluir a conversa. Servidor antigo não manda. */
+  left?: boolean;
+  /** Grupo de amigos (entra por convite aceito e tem eventos do grupo). */
+  community?: boolean;
 }
 
 export interface ChatView {
@@ -703,6 +709,42 @@ export interface ChatView {
   now: string;
   messages: ChatMessage[];
   hasMore: boolean;
+  /** Você saiu do grupo (ou ele foi excluído): só leitura, até excluir a conversa. */
+  left?: boolean;
+  /** Grupo de amigos (entra por convite aceito e tem eventos do grupo). */
+  community?: boolean;
+}
+
+/** Convite que você recebeu para um grupo de amigos. */
+export interface CommunityInvite {
+  conversationId: string;
+  name: string;
+  imageUrl: string | null;
+  memberCount: number;
+  invitedBy: PublicProfile | null;
+  createdAt: string;
+}
+
+/** Grupo de amigos de que você faz parte. */
+export interface CommunitySummary {
+  conversationId: string;
+  name: string;
+  imageUrl: string | null;
+  memberCount: number;
+  canManage: boolean;
+  nextEvent: EventCard | null;
+}
+
+/** Página do grupo de amigos: eventos e, para quem administra, os convites pendentes. */
+export interface CommunityDetails {
+  conversationId: string;
+  name: string;
+  imageUrl: string | null;
+  memberCount: number;
+  canManage: boolean;
+  pending: { user: PublicProfile; invitedBy: PublicProfile | null; shareHistory: boolean; createdAt: string }[];
+  events: EventCard[];
+  pastEvents: EventCard[];
 }
 
 export interface SuggestionItem {
@@ -1040,8 +1082,14 @@ export interface EventPage {
   group?: { conversationId: string; name: string } | null;
   /** Quem criou o evento e ainda não está num grupo dele: pode criar. */
   canCreateGroup?: boolean;
+  /** Grupo de amigos onde o evento foi criado (só para quem está nele). */
+  originGroup?: { conversationId: string; name: string } | null;
   owner: PublicProfile | null;
   isOwner: boolean;
+  /** Admins do evento de pessoa (sem o dono): convidam, cancelam os convites que mandaram e editam o evento. */
+  admins?: PublicProfile[];
+  /** Você é admin do evento (não o dono). */
+  isAdmin?: boolean;
 }
 
 /** Busca de lugar pelo nome: AskouT e OpenStreetMap (grátis); Google só quando a pessoa pede. */

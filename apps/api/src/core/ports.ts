@@ -1,6 +1,6 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
-import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditFilter, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditFilter, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, GroupInviteRecord, EventAdminRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -438,11 +438,28 @@ export interface ConversationRepository {
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
-  createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord>;
+  createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string; community?: boolean }): Promise<ConversationRecord>;
+  /** Convite para o grupo de amigos. Devolve false se a pessoa já tinha convite pendente (o primeiro vale). */
+  addGroupInvite(conversationId: string, userId: string, invitedById: string, now: Date, shareHistory: boolean): Promise<boolean>;
+  /** Apaga o convite pendente. Devolve false se não havia. */
+  removeGroupInvite(conversationId: string, userId: string): Promise<boolean>;
+  /** Convites pendentes do grupo, mais antigos primeiro. */
+  listGroupInvites(conversationId: string): Promise<GroupInviteRecord[]>;
+  /** Convites pendentes que a pessoa recebeu, mais recentes primeiro. */
+  listGroupInvitesForUser(userId: string): Promise<GroupInviteRecord[]>;
   /** Grupos criados para este evento (post), o mais antigo primeiro. */
   groupIdsForEventPost(postId: string): Promise<string[]>;
   /** Idempotente: coloca a pessoa no grupo. */
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
+  /**
+   * Saiu do grupo (de amigos) mas guarda o histórico: deixa de ser membro (some de `participantIds`, dos administradores
+   * e do acesso a eventos pelo cartão) e a conversa segue na lista dela, só para ler até `at`, até ela excluir.
+   */
+  markLeft(conversationId: string, userId: string, at: Date): Promise<void>;
+  /** Quando a pessoa saiu do grupo guardando o histórico (nulo se é membro ou nunca esteve). */
+  leftAt(conversationId: string, userId: string): Promise<Date | null>;
+  /** Exclui a conversa para quem já saiu. Sem ninguém mais (nem membros nem quem guardou o histórico), o grupo é apagado. */
+  forget(conversationId: string, userId: string): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */
   removeParticipant(conversationId: string, userId: string): Promise<void>;
   /** Apaga o grupo para todos: conversa, mensagens, membros e preferências. Só vale para conversas GROUP. */
@@ -605,9 +622,18 @@ export interface PostRepository {
   addInvites(postId: string, userIds: string[], invitedById: string, at: Date): Promise<string[]>;
   /** Convites do evento, mais antigos primeiro. */
   listInvites(postId: string): Promise<EventInviteRecord[]>;
+  /** Eventos criados dentro do grupo de amigos (id da conversa do grupo), mais recentes primeiro. Inclui arquivados. */
+  listByOriginGroup(conversationId: string): Promise<PostWithImages[]>;
   isInvited(postId: string, userId: string): Promise<boolean>;
   /** Desfaz o convite (e a marcação) de `userId` no evento. Devolve false se não havia convite. */
   removeInvite(postId: string, userId: string): Promise<boolean>;
+  /** Admins do evento (sem o dono), mais antigos primeiro. */
+  listEventAdmins(postId: string): Promise<EventAdminRecord[]>;
+  isEventAdmin(postId: string, userId: string): Promise<boolean>;
+  /** Torna `userId` admin do evento. Devolve false se já era. */
+  addEventAdmin(postId: string, userId: string, addedById: string, at: Date): Promise<boolean>;
+  /** Tira `userId` dos admins do evento. Devolve false se não era. */
+  removeEventAdmin(postId: string, userId: string): Promise<boolean>;
   /** Posts em que `userId` foi marcado e ainda não respondeu, mais recentes primeiro. */
   listPendingTags(userId: string, page: Page): Promise<PostWithImages[]>;
   /** Só apaga se `authorId` é o autor. Devolve false se não existia ou era de outra pessoa. */

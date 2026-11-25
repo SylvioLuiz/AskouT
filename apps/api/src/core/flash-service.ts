@@ -819,6 +819,12 @@ export class FlashService {
     await this.deps.flash.upsertPosition(position);
     // Falha no aviso de chegada nunca atrapalha o envio da posição.
     if (arrivalFor(invite, actorId)) await this.pushArrival(invite, position, now).catch(() => undefined);
+    // Sem lugar combinado, a chegada do outro é medida até você: quando você se move, a dele muda junto.
+    const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    if (!invite.destination && arrivalFor(invite, otherId)) {
+      const theirs = (await this.deps.flash.listPositions(inviteId)).find((p) => p.userId === otherId);
+      if (theirs) await this.pushArrival(invite, theirs, now).catch(() => undefined);
+    }
     return { ok: true };
   }
 

@@ -17,7 +17,7 @@ import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
 import { AlbumContent } from './albums.tsx';
 import { api, session } from '../client.ts';
-import { useIsVisitor } from '../auth.tsx';
+import { useIsVisitor, useOptionalUser } from '../auth.tsx';
 import { askLogin } from '../components/visitor.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
 import type { StoryPos } from '../lib/stories.ts';
@@ -87,12 +87,12 @@ function goBack() {
   routerGoBack(session.get() === undefined ? '/' : '/explorar');
 }
 
-/** Menu ⋯ do evento: editar (quem criou o evento), compartilhar e adicionar à agenda. */
+/** Menu ⋯ do evento: editar (quem criou o evento ou é admin dele), compartilhar e adicionar à agenda. */
 function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; onShare: () => void; onEdit: (post: PostView) => void; onClose: () => void }) {
   const [message, setMessage] = useState<string | undefined>();
   const [opening, setOpening] = useState(false);
   // O evento criado por uma pessoa é um post: edita pelo mesmo formulário de "Editar" do post.
-  const canEdit = page.isOwner && page.source === 'USER';
+  const canEdit = (page.isOwner || page.isAdmin === true) && page.source === 'USER';
 
   async function edit() {
     setMessage(undefined);
@@ -160,6 +160,7 @@ function EventAlbumTab({ eventId, onGo }: { eventId: string; onGo: () => void })
 
 export function EventScreen({ eventId }: { eventId: string }) {
   const visitor = useIsVisitor();
+  const meId = useOptionalUser()?.id;
   const where = useCurrentPosition();
   const waiting = where.status === 'asking';
   const loaded = useAsync<EventPage | null>(async () => (waiting ? null : api.eventPage(eventId, where.position)), [eventId, waiting, where.position?.lat, where.position?.lng]);
@@ -180,6 +181,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   /** Dono convidando mais amigos a partir de "Quem vai" (o convite sai na hora) e o aviso de quantos foram. */
   const [invitingFriends, setInvitingFriends] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | undefined>();
+  /** Tornando ou tirando admin do evento (o id de quem) e o erro, se houver. */
+  const [adminBusy, setAdminBusy] = useState<string | undefined>();
+  const [adminProblem, setAdminProblem] = useState<string | undefined>();
   const [creatingStory, setCreatingStory] = useState(false);
   /** Tocou em "Seu flash" sem ter marcado que vai: aviso de que só quem vai posta. */
   const [storyNeedsGoing, setStoryNeedsGoing] = useState(false);
@@ -219,6 +223,23 @@ export function EventScreen({ eventId }: { eventId: string }) {
     if (openPost) setTab('feed');
   }, [openPost]);
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
+
+  /** O dono torna (ou tira) alguém admin do evento; o próprio admin também pode sair do papel. */
+  async function setAdmin(userId: string, make: boolean) {
+    if (!e) return;
+    setAdminBusy(userId);
+    setAdminProblem(undefined);
+    try {
+      const { admins } = make ? await api.addEventAdmin(e.id, userId) : await api.removeEventAdmin(e.id, userId);
+      const me = meId;
+      setFresh({ ...e, admins, isAdmin: e.isAdmin === true && admins.some((a) => a.userId === me) });
+      if (!make && userId === me) pendingInvites.reload();
+    } catch (failure) {
+      setAdminProblem(toApiError(failure).message);
+    } finally {
+      setAdminBusy(undefined);
+    }
+  }
 
   async function toggleGoing() {
     if (!e) return;
@@ -347,8 +368,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   }, [e?.title]);
   const showStoryButton = e ? canStory || !ended : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
-  // Quem criou o evento chama mais amigos direto da lista de quem vai (o mesmo seletor da criação).
-  const canInviteFriends = !visitor && e?.isOwner === true && e.source === 'USER' && !ended;
+  // Quem criou o evento (ou é admin dele) chama mais amigos direto da lista de quem vai (o mesmo seletor da criação).
+  const canInviteFriends = !visitor && (e?.isOwner === true || e?.isAdmin === true) && e.source === 'USER' && !ended;
+  const adminIds = new Set((e?.admins ?? []).map((a) => a.userId));
 
   return (
     <>
@@ -470,6 +492,19 @@ export function EventScreen({ eventId }: { eventId: string }) {
               );
             })()
           ) : null}
+          {/* Grupo de amigos onde o evento foi criado: só quem está no grupo vê (para os outros, mesmo com o evento público, ele não existe). */}
+          {!visitor && e.originGroup ? (
+            <Link to={`/conversas/${encodeURIComponent(e.originGroup.conversationId)}/grupo`} className="evhost evgroup">
+              <span className="evgroup__icon" aria-hidden="true">
+                <UsersIcon />
+              </span>
+              <span className="evhost__text">
+                <span className="evhost__label">{t('Criado no grupo')}</span>
+                <strong className="evhost__name">{e.originGroup.name || t('Abrir o grupo')}</strong>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+          ) : null}
           {/* Grupo do evento: aparece só para quem está nele; quem criou o evento e ainda não tem grupo pode criar. */}
           {!visitor && e.group ? (
             <Link to={`/conversas/${encodeURIComponent(e.group.conversationId)}`} className="evhost evgroup">
@@ -573,6 +608,22 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {choosing ? <GoingChoiceSheet {...(e.startsAt && e.endsAt ? { event: { id: e.id, startsAt: e.startsAt, endsAt: e.endsAt } } : {})} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
+            {/* Admin do evento: convida gente (também em evento privado) e edita pelo menu ⋯. */}
+            {e.isAdmin && !ended ? (
+              <>
+                <div className="evgo">
+                  <Button full variant="secondary" onClick={() => setInvitingFriends(true)}>
+                    <UsersIcon /> {t('Convidar')}
+                  </Button>
+                </div>
+                <p className="evgo__hint">
+                  {t('Você é admin deste evento: pode convidar pessoas e editar o evento.')}{' '}
+                  <button type="button" className="linkbtn" disabled={adminBusy !== undefined} onClick={() => void setAdmin(meId ?? '', false)}>
+                    {t('Deixar de ser admin')}
+                  </button>
+                </p>
+              </>
+            ) : null}
             {/* Quem vai (ou criou) escolhe os lembretes só deste evento; sem mexer, vale a escolha de Configuração > Notificações. */}
             {!visitor && e.going && !ended && e.startsAt !== null ? (
               <p className="evgo__hint">
@@ -682,17 +733,28 @@ export function EventScreen({ eventId }: { eventId: string }) {
           ) : null}
 
           {whoOpen ? (
-            <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => setWhoOpen(false)}>
+            <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => { setWhoOpen(false); setAdminProblem(undefined); }}>
+              {e.isOwner && e.source === 'USER' && !ended ? <p className="muted evwho__adminhint">{t('Admins convidam pessoas (também em evento privado) e editam o evento. Você continua sendo o dono.')}</p> : null}
+              {adminProblem ? <Notice tone="error">{adminProblem}</Notice> : null}
               <ul className="evwho__list">
-                {e.attendees.map((p) => (
-                  <li key={p.userId} className="evwho__item">
-                    <Avatar profile={p} size={44} />
-                    <Link to={`/u/${encodeURIComponent(p.username)}`} className="evwho__who" onClick={() => setWhoOpen(false)}>
-                      <strong>{p.displayName}</strong>
-                      <span>@{p.username}</span>
-                    </Link>
-                  </li>
-                ))}
+                {e.attendees.map((p) => {
+                  const isOwnerRow = p.userId === e.owner?.userId;
+                  const isAdminRow = adminIds.has(p.userId);
+                  return (
+                    <li key={p.userId} className="evwho__item">
+                      <Avatar profile={p} size={44} />
+                      <Link to={`/u/${encodeURIComponent(p.username)}`} className="evwho__who" onClick={() => setWhoOpen(false)}>
+                        <strong>{p.displayName}</strong>
+                        <span>{isOwnerRow ? t('@{user} · organiza', { user: p.username }) : isAdminRow ? t('@{user} · admin', { user: p.username }) : `@${p.username}`}</span>
+                      </Link>
+                      {e.isOwner && e.source === 'USER' && !isOwnerRow ? (
+                        <Button small variant={isAdminRow ? 'quiet' : 'secondary'} loading={adminBusy === p.userId} disabled={adminBusy !== undefined && adminBusy !== p.userId} onClick={() => void setAdmin(p.userId, !isAdminRow)}>
+                          {isAdminRow ? t('Tirar admin') : t('Tornar admin')}
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
               {e.confirmedCount > e.attendees.length ? <p className="muted evwho__more">{e.confirmedCount - e.attendees.length === 1 ? t('e mais 1 pessoa') : t('e mais {n} pessoas', { n: e.confirmedCount - e.attendees.length })}</p> : null}
               {canInviteFriends ? (
@@ -707,7 +769,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           {invitingFriends ? (
             <EventInviteSheet
               eventId={e.id}
-              {...(e.group ? { groupId: e.group.conversationId } : {})}
+              {...(e.isOwner && e.group ? { groupId: e.group.conversationId } : {})}
               onInvite={(n) => {
                 setInvitingFriends(false);
                 setInviteNote(n === 0 ? t('Essas pessoas já estavam convidadas.') : n === 1 ? t('1 pessoa convidada.') : t('{n} pessoas convidadas.', { n }));

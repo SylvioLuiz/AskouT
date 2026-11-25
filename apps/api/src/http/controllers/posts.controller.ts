@@ -55,7 +55,7 @@ export class PostsController {
           return i;
         })
       : b.images;
-    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId }));
+    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId, groupId: b.groupId }));
   }
 
   /** Seus posts arquivados (só você vê). Vem antes de `posts/:id`. */
@@ -167,6 +167,25 @@ export class PostsController {
   @Delete('posts/:id/invites/:userId')
   cancelInvite(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
     return this.core.posts.cancelInvite(actor.userId, id, userId);
+  }
+
+  /** Admins do evento (sem o dono). */
+  @Get('posts/:id/admins')
+  eventAdmins(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.listEventAdmins(actor.userId, id);
+  }
+
+  /** O dono torna admin do evento quem vai (ou aceitou o convite): `{userId}`. Devolve os admins. */
+  @Post('posts/:id/admins')
+  @HttpCode(200)
+  addEventAdmin(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.posts.addEventAdmin(actor.userId, id, asBody(body).userId);
+  }
+
+  /** O dono tira um admin do evento; o próprio admin também pode sair. Devolve os admins. */
+  @Delete('posts/:id/admins/:userId')
+  removeEventAdmin(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.core.posts.removeEventAdmin(actor.userId, id, userId);
   }
 
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */

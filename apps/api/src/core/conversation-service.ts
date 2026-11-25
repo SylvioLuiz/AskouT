@@ -147,6 +147,10 @@ export interface ConversationListItem {
   pinned: boolean;
   /** Sem avisos de mensagem nova (só para você). */
   muted: boolean;
+  /** Você saiu do grupo (ou ele foi encerrado): dá para ler o que veio até aí e excluir a conversa, mas não enviar. */
+  left: boolean;
+  /** Grupo de amigos (entra por convite aceito, tem eventos do grupo). */
+  community: boolean;
 }
 
 export interface ConversationView {
@@ -181,6 +185,10 @@ export interface ConversationView {
   /** Em ordem cronológica. */
   messages: MessageView[];
   hasMore: boolean;
+  /** Você saiu do grupo (ou ele foi encerrado): só leitura, até excluir a conversa. */
+  left: boolean;
+  /** Grupo de amigos (entra por convite aceito, tem eventos do grupo). */
+  community: boolean;
 }
 
 export interface SharedLink {
@@ -248,6 +256,8 @@ export interface GroupDetails {
   meetups: MeetupView[];
   /** Fotos e vídeos da conversa ficam na aba Mídia (`GET .../shared`). */
   mediaAvailable: true;
+  /** Grupo de amigos: convites, eventos do grupo e "Criar evento no grupo" vêm de `GET /groups/:id`. */
+  community: boolean;
 }
 
 /** Evento ao qual o grupo pertence. */
@@ -765,11 +775,13 @@ export class ConversationService {
         memberCount: s.conversation.type === 'GROUP' ? s.participantIds.filter((id) => !hidden.has(id)).length : s.participantIds.length,
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
-        canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && (sendable.get(s.conversation.id) ?? (friendSet.has(otherId) && requestRole(s.conversation, actorId) !== 'INCOMING')),
+        canSend: s.conversation.type === 'GROUP' ? !s.leftAt : otherId !== null && (sendable.get(s.conversation.id) ?? (friendSet.has(otherId) && requestRole(s.conversation, actorId) !== 'INCOMING')),
         request: requestRole(s.conversation, actorId),
         venue: venueChats.get(s.conversation.id) ?? null,
         pinned: s.pinnedAt != null,
         muted: s.muted === true,
+        left: s.leftAt != null,
+        community: s.conversation.community === true,
       });
       if (s.pinnedAt) pins.set(s.conversation.id, s.pinnedAt.getTime());
     }
@@ -783,7 +795,7 @@ export class ConversationService {
   /** Mensagens da conversa. A primeira página (sem `before`) também marca a conversa como lida. */
   async messages(actorId: string, conversationId: string, query: { limit?: unknown; before?: unknown } = {}): Promise<ConversationView> {
     const { conversations, clock } = this.deps;
-    const { conversation, memberIds, otherId, other } = await this.access(actorId, conversationId);
+    const { conversation, memberIds, otherId, other, leftAt } = await this.readAccess(actorId, conversationId);
     const limit = this.parseLimit(query.limit);
     let before: Date | undefined;
     if (query.before !== undefined && query.before !== null && query.before !== '') {
@@ -791,6 +803,10 @@ export class ConversationService {
       if (Number.isNaN(parsed)) throw validationError('Data inválida', { before: 'Data inválida' });
       before = new Date(parsed);
     }
+    // Quem saiu do grupo vê só o que veio até sair.
+    const until = leftAt ? new Date(leftAt.getTime() + 1) : undefined;
+    const firstPage = before === undefined;
+    if (until && (before === undefined || before > until)) before = until;
     const now = clock.now();
     // Em grupo, quem tem bloqueio com você (nos dois sentidos) some do chat, como na conversa 1 a 1.
     const hiddenIds = conversation.type === 'GROUP' ? await this.deps.blocks.listRelatedIds(actorId) : [];
@@ -798,11 +814,11 @@ export class ConversationService {
     const page = await conversations.listMessages(conversationId, limit + 1, before, hiddenIds, clearedAt);
     const hasMore = page.length > limit;
     const items = hasMore ? page.slice(page.length - limit) : page;
-    const myReadAt = before === undefined ? ((await conversations.listReads(conversationId)).find((r) => r.userId === actorId)?.lastReadAt ?? null) : null;
-    if (before === undefined) await conversations.markRead(conversationId, actorId, now);
+    const myReadAt = firstPage ? ((await conversations.listReads(conversationId)).find((r) => r.userId === actorId)?.lastReadAt ?? null) : null;
+    if (firstPage && !leftAt) await conversations.markRead(conversationId, actorId, now);
     const isGroup = conversation.type === 'GROUP';
     const request = requestRole(conversation, actorId);
-    const canSend = isGroup ? true : otherId !== null && (await this.directCanSend(actorId, conversation, otherId));
+    const canSend = isGroup ? !leftAt : otherId !== null && (await this.directCanSend(actorId, conversation, otherId));
     const positions = otherId && items.some((m) => m.suggestion) ? await this.livePositions(actorId, otherId, now) : null;
 
     const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
@@ -837,7 +853,7 @@ export class ConversationService {
       pinned: prefs.pinnedAt !== null,
       muted: prefs.muted,
       color: prefs.color,
-      typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
+      typing: leftAt ? [] : await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
       members,
       myReadAt: myReadAt ? myReadAt.toISOString() : null,
       canSend,
@@ -859,6 +875,8 @@ export class ConversationService {
         }),
       ),
       hasMore,
+      left: leftAt !== null,
+      community: conversation.community === true,
     };
   }
 
@@ -912,9 +930,9 @@ export class ConversationService {
       if (!eventCard) throw notFound('Evento não encontrado');
       eventCard.going = eventCard.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: eventCard.userEvent ? 'USER' : 'PLACE', id: eventCard.id }, actorId));
       if (eventCard.userEvent) {
-        // Evento de pessoa: o dono envia; outros só reencaminham o que receberam, e nunca um evento privado.
+        // Evento de pessoa: o dono (e os admins do evento) envia; outros só reencaminham o que receberam, e nunca um evento privado.
         if (eventCard.ownerId !== actorId) {
-          if (eventCard.private) throw forbidden('Este evento é privado: só quem criou pode enviar');
+          if (eventCard.private && !(await this.deps.posts.isEventAdmin(eventCard.id, actorId))) throw forbidden('Este evento é privado: só quem organiza pode enviar');
           if (!(await canOpenByInvite(this.deps, actorId, eventCard.id)) && !(await follows.get(actorId, eventCard.ownerId ?? ''))) throw notFound('Evento não encontrado');
         }
         postEventId = eventCard.id;
@@ -1340,19 +1358,29 @@ export class ConversationService {
           return { id: found.card.id, title: found.card.title, coverUrl: found.card.imageUrl, coverImageId, canEditCover: coverImageId !== null };
         })()
       : null;
-    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl ?? event?.coverUrl ?? null, ownImage: conversation.imageUrl !== null, event, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true };
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl ?? event?.coverUrl ?? null, ownImage: conversation.imageUrl !== null, event, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true, community: conversation.community === true };
   }
 
   // ---------- Gestão do grupo ----------
 
-  /** Sai do grupo. Quem criou passa o grupo para quem entrou há mais tempo. */
-  async leave(actorId: string, conversationId: string): Promise<{ ok: true }> {
+  /**
+   * Sai do grupo. Quem criou passa o grupo para quem entrou há mais tempo.
+   * Grupo de amigos (como no WhatsApp): sair não apaga a conversa. Ela fica na lista só para ler o que veio até sair,
+   * até a pessoa excluir (`forget`); com `deleteChat: true`, sai e já exclui.
+   */
+  async leave(actorId: string, conversationId: string, rawDeleteChat?: unknown): Promise<{ ok: true }> {
     const { conversations, meetups, clock } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (rawDeleteChat !== undefined && rawDeleteChat !== null && typeof rawDeleteChat !== 'boolean') throw validationError('Valor inválido', { deleteChat: 'Use true ou false' });
     const now = clock.now();
     const name = await this.nameOf(actorId);
     await this.postSystem(conversationId, actorId, `${name} saiu do grupo`, now);
-    await conversations.removeParticipant(conversationId, actorId);
+    if (conversation.community) {
+      await conversations.markLeft(conversationId, actorId, now);
+      if (rawDeleteChat === true) await conversations.forget(conversationId, actorId);
+    } else {
+      await conversations.removeParticipant(conversationId, actorId);
+    }
     await meetups.declineAllFor(conversationId, actorId, now);
     await this.leaveGroupPolls(conversationId, actorId);
     if (conversation.ownerId === actorId) {
@@ -1370,10 +1398,24 @@ export class ConversationService {
     }
   }
 
-  /** Apaga o grupo para todos. Só quem criou. Os outros membros recebem um aviso. */
+  /** Exclui da sua lista a conversa de um grupo de que você já saiu (ou que foi encerrado). */
+  async forget(actorId: string, conversationId: string): Promise<{ deleted: true }> {
+    const conversation = conversationId.length <= 64 ? await this.deps.conversations.findById(conversationId) : undefined;
+    if (!conversation || conversation.type !== 'GROUP' || !(await this.deps.conversations.leftAt(conversationId, actorId))) throw notFound('Conversa não encontrada');
+    await this.deps.conversations.forget(conversationId, actorId);
+    return { deleted: true };
+  }
+
+  /**
+   * Apaga o grupo.
+   * - Grupo de amigos: quem é o único administrador (o dono sem outros administradores, ou o último que sobrou)
+   *   encerra o grupo. Todos deixam de fazer parte, mas cada um guarda o histórico e pode excluir a conversa depois.
+   * - Outros grupos: só quem criou apaga, para todos. Os outros membros recebem um aviso.
+   */
   async deleteGroup(actorId: string, conversationId: string): Promise<{ deleted: true }> {
     const { conversations } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (conversation.community) return this.endCommunity(actorId, conversation, memberIds);
     if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode apagá-lo. Você pode sair do grupo.');
     const title = conversation.name ?? 'Grupo';
     await conversations.deleteGroup(conversationId);
@@ -1381,6 +1423,28 @@ export class ConversationService {
       if (id === actorId) continue;
       await this.deps.notifier.notify({ userId: id, type: 'GROUP_REMOVED', title, body: 'O grupo foi apagado por quem criou', url: '/conversas' });
     }
+    return { deleted: true };
+  }
+
+  private async endCommunity(actorId: string, conversation: ConversationRecord, memberIds: string[]): Promise<{ deleted: true }> {
+    const { conversations, meetups, clock } = this.deps;
+    const admins = await conversations.adminIds(conversation.id);
+    const managers = new Set([...(conversation.ownerId && memberIds.includes(conversation.ownerId) ? [conversation.ownerId] : []), ...admins]);
+    if (!managers.has(actorId)) throw forbidden('Só quem administra pode excluir o grupo. Você pode sair do grupo.');
+    if (managers.size > 1) throw forbidden('Só dá para excluir o grupo quando você é o único administrador. Tire os outros administradores antes ou saia do grupo.');
+    const now = clock.now();
+    const title = conversation.name ?? 'Grupo';
+    await this.postSystem(conversation.id, actorId, `${await this.nameOf(actorId)} excluiu o grupo`, now);
+    for (const invite of await conversations.listGroupInvites(conversation.id)) {
+      await conversations.removeGroupInvite(conversation.id, invite.userId);
+      await this.deps.notifier.withdraw?.(invite.userId, `group-invite:${conversation.id}`);
+    }
+    for (const id of memberIds) {
+      await meetups.declineAllFor(conversation.id, id, now);
+      await conversations.markLeft(conversation.id, id, now);
+      if (id !== actorId) await this.deps.notifier.notify({ userId: id, type: 'GROUP_REMOVED', title, body: 'O grupo foi excluído. As mensagens continuam com você até excluir a conversa.', url: `/conversas/${conversation.id}` });
+    }
+    await conversations.forget(conversation.id, actorId);
     return { deleted: true };
   }
 
@@ -1396,7 +1460,9 @@ export class ConversationService {
     if (targetId === conversation.ownerId) throw forbidden('Quem criou o grupo não pode ser removido');
     if (!actorIsOwner && admins.includes(targetId)) throw forbidden('Só quem criou o grupo pode remover um administrador');
     const now = clock.now();
-    await conversations.removeParticipant(conversationId, targetId);
+    // Grupo de amigos: quem é removido guarda o histórico até ali (como quem sai).
+    if (conversation.community) await conversations.markLeft(conversationId, targetId, now);
+    else await conversations.removeParticipant(conversationId, targetId);
     await meetups.declineAllFor(conversationId, targetId, now);
     await this.leaveGroupPolls(conversationId, targetId);
     await this.postSystem(conversationId, actorId, `${await this.nameOf(targetId)} foi removido(a) por ${await this.nameOf(actorId)}`, now);
@@ -1428,11 +1494,17 @@ export class ConversationService {
     return { imageUrl };
   }
 
-  /** Quem criou o grupo e os administradores adicionam amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou. */
-  async addMembers(actorId: string, conversationId: string, userIds: unknown): Promise<{ added: number }> {
+  /**
+   * Quem criou o grupo e os administradores adicionam amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou.
+   * `shareHistory: false` esconde de quem entra as mensagens de antes (vê só o que vier depois); ausente ou true mostra tudo.
+   * Grupo de amigos não usa esta rota: lá as pessoas são convidadas e só entram quando aceitam.
+   */
+  async addMembers(actorId: string, conversationId: string, userIds: unknown, rawShareHistory?: unknown): Promise<{ added: number }> {
     const { conversations, follows, blocks, clock } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
     await this.requireManager(actorId, conversationId, conversation.ownerId, 'adicionar pessoas');
+    if (conversation.community) throw conflict('Neste grupo as pessoas entram por convite: convide e elas entram quando aceitarem');
+    const shareHistory = parseShareHistory(rawShareHistory);
     if (!Array.isArray(userIds) || userIds.length === 0) throw validationError('Escolha as pessoas', { userIds: 'Escolha ao menos uma pessoa' });
     const targets = [...new Set(userIds)];
     for (const t of targets) if (typeof t !== 'string' || t === '' || t.length > 64) throw validationError('Pessoa inválida', { userIds: 'Pessoa inválida' });
@@ -1448,6 +1520,7 @@ export class ConversationService {
     const actorName = await this.nameOf(actorId);
     for (const t of wanted) {
       await conversations.addParticipant(conversationId, t, now);
+      if (!shareHistory) await hideHistoryFor(conversations, conversationId, t, now);
       await this.postSystem(conversationId, actorId, `${actorName} adicionou ${await this.nameOf(t)}`, now);
     }
     await this.notifyMembers(actorId, actorName, conversation, wanted, 'adicionou você ao grupo');
@@ -1588,6 +1661,19 @@ export class ConversationService {
     return Math.min(n, PAGE_MAX);
   }
 
+  /** Como `access`, mas quem saiu do grupo guardando o histórico também lê (só até quando saiu: `leftAt`). */
+  private async readAccess(actorId: string, conversationId: string) {
+    try {
+      return { ...(await this.access(actorId, conversationId)), leftAt: null as Date | null };
+    } catch (failure) {
+      const conversation = conversationId.length <= 64 ? await this.deps.conversations.findById(conversationId) : undefined;
+      const leftAt = conversation?.type === 'GROUP' ? await this.deps.conversations.leftAt(conversationId, actorId) : null;
+      if (!conversation || !leftAt) throw failure;
+      const memberIds = (await this.deps.conversations.participantIds(conversationId)) ?? [];
+      return { conversation, memberIds, otherId: null, other: null, leftAt };
+    }
+  }
+
   /** Quem não participa vê "não encontrada"; na 1 a 1, bloqueio em qualquer sentido também. */
   private async access(actorId: string, conversationId: string) {
     const { conversations, blocks, users } = this.deps;
@@ -1613,6 +1699,18 @@ export class ConversationService {
     if (!other) throw notFound('Conversa não encontrada');
     return { conversation: await this.settle(conversation), memberIds: members, otherId, other };
   }
+}
+
+/** "Compartilhar o histórico" ao colocar alguém num grupo: ausente vale sim (como sempre foi). */
+export function parseShareHistory(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'boolean') throw validationError('Valor inválido', { shareHistory: 'Use true ou false' });
+  return value;
+}
+
+/** Quem entra sem o histórico só vê as mensagens a partir de agora (o aviso de entrada, gravado em seguida, aparece). */
+export async function hideHistoryFor(conversations: CoreDeps['conversations'], conversationId: string, userId: string, now: Date): Promise<void> {
+  await conversations.setCleared(conversationId, userId, new Date(now.getTime() - 1));
 }
 
 /** Pedaço da mensagem para o aviso: uma linha só, até 100 caracteres (sem cortar emoji ao meio), com "…" se passar. */

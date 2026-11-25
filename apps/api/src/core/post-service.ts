@@ -1,4 +1,6 @@
+import { communityForEvent, shareGroupEvent } from './community-service.ts';
 import { canOpenByInvite } from './event-invites.ts';
+import { EVENT_ADMINS_MAX, canManageEvent } from './event-admins.ts';
 import { canManageVenue, managedVenueIds } from './venue-access.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
@@ -47,6 +49,8 @@ export interface PostInput {
   event?: unknown;
   /** Votação de datas concluída da qual este evento é consequência (só quem organizou a votação). */
   datePollId?: unknown;
+  /** Evento criado dentro de um grupo de amigos (id da conversa do grupo): nasce privado e o convite vai para todos do grupo. */
+  groupId?: unknown;
 }
 
 export interface PostImageView {
@@ -247,7 +251,10 @@ export class PostService {
     const placeName = venue ? venue.name : (optionalText(input.placeName, 120, 'placeName', 'Nome do local') ?? placeVenue?.name.slice(0, 120) ?? null);
     const placeAddress = venue ? venue.address : (optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço') ?? placeVenue?.address?.slice(0, 200) ?? null);
     const event = this.parseEvent(input.event, placeName);
-    const eventPrivate = event !== null && this.parsePrivate(input.event);
+    // Evento no grupo de amigos: só quem está no grupo cria, e nasce privado (dá para abrir ao público depois, editando).
+    const community = input.groupId === undefined || input.groupId === null || input.groupId === '' ? undefined : await communityForEvent(this.deps, actorId, input.groupId);
+    if (community && (event === null || venue)) throw validationError('Só eventos são criados no grupo', { groupId: 'Crie um evento para o grupo' });
+    const eventPrivate = event !== null && (community !== undefined || this.parsePrivate(input.event));
     const eventExtras = event !== null ? await this.parseExtras(input.event) : [];
     const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
     // Evento criado pela pessoa já é o próprio evento; post de local já tem o local. Os demais vinculam um evento ou um rolê.
@@ -280,7 +287,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do local por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null, originGroupId: community?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       // Marcar alguém no evento já é convidar: aparece como convidado e abre o evento (mesmo privado).
@@ -288,6 +295,7 @@ export class PostService {
       await this.notifyTagged(actorId, postId, event?.title ?? null, tagIds);
     }
     if (poll && event) await this.linkPoll(poll, postId, event.title, actorId);
+    if (community && event) await shareGroupEvent(this.deps, actorId, community, { id: postId, title: event.title });
     const created = await posts.findById(postId);
     if (!created) throw notFound('Post não encontrado');
     return (await this.views(actorId, [created]))[0] as PostView;
@@ -508,7 +516,10 @@ export class PostService {
 
   async update(actorId: string, postId: unknown, input: PostEditInput): Promise<PostView> {
     const { post, images } = await this.seeable(actorId, postId);
-    if (post.authorId !== actorId) throw forbidden('Só quem publicou edita o post');
+    // Admin do evento edita o evento (não um post comum) e não muda quem vê.
+    const asAdmin = post.authorId !== actorId && post.eventTitle !== null && (await this.deps.posts.isEventAdmin(post.id, actorId));
+    if (post.authorId !== actorId && !asAdmin) throw forbidden('Só quem publicou edita o post');
+    if (asAdmin && input.event === null) throw forbidden('Só quem criou o evento pode transformá-lo em post');
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do local');
     const placeAddress = input.placeAddress === undefined ? post.placeAddress : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
@@ -536,11 +547,11 @@ export class PostService {
     if (!caption && images.length === 0 && event === null) throw validationError('Post vazio', { caption: 'Post sem foto precisa de um texto' });
     // "Quem vê" (público ou só convidados) muda na edição quando vier; virar post comum deixa público.
     const rawPrivate = input.event !== undefined && input.event !== null ? (input.event as { private?: unknown }).private : undefined;
-    const eventPrivate = event === null ? false : rawPrivate === undefined ? undefined : this.parsePrivate(input.event);
+    const eventPrivate = event === null ? false : rawPrivate === undefined || asAdmin ? undefined : this.parsePrivate(input.event);
     // Convidados novos: conferidos antes de salvar, para um erro não deixar a edição pela metade.
     const inviteIds = event === null ? [] : await this.validTags(actorId, input.inviteUserIds, 'inviteUserIds');
     const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, ...(eventPrivate === undefined ? {} : { eventPrivate }), editedAt: this.deps.clock.now() };
-    if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
+    if (!(await this.deps.posts.update(post.id, post.authorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
       await this.deps.meetups.renameForEventPost(post.id, event.title);
@@ -556,7 +567,7 @@ export class PostService {
    */
   async inviteToEvent(actorId: string, postId: unknown, userIds: unknown): Promise<{ invited: string[] }> {
     const { post } = await this.seeable(actorId, postId);
-    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento convida por aqui');
+    if (!(await canManageEvent(this.deps, actorId, post))) throw forbidden('Só quem organiza o evento convida por aqui');
     if (!post.eventTitle) throw validationError('Esse post não é um evento', { inviteUserIds: 'Só dá para convidar para um evento' });
     const ids = await this.validTags(actorId, userIds, 'inviteUserIds');
     return { invited: await this.inviteFriends(actorId, post.id, post.eventTitle, ids) };
@@ -564,7 +575,8 @@ export class PostService {
 
   /**
    * Desfaz um convite que ainda não foi aceito: some o convite, a marcação e o aviso no sino de quem foi convidado
-   * (a pessoa pode ser convidada de novo). Cancela quem organiza o evento (qualquer convite) ou quem mandou aquele convite.
+   * (a pessoa pode ser convidada de novo). Cancela o dono do evento (qualquer convite) ou quem mandou aquele convite (um admin
+   * do evento cancela os que ele mandou).
    * Quem já aceitou a marcação ou confirmou "Eu vou" não sai por aqui.
    */
   async cancelInvite(actorId: string, postId: unknown, userId: unknown): Promise<{ cancelled: true }> {
@@ -578,6 +590,50 @@ export class PostService {
     if (!(await this.deps.posts.removeInvite(post.id, userId))) throw notFound('Convite não encontrado');
     await this.deps.notifier.withdraw?.(userId, `post-tag:${post.id}`);
     return { cancelled: true };
+  }
+
+  /** Admins do evento (sem o dono). Vê quem pode abrir o evento; quem tem bloqueio com quem vê fica de fora. */
+  async listEventAdmins(viewerId: string, postId: unknown): Promise<{ admins: PublicProfile[] }> {
+    const { post } = await this.seeable(viewerId, postId);
+    if (post.eventTitle === null) return { admins: [] };
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    const ids = (await this.deps.posts.listEventAdmins(post.id)).map((a) => a.userId).filter((id) => id === viewerId || !hidden.has(id));
+    const byId = new Map((await this.deps.users.findProfilesByIds(ids)).map((p) => [p.userId, toPublicProfile(p)]));
+    return { admins: ids.flatMap((id) => byId.get(id) ?? []) };
+  }
+
+  /**
+   * O dono torna alguém admin do evento. Só quem vai ao evento ("Eu vou") ou aceitou o convite; o dono continua dono.
+   * O admin convida (também em evento privado), cancela os convites que mandou e edita o evento.
+   */
+  async addEventAdmin(actorId: string, postId: unknown, userId: unknown): Promise<{ admins: PublicProfile[] }> {
+    const { post } = await this.seeable(actorId, postId);
+    if (post.eventTitle === null) throw notFound('Evento não encontrado');
+    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento escolhe os admins');
+    if (typeof userId !== 'string' || userId === '' || userId.length > 64) throw notFound('Pessoa não encontrada');
+    if (userId === actorId) throw conflict('Você já é o dono do evento');
+    if (await this.deps.posts.isEventAdmin(post.id, userId)) return this.listEventAdmins(actorId, post.id);
+    if (!(await this.deps.users.findProfileById(userId)) || (await this.deps.blocks.existsEitherWay(actorId, userId))) throw notFound('Pessoa não encontrada');
+    const going = await this.deps.eventRoom.isGoing({ source: 'USER', id: post.id }, userId);
+    const accepted = (await this.deps.posts.tagsFor([post.id])).some((t) => t.userId === userId && t.status === 'ACCEPTED');
+    if (!going && !accepted) throw conflict('Só quem vai ao evento ou aceitou o convite pode ser admin');
+    if ((await this.deps.posts.listEventAdmins(post.id)).length >= EVENT_ADMINS_MAX) throw conflict(`O evento pode ter até ${EVENT_ADMINS_MAX} admins`);
+    if (await this.deps.posts.addEventAdmin(post.id, userId, actorId, this.deps.clock.now())) {
+      const who = (await this.deps.users.findProfileById(actorId))?.username ?? 'Alguém';
+      await this.deps.notifier.notify({ userId, type: 'EVENT_ADMIN', title: `${who} fez você admin do evento ${post.eventTitle}`, body: 'Agora você pode convidar pessoas e editar o evento', url: `/eventos/${post.id}`, dedupeKey: `event-admin:${post.id}`, actorId });
+    }
+    return this.listEventAdmins(actorId, post.id);
+  }
+
+  /** O dono tira alguém dos admins; o próprio admin também pode sair do papel. Os convites que ele mandou continuam valendo. */
+  async removeEventAdmin(actorId: string, postId: unknown, userId: unknown): Promise<{ admins: PublicProfile[] }> {
+    const { post } = await this.seeable(actorId, postId);
+    if (post.eventTitle === null) throw notFound('Evento não encontrado');
+    if (typeof userId !== 'string' || userId === '' || userId.length > 64) throw notFound('Admin não encontrado');
+    if (post.authorId !== actorId && userId !== actorId) throw forbidden('Só quem criou o evento tira os admins');
+    if (!(await this.deps.posts.removeEventAdmin(post.id, userId))) throw notFound('Admin não encontrado');
+    await this.deps.notifier.withdraw?.(userId, `event-admin:${post.id}`);
+    return this.listEventAdmins(actorId, post.id);
   }
 
   /** Convida (sem duplicar) e, só para quem é novo, cria a marcação e avisa. Quem tinha recusado volta a ter o convite pendente. */
@@ -604,7 +660,7 @@ export class PostService {
   /** Ajuste (recorte) de uma foto enviada do próprio post. */
   async replaceImage(actorId: string, postId: unknown, imageId: unknown, dataUrl: unknown): Promise<PostView> {
     const { post, images } = await this.seeable(actorId, postId);
-    if (post.authorId !== actorId) throw forbidden('Só quem publicou ajusta as fotos');
+    if (post.authorId !== actorId && !(post.eventTitle !== null && (await this.deps.posts.isEventAdmin(post.id, actorId)))) throw forbidden('Só quem publicou ajusta as fotos');
     const target = typeof imageId === 'string' ? images.find((i) => i.id === imageId) : undefined;
     if (!target || !target.isUpload) throw notFound('Foto não encontrada');
     const decoded = decodeImageDataUrl(dataUrl, POST_IMAGE_MAX_BYTES, '100 KB');
@@ -615,7 +671,7 @@ export class PostService {
   /** Troca a capa do próprio evento por uma foto enviada (a foto do lugar ou o vídeo que era a capa saem; as outras fotos ficam). */
   async setCover(actorId: string, postId: unknown, dataUrl: unknown): Promise<PostView> {
     const { post } = await this.seeable(actorId, postId);
-    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento troca a capa');
+    if (!(await canManageEvent(this.deps, actorId, post))) throw forbidden('Só quem organiza o evento troca a capa');
     if (post.eventTitle === null) throw notFound('Evento não encontrado');
     const decoded = decodeImageDataUrl(dataUrl, POST_IMAGE_MAX_BYTES, '100 KB');
     await this.deps.posts.setCover(post.id, this.deps.ids.next(), decoded.mime, new Uint8Array(decoded.bytes));

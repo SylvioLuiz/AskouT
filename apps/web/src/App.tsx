@@ -47,6 +47,7 @@ const MatchScreen = lazyWithReload(() => import('./screens/flash.tsx').then((m) 
 const DatePollCreateScreen = lazyWithReload(() => import('./components/date-poll-create.tsx').then((m) => ({ default: m.DatePollCreateScreen })));
 const ChatInfoScreen = lazyWithReload(() => import('./screens/chat-info.tsx').then((m) => ({ default: m.ChatInfoScreen })));
 const GroupScreen = lazyWithReload(() => import('./screens/group.tsx').then((m) => ({ default: m.GroupScreen })));
+const GroupsScreen = lazyWithReload(() => import('./screens/groups.tsx').then((m) => ({ default: m.GroupsScreen })));
 const VenueCalendarScreen = lazyWithReload(() => import('./screens/venue-calendar.tsx').then((m) => ({ default: m.VenueCalendarScreen })));
 const VenueOffersScreen = lazyWithReload(() => import('./screens/venue-offers.tsx').then((m) => ({ default: m.VenueOffersScreen })));
 const CheckinScreen = lazyWithReload(() => import('./screens/checkin.tsx').then((m) => ({ default: m.CheckinScreen })));
@@ -165,6 +166,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/conversas', render: () => <ConversationsRoute /> },
   { path: '/conversas/solicitacoes', render: () => <MessageRequestsScreen /> },
   { path: '/conversas/:id/info', render: (p) => <ChatInfoScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
+  { path: '/grupos', render: () => <GroupsScreen /> },
   { path: '/conversas/:id/grupo', render: (p) => <GroupScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id', render: (p) => <ConversationsRoute conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },

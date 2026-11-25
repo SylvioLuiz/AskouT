@@ -143,7 +143,10 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
     }
     setCamera('starting');
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false })
+      // Sem pedir proporção (largura e altura ideais juntas): o iPhone recortava a imagem para caber num
+      // quadrado e a tela ainda cortava os lados, dando um zoom enorme. Assim vem o quadro inteiro do
+      // sensor, no mesmo campo de visão da câmera do Instagram; o `max` só evita pegar 4K.
+      .getUserMedia({ video: { facingMode: facing, width: { ideal: 1920, max: 1920 }, height: { max: 1920 } }, audio: false })
       .then((s) => {
         if (cancelled) {
           s.getTracks().forEach((track) => track.stop());

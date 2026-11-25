@@ -8,7 +8,7 @@ import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '.
 import type { VoiceControl } from '../components/voice.tsx';
 import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { UsersIcon, ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb, galleryOf } from '../components/chat-media.tsx';
 import { ImageEditor } from '../components/image-editor.tsx';
 import { canEditImage } from '../lib/image-edit.ts';
@@ -74,6 +74,9 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   useTitle(split && activeId ? undefined : t('Conversas'));
   const [cameBack] = useState(() => Date.now() - chatLeftAt < BACK_WINDOW_MS);
   const list = useAsync(() => api.conversations(), []);
+  // Convites para grupos de amigos ainda sem resposta (o atalho "Grupos de amigos" mostra quantos). Falha aqui não atrapalha a lista.
+  const communities = useAsync(() => api.communities().catch(() => ({ items: [], invites: [] })), []);
+  const groupInvites = communities.data?.invites.length ?? 0;
   useLiveRefresh(list.reload, 5_000);
   useEffect(() => {
     if (list.data) announceChatsChanged();
@@ -135,6 +138,16 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
     >
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead title={t('Conversas')} />
+      <Link to="/grupos" className={`convrequests groupslink${groupInvites > 0 ? ' convrequests--unread' : ''}`}>
+        <span className="convrequests__icon" aria-hidden="true">
+          <UsersIcon />
+        </span>
+        <span className="convrequests__text">
+          <strong>{t('Grupos de amigos')}</strong>
+          <span>{groupInvites > 0 ? (groupInvites === 1 ? t('1 convite para um grupo') : t('{count} convites para grupos', { count: groupInvites })) : t('Seus grupos, convites e eventos de cada grupo')}</span>
+        </span>
+        {groupInvites > 0 ? <span className="convrow__count">{groupInvites > 9 ? '9+' : groupInvites}</span> : null}
+      </Link>
       {requestCount > 0 ? (
         <Link to="/conversas/solicitacoes" className={`convrequests${requestUnread > 0 ? ' convrequests--unread' : ''}`}>
           <span className="convrequests__icon" aria-hidden="true">
@@ -255,7 +268,7 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
           muted={prefsFor.muted}
           onClose={() => setPrefsFor(undefined)}
           onChanged={() => list.reload()}
-          remove={{ group: prefsFor.type === 'GROUP', onRemoved: () => list.reload() }}
+          remove={{ group: prefsFor.type === 'GROUP', community: prefsFor.community === true, left: prefsFor.left === true, onRemoved: () => list.reload() }}
         />
       ) : null}
     </div>
@@ -1674,7 +1687,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     }}
                   />
                   {/* Emoji e GIF sempre à mão, como a figurinha do Instagram: dá para mandar um GIF sem escrever nada. */}
-                  <CommentTools disabled={sending} closeKey={sentCount} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                  <CommentTools combined disabled={sending} closeKey={sentCount} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
                   {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
                     <>
                       {/* Escrevendo (ou com foto/GIF na fila): o canto vira o botão de enviar, como no Instagram. */}
@@ -1694,14 +1707,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     </>
                   ) : (
                     <span className="composer__tools">
-                      <button type="button" className="composer__tool" aria-label={t('Enviar arquivo (PDF, documento, planilha)')} disabled={sending} onClick={() => fileRef.current?.click()}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M20.5 11.5 12.6 19.4a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
-                        </svg>
-                      </button>
-                      <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
-                        <PhotoIcon />
-                      </button>
+                      <AttachMenu disabled={sending} onFile={() => fileRef.current?.click()} onGallery={() => galleryRef.current?.click()} />
                       <button
                         type="button"
                         className="composer__tool composer__mic"
@@ -1729,6 +1735,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </form>
           </div>
         </>
+      ) : data.left ? (
+        <LeftGroupBar conversationId={conversationId} />
       ) : data.request === 'INCOMING' && data.other ? (
         <MessageRequestBar conversationId={conversationId} other={data.other} onAccepted={view.reload} />
       ) : (
@@ -1798,5 +1806,89 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Grupo de que você saiu (ou que foi excluído): as mensagens até ali ficam para ler; excluir tira a conversa da sua lista. */
+function LeftGroupBar({ conversationId }: { conversationId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  async function forget() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await api.forgetConversation(conversationId);
+      navigate('/conversas');
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="leftbar" role="status">
+      <p className="muted">{t('Você não faz mais parte deste grupo. As mensagens até a sua saída continuam aqui para você.')}</p>
+      {problem ? <p className="sugcard__problem">{problem}</p> : null}
+      {confirming ? (
+        <Confirm danger question={t('Excluir esta conversa? Ela some da sua lista e as mensagens somem para você.')} confirmLabel={t('Excluir conversa')} busy={busy} onCancel={() => setConfirming(false)} onConfirm={() => void forget()} />
+      ) : (
+        <Button full variant="secondary" onClick={() => setConfirming(true)}>
+          {t('Excluir conversa')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** Um clipe só na barra de mensagem: toca e escolhe, num menu em cima, documento ou fotos e vídeos (como no WhatsApp). */
+function AttachMenu({ disabled, onFile, onGallery }: { disabled?: boolean; onFile: () => void; onGallery: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const esc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const choose = (pick: () => void) => {
+    setOpen(false);
+    pick();
+  };
+  return (
+    <span ref={rootRef} className="attachmenu">
+      <button type="button" className={`composer__tool${open ? ' composer__tool--on' : ''}`} aria-label={t('Anexar')} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20.5 11.5 12.6 19.4a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
+        </svg>
+      </button>
+      {open ? (
+        <span className="attachmenu__list" role="menu">
+          <button type="button" role="menuitem" className="attachmenu__item" onClick={() => choose(onFile)}>
+            <span className="attachmenu__icon attachmenu__icon--doc" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                <path d="M14 3v5h5M9 13h6M9 17h6" />
+              </svg>
+            </span>
+            {t('Documento')}
+          </button>
+          <button type="button" role="menuitem" className="attachmenu__item" onClick={() => choose(onGallery)}>
+            <span className="attachmenu__icon attachmenu__icon--media" aria-hidden="true">
+              <PhotoIcon />
+            </span>
+            {t('Fotos e vídeos')}
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }

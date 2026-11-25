@@ -1,3 +1,4 @@
+import { originGroupFor } from './community-service.ts';
 import { canOpenByInvite } from './event-invites.ts';
 import { VISITOR_ID } from './visitor.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
@@ -142,6 +143,10 @@ export interface EventPageView {
   attendees: PublicProfile[];
   owner: PublicProfile | null;
   isOwner: boolean;
+  /** Admins do evento de pessoa (sem o dono): convidam, cancelam os convites que mandaram e editam o evento. */
+  admins: PublicProfile[];
+  /** O visitante é admin do evento (não o dono). */
+  isAdmin: boolean;
   /** Quem tem story no ar neste evento (para o círculo no avatar). */
   storyUserIds: string[];
   /** O visitante pode publicar story: confirmou presença (ou é o dono) e o evento não acabou. */
@@ -160,6 +165,11 @@ export interface EventPageView {
   group: { conversationId: string; name: string } | null;
   /** Quem criou o evento (de pessoa) ainda não está num grupo dele: vê o botão para criar. */
   canCreateGroup: boolean;
+  /**
+   * Grupo de amigos onde o evento foi criado. Só aparece para quem está no grupo: para os outros (mesmo com o evento
+   * aberto ao público) o grupo de origem não existe.
+   */
+  originGroup: { conversationId: string; name: string } | null;
 }
 
 /** Pessoa convidada para um evento criado por uma pessoa. */
@@ -299,6 +309,9 @@ export class EventPageService {
 
     const isOwner = owner?.userId === viewerId;
     const iGo = isOwner || going.some((g) => g.userId === viewerId);
+    const adminIds = ref.source === 'USER' ? (await this.deps.posts.listEventAdmins(ref.id)).map((a) => a.userId) : [];
+    const shownAdminIds = adminIds.filter((u) => u === viewerId || !hidden.has(u));
+    const adminProfiles = new Map((await this.deps.users.findProfilesByIds(shownAdminIds)).map((p) => [p.userId, toPublicProfile(p)]));
     return {
       ...base.view,
       confirmedCount: ordered.length,
@@ -306,13 +319,21 @@ export class EventPageService {
       attendees,
       owner,
       isOwner,
+      admins: shownAdminIds.flatMap((u) => adminProfiles.get(u) ?? []),
+      isAdmin: adminIds.includes(viewerId),
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       // Evento sem data (em votação) ainda não acabou: dá para postar flash.
       canStory: (isOwner || iGo) && (base.view.endsAt === null || Date.parse(base.view.endsAt) > this.deps.clock.now().getTime()),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
       datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
       ...(await this.groupFor(viewerId, ref, isOwner)),
+      originGroup: ref.source === 'USER' ? await this.originGroupOf(viewerId, ref.id) : null,
     };
+  }
+
+  private async originGroupOf(viewerId: string, postId: string): Promise<EventPageView['originGroup']> {
+    const post = (await this.deps.posts.findById(postId))?.post;
+    return post ? originGroupFor(this.deps, viewerId, post) : null;
   }
 
   /** Grupo do evento em que o visitante está (só mostra conversa de que ele já faz parte) e se ele pode criar um. */
@@ -339,7 +360,7 @@ export class EventPageService {
 
   /**
    * Quem já foi convidado para o evento (marcado na criação ou que recebeu o cartão), para a folha de convidar mostrar
-   * "Convidado". O dono vê todos e quem convidou cada um; os demais veem só quem eles convidaram. Evento de local não tem convites.
+   * "Convidado". O dono vê todos e quem convidou cada um; os demais (admins do evento inclusive) veem só quem eles convidaram. Evento de local não tem convites.
    */
   async invites(viewerId: string, rawId: unknown): Promise<{ invites: EventInviteView[] }> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
@@ -398,12 +419,15 @@ export class EventPageService {
       attendees: [],
       owner,
       isOwner: false,
+      admins: [],
+      isAdmin: false,
       storyUserIds: [],
       canStory: false,
       goingOnProfile: false,
       datePollId: null,
       group: null,
       canCreateGroup: false,
+      originGroup: null,
     };
   }
 
@@ -424,7 +448,7 @@ export class EventPageService {
     return toPublicProfile(author);
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup'> }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'admins' | 'isAdmin' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup' | 'originGroup'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');

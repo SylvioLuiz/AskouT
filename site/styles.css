@@ -242,7 +242,7 @@ body.is-ready .intro__word span:nth-child(6) { transition-delay: 1.58s; }
 
 /* ---------- Manifesto ---------- */
 .manifesto { height: 260vh; position: relative; }
-.manifesto__sticky { position: sticky; top: 0; height: 100vh; display: grid; place-items: center; padding: 0 var(--pad); }
+.manifesto__sticky { position: sticky; top: 0; height: 100vh; height: 100svh; display: grid; place-items: center; padding: 0 var(--pad); }
 .manifesto__text {
   font-family: var(--display); text-transform: uppercase; line-height: 1.08;
   font-size: clamp(26px, 4vw, 66px); font-weight: 800; letter-spacing: -.02em; max-width: 19em; text-align: center;
@@ -621,10 +621,15 @@ body.is-ready .intro__word span:nth-child(6) { transition-delay: 1.58s; }
 
 /* ---------- Responsivo ---------- */
 @media (max-width: 900px) {
+  /* Celular: trechos "presos" mais curtos, pra rolar fluido e chegar logo nas próximas dobras */
+  .intro { height: 270vh; }
+  .manifesto { height: 190vh; }
+  .cardrev { height: 175vh; }
+  .chapter { padding-block: clamp(70px, 10vh, 120px); }
   .chapter__grid { grid-template-columns: 1fr; }
   .chapter--flip .chapter__copy { order: 0; }
   .toasts { right: 8px; top: 8px; }
-  .gallery { height: 380vh; }
+  .gallery { height: 290vh; }
   .gallery__head { top: 90px; }
   .gallery__track { padding-left: 8vw; padding-top: 16vh; gap: 28px; }
   .phone { width: min(62vw, 260px, 27svh); }

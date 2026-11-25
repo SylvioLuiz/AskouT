@@ -89,6 +89,9 @@ import type {
   FeedReactions,
   FeedSettings,
   GroupDetails,
+  CommunityDetails,
+  CommunityInvite,
+  CommunitySummary,
   GoingEvent,
   MeetupView,
   AlbumDetail,
@@ -312,7 +315,7 @@ export function createApi(deps: ApiDeps) {
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
     /** Compartilha um perfil: a conversa mostra o cartão do perfil (o servidor aplica privado e bloqueio). */
     sendProfile: (conversationId: string, username: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { profileUsername: username } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt?: string | null; endsAt?: string | null; dateByPoll?: boolean; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt?: string | null; endsAt?: string | null; dateByPoll?: boolean; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string; groupId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
     /** Gostos de rolê cadastrados pela gestão (cadastro, configurações e filtro do Explorar). */
@@ -391,6 +394,10 @@ export function createApi(deps: ApiDeps) {
     editPost: (postId: string, patch: PostEdit) => request<PostView>('PATCH', `/posts/${id(postId)}`, { body: patch }),
     inviteToEvent: (postId: string, userIds: string[]) => request<{ invited: string[] }>('POST', `/posts/${id(postId)}/invites`, { body: { userIds } }),
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
+    /** O dono torna admin do evento quem vai ou aceitou o convite. */
+    addEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('POST', `/posts/${id(postId)}/admins`, { body: { userId } }),
+    /** O dono tira um admin; o próprio admin também pode sair. */
+    removeEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('DELETE', `/posts/${id(postId)}/admins/${id(userId)}`),
     setPostCover: (postId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/cover`, { body: { image } }),
     adjustPostImage: (postId: string, imageId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/images/${id(imageId)}`, { body: { image } }),
     archivePost: (postId: string) => request<{ archived: true }>('POST', `/posts/${id(postId)}/archive`),
@@ -921,10 +928,20 @@ export function createApi(deps: ApiDeps) {
     shared: (conversationId: string) => request<SharedView>('GET', `/conversations/${id(conversationId)}/shared`),
     group: (conversationId: string) => request<GroupDetails>('GET', `/conversations/${id(conversationId)}/group`),
     deleteGroup: (conversationId: string) => request<{ deleted: true }>('DELETE', `/conversations/${id(conversationId)}/group`),
-    leaveGroup: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`),
+    leaveGroup: (conversationId: string, deleteChat = false) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`, { body: { deleteChat } }),
+    /** Exclui da sua lista a conversa de um grupo de que você saiu (ou que foi excluído). */
+    forgetConversation: (conversationId: string) => request<{ deleted: true }>('POST', `/conversations/${id(conversationId)}/forget`),
+    /** Grupos de amigos: seus grupos e os convites que você recebeu. */
+    communities: () => request<{ items: CommunitySummary[]; invites: CommunityInvite[] }>('GET', '/groups'),
+    community: (conversationId: string) => request<CommunityDetails>('GET', `/groups/${id(conversationId)}`),
+    createCommunity: (name: string, memberIds: string[]) => request<{ id: string; invited: number }>('POST', '/groups', { body: { name, memberIds } }),
+    inviteToCommunity: (conversationId: string, userIds: string[], shareHistory: boolean) => request<{ invited: number }>('POST', `/groups/${id(conversationId)}/invites`, { body: { userIds, shareHistory } }),
+    cancelCommunityInvite: (conversationId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/groups/${id(conversationId)}/invites/${id(userId)}`),
+    acceptCommunity: (conversationId: string) => request<{ id: string }>('POST', `/groups/${id(conversationId)}/accept`),
+    declineCommunity: (conversationId: string) => request<{ declined: true }>('POST', `/groups/${id(conversationId)}/decline`),
     setGroupAdmin: (conversationId: string, userId: string, admin: boolean) =>
       request<{ role: 'ADMIN' | 'MEMBER' }>('PUT', `/conversations/${id(conversationId)}/members/${id(userId)}/admin`, { body: { admin } }),
-    addGroupMembers: (conversationId: string, userIds: string[]) => request<{ added: number }>('POST', `/conversations/${id(conversationId)}/members`, { body: { userIds } }),
+    addGroupMembers: (conversationId: string, userIds: string[], shareHistory = true) => request<{ added: number }>('POST', `/conversations/${id(conversationId)}/members`, { body: { userIds, shareHistory } }),
     removeMember: (conversationId: string, userId: string) => request<{ ok: true }>('DELETE', `/conversations/${id(conversationId)}/members/${id(userId)}`),
     renameGroup: (conversationId: string, name: string) => request<{ name: string }>('PUT', `/conversations/${id(conversationId)}/group/name`, { body: { name } }),
     setGroupPhoto: (conversationId: string, image: string | null) => request<{ imageUrl: string | null }>('PUT', `/conversations/${id(conversationId)}/group/photo`, { body: { image } }),

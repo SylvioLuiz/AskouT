@@ -2001,6 +2001,60 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.conversations.participantIds(g.id)) ?? [], []);
       });
 
+      it('grupo de amigos: convites, sair guardando o histórico, excluir e eventos do grupo', async () => {
+        const { ana, bia, caio } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'Turma', ownerId: ana, now: at(1), community: true });
+        assert.equal(g.community, true);
+        assert.equal((await h.conversations.findById(g.id))?.community, true);
+        assert.equal(await h.conversations.addGroupInvite(g.id, bia, ana, at(2), false), true);
+        assert.equal(await h.conversations.addGroupInvite(g.id, bia, ana, at(3), true), false, 'o primeiro convite vale');
+        await h.conversations.addGroupInvite(g.id, caio, ana, at(4), true);
+        assert.deepEqual((await h.conversations.listGroupInvites(g.id)).map((i) => [i.userId, i.invitedById, i.shareHistory]), [[bia, ana, false], [caio, ana, true]]);
+        assert.deepEqual((await h.conversations.listGroupInvitesForUser(bia)).map((i) => i.conversationId), [g.id]);
+        assert.equal(await h.conversations.removeGroupInvite(g.id, caio), true);
+        assert.equal(await h.conversations.removeGroupInvite(g.id, caio), false);
+        assert.deepEqual(await h.conversations.listGroupInvitesForUser(caio), []);
+
+        await h.conversations.addParticipant(g.id, bia, at(5));
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: g.id, senderId: ana, kind: 'TEXT', body: 'antes', suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: at(6) });
+        await h.conversations.markLeft(g.id, bia, at(7));
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: g.id, senderId: ana, kind: 'TEXT', body: 'depois', suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: at(8) });
+        assert.deepEqual(await h.conversations.participantIds(g.id), [ana], 'quem saiu não é mais membro');
+        assert.equal((await h.conversations.leftAt(g.id, bia))?.getTime(), at(7).getTime());
+        assert.equal(await h.conversations.leftAt(g.id, ana), null);
+        const mine = (await h.conversations.listForUser(bia)).find((x) => x.conversation.id === g.id)!;
+        assert.equal(mine.leftAt?.getTime(), at(7).getTime(), 'continua na lista de quem saiu');
+        assert.equal(mine.lastMessage?.body, 'antes', 'só até sair');
+        assert.equal(mine.unread, 1);
+        assert.deepEqual(mine.participantIds, [ana]);
+        assert.deepEqual((await h.conversations.listReads(g.id)).map((r) => r.userId), [ana]);
+        assert.equal((await h.conversations.listForUser(ana)).find((x) => x.conversation.id === g.id)?.participantIds.length, 1);
+        // Voltar (convite aceito de novo): é membro outra vez.
+        await h.conversations.addParticipant(g.id, bia, at(9));
+        assert.equal(await h.conversations.leftAt(g.id, bia), null);
+        assert.equal((await h.conversations.listForUser(bia)).find((x) => x.conversation.id === g.id)?.leftAt ?? null, null);
+        // Excluir só vale para quem saiu; sem ninguém, o grupo some.
+        await h.conversations.forget(g.id, bia);
+        assert.ok((await h.conversations.participantIds(g.id))?.includes(bia), 'membro não é excluído por aqui');
+        await h.conversations.markLeft(g.id, bia, at(10));
+        await h.conversations.markLeft(g.id, ana, at(10));
+        await h.conversations.forget(g.id, bia);
+        assert.equal((await h.conversations.listForUser(bia)).some((x) => x.conversation.id === g.id), false);
+        assert.ok(await h.conversations.findById(g.id), 'ana ainda guarda o histórico');
+        await h.conversations.forget(g.id, ana);
+        assert.equal(await h.conversations.findById(g.id), undefined);
+
+        // Eventos criados no grupo.
+        const g2 = await h.conversations.createGroup({ id: randomUUID(), name: 'Vôlei', ownerId: ana, now: at(20), community: true });
+        const p1 = randomUUID();
+        const p2 = randomUUID();
+        await h.posts.create({ id: p1, authorId: ana, caption: null, placeName: null, placeAddress: null, eventTitle: 'Treino', eventStartsAt: at(100), eventEndsAt: at(101), eventKind: 'OTHER', eventPrivate: true, archivedAt: null, editedAt: null, createdAt: at(21), originGroupId: g2.id }, []);
+        await h.posts.create({ id: p2, authorId: ana, caption: null, placeName: null, placeAddress: null, eventTitle: 'Jogo', eventStartsAt: at(200), eventEndsAt: at(201), eventKind: 'OTHER', eventPrivate: true, archivedAt: null, editedAt: null, createdAt: at(22), originGroupId: g2.id }, []);
+        assert.deepEqual((await h.posts.listByOriginGroup(g2.id)).map((r) => r.post.id), [p2, p1]);
+        assert.equal((await h.posts.findById(p1))?.post.originGroupId, g2.id);
+        assert.deepEqual(await h.posts.listByOriginGroup(randomUUID()), []);
+      });
+
       it('encontro: convidar de novo, mudar título/estado e sair dos encontros do grupo', async () => {
         const { ana, bia, caio, e } = await setup();
         const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });

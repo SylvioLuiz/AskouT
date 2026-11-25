@@ -287,6 +287,8 @@ export interface ConversationRecord {
   imageUrl: string | null;
   /** Grupo criado para um evento de pessoa (post): pela página do evento ou pela votação da data. */
   eventPostId?: string | null;
+  /** Grupo de amigos (turma): só entra quem aceita o convite, e os eventos criados nele já convidam todos. */
+  community?: boolean;
   /** Só DIRECT: solicitação de mensagem pendente para esta pessoa (nula = conversa normal). */
   requestToId?: string | null;
   /** Quem recebeu a solicitação recusou: some para ela até chegar mensagem nova. */
@@ -371,6 +373,8 @@ export interface ConversationSummaryRecord {
   muted?: boolean;
   /** Quando quem pediu a lista limpou/apagou a conversa (mensagens até aí não aparecem para ela). */
   clearedAt?: Date | null;
+  /** Quem pediu a lista saiu do grupo e guardou o histórico até aqui (nulo: é membro). */
+  leftAt?: Date | null;
 }
 
 // ---------- Lugares e eventos ----------
@@ -528,7 +532,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -602,6 +606,18 @@ export interface PostRecord {
   placeVenueId?: string | null;
   /** Evento vinculado ao post (id de um evento de local ou de um post que é evento). */
   linkedEventId?: string | null;
+  /** Evento criado dentro de um grupo de amigos: id da conversa do grupo. Só quem está no grupo vê esse vínculo. */
+  originGroupId?: string | null;
+}
+
+/** Convite pendente para entrar num grupo de amigos (pela conversa do grupo). */
+export interface GroupInviteRecord {
+  conversationId: string;
+  userId: string;
+  invitedById: string | null;
+  /** Quem entrar vê as mensagens de antes de entrar. Falso: só o que vier depois. */
+  shareHistory: boolean;
+  createdAt: Date;
 }
 
 export interface PostImageRecord {
@@ -832,6 +848,14 @@ export type PostKindFilter = 'EVENT' | 'POST';
 export type PostTagStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
 /** Convite para um evento criado por uma pessoa. `invitedById` nulo: quem convidou apagou a conta. */
+/** Admin de um evento criado por pessoa (o dono promove; o dono continua dono). */
+export interface EventAdminRecord {
+  postId: string;
+  userId: string;
+  addedById: string | null;
+  createdAt: Date;
+}
+
 export interface EventInviteRecord {
   postId: string;
   userId: string;

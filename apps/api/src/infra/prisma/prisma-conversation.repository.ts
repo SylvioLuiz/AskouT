@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { DirectActivityRow, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import type { DirectActivityRow, GroupInviteRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { DELETED_BODY } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
@@ -49,7 +49,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; venueId?: string | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; venueId?: string | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null; community?: boolean } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -59,6 +59,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
   eventPostId: c.group?.eventPostId ?? null,
+  ...(c.group ? { community: c.group.community === true } : {}),
   ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null, venueId: c.venueId ?? null } : {}),
   createdAt: c.createdAt,
 });
@@ -187,7 +188,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     return rows.length > 0 ? rows.map((r) => r.userId) : undefined;
   }
 
-  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord> {
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string; community?: boolean }): Promise<ConversationRecord> {
     const groupId = randomUUID();
     await this.prisma.group.create({
       data: {
@@ -195,18 +196,75 @@ export class PrismaConversationRepository implements ConversationRepository {
         ownerId: input.ownerId,
         name: input.name,
         ...(input.eventPostId ? { eventPostId: input.eventPostId } : {}),
+        community: input.community === true,
         createdAt: input.now,
         members: { create: [{ userId: input.ownerId, role: 'OWNER', joinedAt: input.now }] },
         conversation: { create: { id: input.id, type: 'GROUP', createdAt: input.now, participants: { create: [{ userId: input.ownerId }] } } },
       },
     });
-    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, createdAt: input.now };
+    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, community: input.community === true, createdAt: input.now };
+  }
+
+  private async groupIdOf(conversationId: string): Promise<string | null> {
+    if (!isUuid(conversationId)) return null;
+    return (await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } }))?.groupId ?? null;
+  }
+
+  async addGroupInvite(conversationId: string, userId: string, invitedById: string, now: Date, shareHistory: boolean): Promise<boolean> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId || !isUuid(userId)) return false;
+    const created = await this.prisma.groupInvite.createMany({ data: [{ groupId, userId, invitedById: isUuid(invitedById) ? invitedById : null, shareHistory, createdAt: now }], skipDuplicates: true });
+    return created.count > 0;
+  }
+
+  async removeGroupInvite(conversationId: string, userId: string): Promise<boolean> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId || !isUuid(userId)) return false;
+    return (await this.prisma.groupInvite.deleteMany({ where: { groupId, userId } })).count > 0;
+  }
+
+  async listGroupInvites(conversationId: string): Promise<GroupInviteRecord[]> {
+    const groupId = await this.groupIdOf(conversationId);
+    if (!groupId) return [];
+    const rows = await this.prisma.groupInvite.findMany({ where: { groupId }, orderBy: [{ createdAt: 'asc' }, { userId: 'asc' }], take: 500 });
+    return rows.map((r) => ({ conversationId, userId: r.userId, invitedById: r.invitedById, shareHistory: r.shareHistory, createdAt: r.createdAt }));
+  }
+
+  async listGroupInvitesForUser(userId: string): Promise<GroupInviteRecord[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.groupInvite.findMany({ where: { userId }, include: { group: { select: { conversation: { select: { id: true } } } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return rows.flatMap((r) => (r.group.conversation ? [{ conversationId: r.group.conversation.id, userId: r.userId, invitedById: r.invitedById, shareHistory: r.shareHistory, createdAt: r.createdAt }] : []));
   }
 
   async groupIdsForEventPost(postId: string): Promise<string[]> {
     if (!isUuid(postId)) return [];
     const rows = await this.prisma.conversation.findMany({ where: { group: { eventPostId: postId } }, select: { id: true }, orderBy: { createdAt: 'asc' } });
     return rows.map((r) => r.id);
+  }
+
+  async markLeft(conversationId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation?.groupId) return;
+    const groupId = conversation.groupId;
+    await this.prisma.$transaction(async (tx) => {
+      const removed = await tx.groupMember.deleteMany({ where: { groupId, userId } });
+      if (removed.count > 0) await tx.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { leftAt: at } });
+    });
+  }
+
+  async leftAt(conversationId: string, userId: string): Promise<Date | null> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return null;
+    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { leftAt: true } });
+    return row?.leftAt ?? null;
+  }
+
+  async forget(conversationId: string, userId: string): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const removed = await this.prisma.conversationParticipant.deleteMany({ where: { conversationId, userId, leftAt: { not: null } } });
+    if (removed.count === 0) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true, _count: { select: { participants: true } } } });
+    if (conversation?.groupId && conversation._count.participants === 0) await this.prisma.group.delete({ where: { id: conversation.groupId } });
   }
 
   async removeParticipant(conversationId: string, userId: string): Promise<void> {
@@ -262,7 +320,8 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
     await this.prisma.$transaction(async (tx) => {
-      await tx.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId, userId } }, create: { conversationId, userId }, update: {} });
+      // Quem tinha saído guardando o histórico volta a ser membro.
+      await tx.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId, userId } }, create: { conversationId, userId }, update: { leftAt: null } });
       if (conversation?.groupId) {
         await tx.groupMember.upsert({ where: { groupId_userId: { groupId: conversation.groupId, userId } }, create: { groupId: conversation.groupId, userId, joinedAt: now }, update: {} });
       }
@@ -274,7 +333,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     const mine = await this.prisma.conversationParticipant.findMany({
       where: { userId },
       include: {
-        conversation: { include: { group: true, participants: { select: { userId: true } } } },
+        conversation: { include: { group: true, participants: { select: { userId: true, leftAt: true } } } },
       },
     });
     // Por conversa há dois acessos ao banco (não lidas e última mensagem). Em paralelo: antes eram em fila,
@@ -282,13 +341,17 @@ export class PrismaConversationRepository implements ConversationRepository {
     const built = await Promise.all(
       mine.map(async (p): Promise<ConversationSummaryRecord | undefined> => {
         const c = p.conversation;
-        const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
+        // Membros de verdade: quem saiu guardando o histórico não conta.
+        const ids = c.participants.filter((x: { leftAt: Date | null }) => x.leftAt === null).map((x: { userId: string }) => x.userId).sort();
         if (c.type === 'DIRECT' && ids.length !== 2) return undefined;
-        const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt ? { createdAt: { gt: p.clearedAt } } : {}) };
+        // Quem saiu do grupo vê só até quando saiu.
+        const window = { ...(p.clearedAt ? { gt: p.clearedAt } : {}), ...(p.leftAt ? { lte: p.leftAt } : {}) };
+        const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt || p.leftAt ? { createdAt: window } : {}) };
         const lastReadFloor = [p.lastReadAt, p.clearedAt].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
+        const unreadWindow = { ...(lastReadFloor ? { gt: lastReadFloor } : {}), ...(p.leftAt ? { lte: p.leftAt } : {}) };
         const [unread, last] = await Promise.all([
           this.prisma.message.count({
-            where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor ? { createdAt: { gt: lastReadFloor } } : {}) },
+            where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor || p.leftAt ? { createdAt: unreadWindow } : {}) },
           }),
           this.prisma.message.findFirst({ where: { conversationId: c.id, ...visible }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }),
         ]);
@@ -300,6 +363,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           pinnedAt: p.pinnedAt,
           muted: p.muted,
           clearedAt: p.clearedAt,
+          leftAt: p.leftAt,
         };
       }),
     );
@@ -482,7 +546,7 @@ export class PrismaConversationRepository implements ConversationRepository {
 
   async listReads(conversationId: string): Promise<{ userId: string; lastReadAt: Date | null }[]> {
     if (!isUuid(conversationId)) return [];
-    return this.prisma.conversationParticipant.findMany({ where: { conversationId }, select: { userId: true, lastReadAt: true } });
+    return this.prisma.conversationParticipant.findMany({ where: { conversationId, leftAt: null }, select: { userId: true, lastReadAt: true } });
   }
 
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {

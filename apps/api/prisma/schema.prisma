@@ -227,6 +227,7 @@ model User {
 
   ownedGroups  Group[]       @relation("GroupOwner")
   groupMembers GroupMember[]
+  groupInvites GroupInvite[] @relation("GroupInvitesReceived")
 
   conversationParticipations ConversationParticipant[]
   messages                   Message[]
@@ -266,6 +267,7 @@ model User {
   postTags          PostTag[]
   eventInvitesReceived EventInvite[] @relation("EventInvitesReceived")
   eventInvitesSent     EventInvite[] @relation("EventInvitesSent")
+  eventAdminOf         EventAdmin[]  @relation("EventAdmins")
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
   postReports       PostReport[]  @relation("PostReports")
@@ -390,6 +392,8 @@ model Group {
   imageUrl  String?
   /// Grupo criado para um evento de pessoa (pela página do evento ou pela votação da data). Liga pelo ID: o nome do evento pode mudar.
   eventPostId String? @db.Uuid
+  /// Grupo de amigos (turma): a pessoa só entra quando aceita o convite, e dentro dele se criam eventos que já convidam todos.
+  community Boolean @default(false)
   createdAt DateTime @default(now())
 
   owner   User          @relation("GroupOwner", fields: [ownerId], references: [id])
@@ -397,8 +401,25 @@ model Group {
   members GroupMember[]
   meetings Meeting[]
   conversation Conversation?
+  invites GroupInvite[]
 
   @@index([eventPostId])
+}
+
+/// Convite pendente para entrar num grupo de amigos. Aceitar coloca a pessoa no grupo e apaga o convite; recusar só apaga.
+model GroupInvite {
+  groupId     String   @db.Uuid
+  userId      String   @db.Uuid
+  invitedById String?  @db.Uuid
+  /// Quem convidou escolheu mostrar as mensagens anteriores do grupo a quem entrar. Falso: a pessoa só vê o que vier depois.
+  shareHistory Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation("GroupInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
 }
 
 model GroupMember {
@@ -511,6 +532,8 @@ model ConversationParticipant {
   muted          Boolean   @default(false)
   /// Cor escolhida para a conversa (só para essa pessoa); nula = cor padrão do app.
   color          String?
+  /// Saiu do grupo de amigos (ou o grupo foi encerrado): continua vendo as mensagens até aqui, sem enviar, até excluir a conversa.
+  leftAt         DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1057,12 +1080,15 @@ model Post {
   placeVenueId String?  @db.Uuid
   /// Evento ao qual o post (foto, vídeo ou só texto) está vinculado: id de um PlaceEvent ou de um Post que é evento. Sem chave estrangeira; se o evento sumir, o vínculo só deixa de aparecer.
   linkedEventId String? @db.Uuid
+  /// Evento criado dentro de um grupo de amigos: id da conversa do grupo. Sem chave estrangeira; só quem está no grupo vê esse vínculo.
+  originGroupId String? @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)
   images PostImage[]
   tags   PostTag[]
   invites EventInvite[]
+  admins  EventAdmin[]
   eventGroups Group[] @relation("EventGroups")
   likes    PostLike[]
   comments PostComment[]
@@ -1080,6 +1106,7 @@ model Post {
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])
   @@index([linkedEventId, createdAt])
+  @@index([originGroupId, createdAt])
 }
 
 // Foto enviada: `mime` e `data`. Foto do lugar: só `placePhotoRef` (o servidor busca no Google na hora de mostrar).
@@ -1211,6 +1238,22 @@ model EventInvite {
   post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User  @relation("EventInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
   invitedBy User? @relation("EventInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+/// Admin de um evento criado por pessoa: o dono promove quem vai (ou aceitou o convite) e pode tirar depois. O dono continua dono.
+/// O admin convida (também em evento privado), cancela os convites que mandou e edita o evento; não apaga, não arquiva nem muda quem vê.
+model EventAdmin {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  /// Quem promoveu (o dono). Sem chave estrangeira: só para registro.
+  addedById String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation("EventAdmins", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([postId, userId])
   @@index([userId])
