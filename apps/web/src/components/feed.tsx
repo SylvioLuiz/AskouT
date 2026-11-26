@@ -954,7 +954,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
       ) : null}
       {bellError ? <Notice tone="error">{bellError}</Notice> : null}
       {settings?.canPost ? (
-        <div className="feedsheet">
+        <div className="feedcompose">
           {me ? <Avatar profile={me} size={40} /> : null}
           <button type="button" className="feedcompose__field" onClick={() => setSheet('compose')}>
             {settings.isModerator ? t('Escreva um aviso ou poste fotos do local…') : t('Poste fotos do rolê ou deixe um recado…')}
