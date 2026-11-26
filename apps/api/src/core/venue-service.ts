@@ -584,14 +584,14 @@ export class VenueService {
    * Marca ou tira o "Adiado" de um evento do local (quem administra) sem mudar a data. Marcar aqui é adiado sem nova data:
    * a data antiga fica guardada e os lembretes param. A nova data vem pela edição. Avisa quem vai.
    */
-  async setEventPostponed(userId: string, venueId: unknown, eventId: unknown, postponed: unknown): Promise<VenueEventView> {
+  async setEventPostponed(userId: string, venueId: unknown, eventId: unknown, postponed: unknown, dateSet?: unknown): Promise<VenueEventView> {
     const venue = await this.managedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
     if (typeof postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
     const event = current.event;
     const was = placePostponed(event);
-    const decided = decidePostponed({ startsAt: event.startsAt, postponed: was }, { startsAt: event.startsAt, postponed }, this.deps.clock.now());
+    const decided = decidePostponed({ startsAt: event.startsAt, postponed: was }, { startsAt: event.startsAt, postponed, ...(typeof dateSet === 'boolean' ? { dateSet } : {}) }, this.deps.clock.now());
     if (!samePostponed(was, decided.state)) {
       if (!(await this.deps.places.setEventPostponed(venue.id, event.id, decided.state))) throw notFound('Evento não encontrado');
       event.postponedAt = decided.state.at;

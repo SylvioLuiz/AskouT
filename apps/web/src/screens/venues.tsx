@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
-import { EventDates, PostponeQuestion } from '../components/event-dates.tsx';
+import { EventDates, PostponeChoice, PostponeQuestion } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { PlaceSearchMore } from '../components/place-search-more.tsx';
@@ -718,11 +718,11 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  async function togglePostponed() {
+  async function togglePostponed(dateSet?: boolean) {
     setBusy(true);
     setError(undefined);
     try {
-      await api.setVenueEventPostponed(venueId, event.id, !event.postponed);
+      await api.setVenueEventPostponed(venueId, event.id, !event.postponed, dateSet);
       onChanged();
     } catch (failure) {
       setError(toApiError(failure).message);
@@ -757,11 +757,14 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
         {event.sample ? <SampleBadge /> : null}
       </div>
       {askPostpone ? (
-        <Confirm
-          question={t('Adiar este evento? Ele fica como adiado, sem nova data, e quem vai recebe um aviso. Quando tiver a nova data, é só editar o evento.')}
-          confirmLabel={t('Adiar')}
+        <PostponeChoice
+          dateLabel={formatWhen(event.startsAt, event.endsAt, now)}
           busy={busy}
-          onConfirm={() => void togglePostponed().then(() => setAskPostpone(false))}
+          onChoose={(dateSet) => void togglePostponed(dateSet).then(() => setAskPostpone(false))}
+          onPickDate={() => {
+            setAskPostpone(false);
+            onEdit();
+          }}
           onCancel={() => setAskPostpone(false)}
         />
       ) : asking ? (

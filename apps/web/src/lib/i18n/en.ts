@@ -3922,4 +3922,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Avisos de publicações novas desligados.": "New post notifications turned off.",
   "Avisos de publicações ligados": "Post notifications on",
   "Avisar publicações novas": "Notify me of new posts",
+  "Adiar o evento? Quem vai recebe um aviso.": "Postpone the event? Everyone going gets a notice.",
+  "A nova data já é a atual ({date})": "The new date is already set ({date})",
+  "Escolher a nova data": "Pick the new date",
+  "Ainda sem nova data": "No new date yet",
 };

@@ -3923,4 +3923,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Avisos de publicações novas desligados.": "Avisos de publicaciones nuevas desactivados.",
   "Avisos de publicações ligados": "Avisos de publicaciones activados",
   "Avisar publicações novas": "Avisarme de publicaciones nuevas",
+  "Adiar o evento? Quem vai recebe um aviso.": "¿Aplazar el evento? Quienes van reciben un aviso.",
+  "A nova data já é a atual ({date})": "La nueva fecha ya es la actual ({date})",
+  "Escolher a nova data": "Elegir la nueva fecha",
+  "Ainda sem nova data": "Aún sin nueva fecha",
 };

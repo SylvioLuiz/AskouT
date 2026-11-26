@@ -27,10 +27,11 @@ export type EventChange = { kind: 'POSTPONED'; startsAt: Date | null } | { kind:
 /**
  * Novo estado do adiado e o que avisar.
  * `postponed`: true marca (ou mantém) adiado; false tira; ausente mantém, a não ser que a data mude (aí tira).
+ * `dateSet`: adiando sem mudar a data, a data atual já é a nova (mostra "Adiado para"); sem ele, é adiado sem nova data.
  */
 export function decidePostponed(
   current: { startsAt: Date; postponed: PostponedState },
-  next: { startsAt: Date; postponed?: boolean },
+  next: { startsAt: Date; postponed?: boolean; dateSet?: boolean },
   now: Date,
 ): { state: PostponedState; change: EventChange | null } {
   const rescheduled = next.startsAt.getTime() !== current.startsAt.getTime();
@@ -39,10 +40,13 @@ export function decidePostponed(
   let state: PostponedState;
   if (!want) state = { at: null, from: null };
   else if (rescheduled) state = { at: was ? current.postponed.at : now, from: current.postponed.from ?? current.startsAt };
+  else if (next.dateSet !== undefined) state = { at: was ? current.postponed.at : now, from: next.dateSet ? (current.postponed.from ?? current.startsAt) : null };
   else state = was ? current.postponed : { at: now, from: null };
+  const tbdBefore = was && current.postponed.from === null;
+  const tbdAfter = state.at !== null && state.from === null;
   let change: EventChange | null = null;
   if (rescheduled) change = want ? { kind: 'POSTPONED', startsAt: next.startsAt } : { kind: 'RESCHEDULED', startsAt: next.startsAt };
-  else if (want && !was) change = { kind: 'POSTPONED', startsAt: null };
+  else if (want && (!was || tbdBefore !== tbdAfter)) change = { kind: 'POSTPONED', startsAt: tbdAfter ? null : next.startsAt };
   else if (!want && was) change = { kind: 'UNPOSTPONED', startsAt: next.startsAt };
   return { state, change };
 }

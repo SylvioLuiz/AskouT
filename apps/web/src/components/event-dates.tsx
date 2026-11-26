@@ -50,3 +50,27 @@ export function PostponeQuestion({ value, onChange }: { value: boolean | undefin
     </div>
   );
 }
+
+/**
+ * Adiar sem passar pela edição: a data atual já é a nova (mostra "Adiado para" ela), escolher a nova data (abre a edição)
+ * ou ainda sem nova data (fica "a definir"). Quem vai recebe um aviso.
+ */
+export function PostponeChoice({ dateLabel, busy, onChoose, onPickDate, onCancel }: { dateLabel: string; busy: boolean; onChoose: (dateSet: boolean) => void; onPickDate: () => void; onCancel: () => void }) {
+  return (
+    <div className="evpostpone" role="group" aria-labelledby="evpostpone-c">
+      <strong id="evpostpone-c">{t('Adiar o evento? Quem vai recebe um aviso.')}</strong>
+      <Button full variant="secondary" loading={busy} onClick={() => onChoose(true)}>
+        {t('A nova data já é a atual ({date})', { date: dateLabel })}
+      </Button>
+      <Button full variant="secondary" disabled={busy} onClick={onPickDate}>
+        {t('Escolher a nova data')}
+      </Button>
+      <Button full variant="secondary" disabled={busy} onClick={() => onChoose(false)}>
+        {t('Ainda sem nova data')}
+      </Button>
+      <Button full variant="quiet" disabled={busy} onClick={onCancel}>
+        {t('Cancelar')}
+      </Button>
+    </div>
+  );
+}

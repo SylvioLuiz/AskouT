@@ -149,3 +149,22 @@ test('evento do local: nova data como adiamento', async () => {
   assert.equal(updated.postponedFrom, start.toISOString());
   assert.match((await updates(w, ana))[0]!.title, /foi adiado/);
 });
+
+test('adiar pelo menu dizendo que a data atual já é a nova mostra "Adiado para" a data', async () => {
+  const { w, ana, caio, post, start } = await userEvent();
+  const view = await w.core.posts.setPostponed(ana, post.id, true, true);
+  assert.equal(view.event?.postponed, true);
+  assert.equal(view.event?.postponedFrom, start.toISOString(), 'tem data: não fica "a definir"');
+  const notes = await updates(w, caio);
+  assert.match(notes[0]!.body, /Nova data/);
+  // Quem já tinha adiado sem data e depois diz que a data atual é a nova também passa a mostrar a data.
+  const other = await userEvent();
+  await other.w.core.posts.setPostponed(other.ana, other.post.id, true);
+  other.w.clock.tick(1000);
+  const fixed = await other.w.core.posts.setPostponed(other.ana, other.post.id, true, true);
+  assert.equal(fixed.event?.postponedFrom, other.start.toISOString());
+  assert.equal((await updates(other.w, other.caio)).length, 2);
+  // Lembretes seguem pela data.
+  const near = await other.w.eventRoom.listGoingStartingBetween(new Date(other.start.getTime() - H), other.start, 50);
+  assert.ok(near.some((g) => g.ref.id === other.post.id));
+});

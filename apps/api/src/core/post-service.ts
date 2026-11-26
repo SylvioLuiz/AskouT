@@ -582,14 +582,14 @@ export class PostService {
    * Marca ou tira o "Adiado" do evento (dono ou admin) sem mudar a data. Marcar aqui é adiado sem nova data: a data antiga
    * fica guardada e os lembretes param. A nova data vem pela edição. Avisa quem vai nas duas direções.
    */
-  async setPostponed(actorId: string, postId: unknown, postponed: unknown): Promise<PostView> {
+  async setPostponed(actorId: string, postId: unknown, postponed: unknown, dateSet?: unknown): Promise<PostView> {
     const { post } = await this.seeable(actorId, postId);
     if (!post.eventTitle) throw notFound('Evento não encontrado');
     if (!(await canManageEvent(this.deps, actorId, post))) throw forbidden('Só quem organiza o evento pode adiar');
     if (typeof postponed !== 'boolean') throw validationError('Escolha se o evento está adiado', { postponed: 'Use true ou false' });
     if (!post.eventStartsAt) throw conflict('O evento ainda está sem data: a votação decide quando vai ser');
     const current = postponedOf(post);
-    const decided = decidePostponed({ startsAt: post.eventStartsAt, postponed: current }, { startsAt: post.eventStartsAt, postponed }, this.deps.clock.now());
+    const decided = decidePostponed({ startsAt: post.eventStartsAt, postponed: current }, { startsAt: post.eventStartsAt, postponed, ...(typeof dateSet === 'boolean' ? { dateSet } : {}) }, this.deps.clock.now());
     if (!samePostponed(current, decided.state)) {
       if (!(await this.deps.posts.setEventPostponed(post.id, decided.state))) throw notFound('Evento não encontrado');
     }

@@ -11,10 +11,11 @@ import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventInviteSheet, PendingInvites } from '../components/event-invite-picker.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
+import { PostponeChoice } from '../components/event-dates.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
-import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
+import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
 import { AlbumContent } from './albums.tsx';
 import { api, session } from '../client.ts';
 import { useIsVisitor, useOptionalUser } from '../auth.tsx';
@@ -98,11 +99,11 @@ function EventMenuSheet({ page, onShare, onEdit, onChanged, onClose }: { page: E
   // Adiar só vale para evento com data (o que está em votação já está sem data).
   const canPostpone = canEdit && page.startsAt !== null;
 
-  async function setPostponed(postponed: boolean) {
+  async function setPostponed(postponed: boolean, dateSet?: boolean) {
     setMessage(undefined);
     setPostponing(true);
     try {
-      await api.setEventPostponed(page.id, postponed);
+      await api.setEventPostponed(page.id, postponed, dateSet);
       onChanged();
       onClose();
     } catch (failure) {
@@ -131,6 +132,12 @@ function EventMenuSheet({ page, onShare, onEdit, onChanged, onClose }: { page: E
           <EditIcon /> {t('Editar evento')}
         </Button>
       ) : null}
+      {/* Adiado sem nova data: a data atual pode já ser a nova. */}
+      {canPostpone && page.postponed && !page.postponedFrom ? (
+        <Button full variant="secondary" loading={postponing} onClick={() => void setPostponed(true, true)}>
+          <CalendarIcon /> {t('A nova data já é a atual ({date})', { date: eventLongDate(page.startsAt, null) })}
+        </Button>
+      ) : null}
       {canPostpone && page.postponed ? (
         <Button full variant="secondary" loading={postponing} onClick={() => void setPostponed(false)}>
           <CalendarIcon /> {t('Tirar o adiado (manter a data)')}
@@ -138,11 +145,11 @@ function EventMenuSheet({ page, onShare, onEdit, onChanged, onClose }: { page: E
       ) : null}
       {canPostpone && !page.postponed ? (
         askPostpone ? (
-          <Confirm
-            question={t('Adiar o evento? Ele fica como adiado, sem nova data, e quem vai recebe um aviso. Quando tiver a nova data, é só editar o evento.')}
-            confirmLabel={t('Adiar')}
+          <PostponeChoice
+            dateLabel={eventLongDate(page.startsAt, null)}
             busy={postponing}
-            onConfirm={() => void setPostponed(true)}
+            onChoose={(dateSet) => void setPostponed(true, dateSet)}
+            onPickDate={() => void edit()}
             onCancel={() => setAskPostpone(false)}
           />
         ) : (
@@ -874,7 +881,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                         {time.main}
                         {time.sub ? ` ${time.sub}` : ''}
                       </p>
-                      {postponed && e.postponedFrom ? <p className="evinfo__sub evinfo__old">{t('Data anterior: {date}', { date: eventLongDate(e.postponedFrom, null) })}</p> : null}
+                      {postponed && e.postponedFrom && e.postponedFrom !== e.startsAt ? <p className="evinfo__sub evinfo__old">{t('Data anterior: {date}', { date: eventLongDate(e.postponedFrom, null) })}</p> : null}
                       <button type="button" className="evinfo__more" onClick={addToAgenda}>
                         {t('Adicionar à agenda')}
                       </button>
