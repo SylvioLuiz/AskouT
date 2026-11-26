@@ -4190,6 +4190,12 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .mentionlist { display: flex; flex-direction: column; margin: 0 0 8px; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
 .mentionlist__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .mentionlist__item:hover, .mentionlist__item:focus-visible { background: var(--brand-soft); outline: none; }
+.mentionlist__item--active { background: var(--brand-soft); }
+/* @menção no chat em grupo: lista acima do campo e o nome destacado no balão. */
+.chat__mentions { padding: 8px 16px 0; background: var(--bg); }
+.chat__mentions .mentionlist { margin: 0; max-height: 40vh; overflow-y: auto; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.bubble__mention { color: inherit; font-weight: 700; text-decoration: none; }
+.bubble:not(.bubble--mine) .bubble__mention { color: var(--brand-text); }
 .comments__form { margin-top: 8px; }
 .comments__empty { margin: 8px 0 16px; text-align: left; color: var(--muted); }
 .commentbox { position: relative; display: flex; align-items: center; }

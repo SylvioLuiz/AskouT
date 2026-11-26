@@ -15,10 +15,11 @@ export type NotificationFilter = NotificationFilterClause[];
 
 /**
  * Menção num comentário de post é gravada como POST_COMMENT com chave `comment-mention:`; o comentário no seu post,
- * com `post-comment:`. Por isso "Menções" e "Comentários" olham a chave além do tipo.
+ * com `post-comment:`. Por isso "Menções" e "Comentários" olham a chave além do tipo. A @menção no chat em grupo é
+ * MESSAGE com chave `chat-mention:` (aparece em "Menções" e também em "Mensagens").
  */
 const FILTERS: Record<Exclude<NotificationCategory, 'all'>, NotificationFilter> = {
-  mentions: [{ types: ['FEED_MENTION', 'POST_TAG'] }, { types: ['POST_COMMENT'], dedupePrefix: 'comment-mention:' }],
+  mentions: [{ types: ['FEED_MENTION', 'POST_TAG'] }, { types: ['POST_COMMENT'], dedupePrefix: 'comment-mention:' }, { types: ['MESSAGE'], dedupePrefix: 'chat-mention:' }],
   comments: [{ types: ['FEED_COMMENT'] }, { types: ['POST_COMMENT'], dedupePrefix: 'post-comment:' }],
   likes: [{ types: ['POST_LIKE', 'FEED_REACTION'] }],
   follows: [{ types: ['FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW'] }],

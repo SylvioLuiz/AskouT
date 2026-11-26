@@ -14,6 +14,8 @@ import { ImageEditor } from '../components/image-editor.tsx';
 import { canEditImage } from '../lib/image-edit.ts';
 import { FileBubble } from '../components/chat-file.tsx';
 import { LinkedText } from '../components/linked-text.tsx';
+import { applyMentionAt, filterMentionCandidates, mentionQueryBefore } from '../lib/mentions.ts';
+import { useOptionalUser } from '../auth.tsx';
 import { MatchPin } from '../components/match-pin.tsx';
 import { CHAT_FILE_ACCEPT, documentType, fileProblem } from '../lib/chat-file.ts';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
@@ -706,6 +708,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const galleryRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  /** Onde está o cursor no campo (nulo sem foco): a @menção em andamento é a que vem logo antes dele. */
+  const [caret, setCaret] = useState<number | null>(null);
+  /** Sugestão de @menção destacada (setas do teclado) e o texto em que a lista foi fechada com Esc. */
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState<string | undefined>();
+  const me = useOptionalUser();
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
   /** Foto da prévia aberta no editor (girar, recortar, desenhar, escrever). */
@@ -1001,6 +1009,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const colorStyle = chatColorStyle(color);
   const match = data.other ? flash.data?.matches.find((m) => m.other.userId === data.other?.userId) : undefined;
   const serverNow = Date.parse(data.now);
+  // @menções (só em grupo): quem está na conversa vira destaque no balão; digitando @ aparece a lista para escolher.
+  const mentionNames = isGroup ? [...data.members.map((member) => member.profile.username), ...(me ? [me.profile.username] : [])] : undefined;
+  const mentionQuery = isGroup && caret !== null && mentionDismissed !== draft ? mentionQueryBefore(draft, caret) : undefined;
+  const mentionPeople = mentionQuery !== undefined ? filterMentionCandidates(data.members.map((member) => member.profile), mentionQuery) : [];
+  const mentionActive = mentionPeople.length > 0 ? Math.min(mentionIndex, mentionPeople.length - 1) : 0;
+  function pickMention(username: string) {
+    const next = applyMentionAt(draft, caret ?? draft.length, username);
+    setDraft(next.text);
+    noteTyping(next.text);
+    setCaret(next.caret);
+    setMentionIndex(0);
+    window.requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(next.caret, next.caret);
+    });
+  }
 
   /**
    * Ctrl+C com o mouse selecionando mais de uma mensagem: copia com a hora e o nome de quem mandou cada uma
@@ -1404,17 +1430,17 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         ) : m.kind === 'TEXT' && m.venue ? (
           // Texto com link da página de um local: o texto e, embaixo, o cartão do local (abre a página no app).
           <>
-            <p className="bubble__text"><LinkedText text={m.body} /></p>
+            <p className="bubble__text"><LinkedText text={m.body} mentions={mentionNames} /></p>
             <VenueBubble venue={m.venue} />
           </>
         ) : m.kind === 'TEXT' && m.event ? (
           // Texto com link de evento: o texto e, embaixo, o cartão do evento (foto, título e link).
           <>
-            <p className="bubble__text"><LinkedText text={m.body} /></p>
+            <p className="bubble__text"><LinkedText text={m.body} mentions={mentionNames} /></p>
             <EventBubble event={m.event} />
           </>
         ) : (
-          <p className="bubble__text"><LinkedText text={m.body} /></p>
+          <p className="bubble__text"><LinkedText text={m.body} mentions={mentionNames} /></p>
         )}
         <ReactionSummary reactions={m.reactions} onOpen={() => setReactionsFor(m)} />
         {burst === m.id ? (
@@ -1655,6 +1681,31 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 </ul>
               </div>
             ) : null}
+            {mentionPeople.length > 0 ? (
+              <div className="chat__mentions">
+                <ul className="mentionlist" id="chat-mentions" role="listbox" aria-label={t('Pessoas para mencionar')}>
+                  {mentionPeople.map((person, i) => (
+                    <li key={person.userId} role="option" aria-selected={i === mentionActive} id={`chat-mention-${i}`}>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className={`mentionlist__item${i === mentionActive ? ' mentionlist__item--active' : ''}`}
+                        // Tocar na pessoa não tira o foco do campo (o teclado continua aberto).
+                        onPointerDown={(e) => e.preventDefault()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickMention(person.username)}
+                      >
+                        <Avatar profile={person} size={28} />
+                        <span>
+                          <strong>{person.displayName || person.username}</strong>
+                          <span className="muted"> @{person.username}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <form className="composer" onSubmit={send}>
               <label className="visually-hidden" htmlFor="msg">
                 Mensagem para {chatName}
@@ -1677,11 +1728,43 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     value={draft}
                     maxLength={MESSAGE_MAX}
                     placeholder={staged.length > 0 ? t('Adicione uma legenda…') : t('Mensagem…')}
+                    role={isGroup ? 'combobox' : undefined}
+                    aria-autocomplete={isGroup ? 'list' : undefined}
+                    aria-expanded={isGroup ? mentionPeople.length > 0 : undefined}
+                    aria-controls={mentionPeople.length > 0 ? 'chat-mentions' : undefined}
+                    aria-activedescendant={mentionPeople.length > 0 ? `chat-mention-${mentionActive}` : undefined}
                     onChange={(e) => {
                       setDraft(e.target.value);
                       noteTyping(e.target.value);
+                      setCaret(e.target.selectionStart);
+                      setMentionIndex(0);
                     }}
+                    onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+                    onFocus={(e) => setCaret(e.currentTarget.selectionStart)}
+                    onBlur={() => setCaret(null)}
                     onKeyDown={(e) => {
+                      // Lista de @menção aberta: setas escolhem, Enter/Tab marca a pessoa, Esc fecha.
+                      if (mentionPeople.length > 0) {
+                        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const step = e.key === 'ArrowDown' ? 1 : -1;
+                          setMentionIndex((mentionActive + step + mentionPeople.length) % mentionPeople.length);
+                          return;
+                        }
+                        if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+                          const person = mentionPeople[mentionActive];
+                          if (person) {
+                            e.preventDefault();
+                            pickMention(person.username);
+                            return;
+                          }
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setMentionDismissed(draft);
+                          return;
+                        }
+                      }
                       // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
                       if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
                     }}
