@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.askout",
+      "sha256_cert_fingerprints": [
+        "9F:E5:10:17:B2:79:AC:CD:AD:1C:82:F7:2F:CE:9E:26:05:CC:5E:F3:5C:AE:68:C7:85:CA:24:00:96:F0:27:BF",
+        "B5:A1:75:A1:1B:AF:04:D3:17:13:CC:26:61:63:DC:EC:43:58:67:EB:FA:F6:37:36:81:ED:CA:5A:5D:CA:CE:EA",
+        "56:46:09:0B:C5:AC:E2:55:92:3C:10:C3:70:25:BE:EC:78:2F:24:44:75:94:52:FC:13:C8:51:DD:D9:00:E3:A4"
+      ]
+    }
+  }
+]

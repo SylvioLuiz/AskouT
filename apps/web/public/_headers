@@ -7,3 +7,8 @@
 # Universal Links do iPhone: a Apple lê este arquivo (sem extensão) e exige JSON.
 /.well-known/apple-app-site-association
   Content-Type: application/json
+
+# App Links do Android: o Google lê este arquivo e exige application/json (sem isto, se o arquivo faltar, o
+# fallback do SPA devolve index.html como text/html e a verificação falha).
+/.well-known/assetlinks.json
+  Content-Type: application/json
