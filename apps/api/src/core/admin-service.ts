@@ -380,9 +380,9 @@ export class AdminService {
     if (actor.role !== 'ADMIN') throw forbidden('Acesso restrito a administradores');
   }
 
-  private async log(adminId: string, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null, extra: AuditExtra = {}): Promise<void> {
+  private async log(adminId: string | null, action: AuditAction, targetType: AuditRecord['targetType'], targetId: string, note: string | null, extra: AuditExtra = {}): Promise<void> {
     await this.deps.admin.addAudit({
-      id: this.deps.ids.next(), adminId, actorKind: 'ADMIN', action, targetType, targetId, note, createdAt: this.deps.clock.now(),
+      id: this.deps.ids.next(), adminId, actorKind: adminId ? 'ADMIN' : 'SYSTEM', action, targetType, targetId, note, createdAt: this.deps.clock.now(),
       targetLabel: extra.targetLabel ?? null, changes: extra.changes && extra.changes.length > 0 ? extra.changes : null,
     });
   }
@@ -949,10 +949,44 @@ export class AdminService {
    */
   async googleSearchVenues(actor: Actor, input: { text?: unknown }): Promise<{ available: boolean; items: GoogleVenueHit[] }> {
     this.assertAdmin(actor);
-    if (typeof input.text !== 'string' || input.text.trim().length < 3) throw validationError('Dados inválidos', { text: 'Escreva pelo menos 3 letras para buscar' });
+    return this.searchGoogleVenues(input.text, undefined);
+  }
+
+  /**
+   * Busca no Google pedida pelo painel do Hunter (ponte autenticada pelo token de serviço, sem pessoa logada): a mesma
+   * busca da gestão, com a posição da região para ordenar os resultados.
+   */
+  async hunterGoogleSearch(input: { text?: unknown; lat?: unknown; lng?: unknown }): Promise<{ available: boolean; items: GoogleVenueHit[] }> {
+    const n = (v: unknown): number | undefined => { const x = typeof v === 'string' ? Number(v) : v; return typeof x === 'number' && Number.isFinite(x) ? x : undefined; };
+    const lat = n(input.lat);
+    const lng = n(input.lng);
+    const center = lat !== undefined && lng !== undefined && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : undefined;
+    return this.searchGoogleVenues(input.text, center);
+  }
+
+  /**
+   * Cria (ou acha, se já existe) o local do AskouT para um lugar do Google escolhido no painel do Hunter. Já vinculado ao
+   * Google ou com o mesmo nome a menos de 250 m: devolve o existente em vez de duplicar. Fica na auditoria como sistema.
+   */
+  async hunterGoogleCreate(input: { placeId?: unknown; name?: unknown; address?: unknown; category?: unknown; lat?: unknown; lng?: unknown }): Promise<{ created: boolean; venue: { id: string; name: string } }> {
+    if (typeof input.placeId !== 'string' || !GOOGLE_PLACE_ID_RE.test(input.placeId)) throw validationError('Dados inválidos', { placeId: 'Lugar do Google inválido' });
+    const linked = await this.deps.places.findVenueByExternalKey(`google:${input.placeId}`);
+    if (linked) return { created: false, venue: { id: linked.id, name: linked.name } };
+    const lat = typeof input.lat === 'string' ? Number(input.lat) : input.lat;
+    const lng = typeof input.lng === 'string' ? Number(input.lng) : input.lng;
+    if (typeof input.name === 'string' && typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+      const twin = await this.findDuplicateVenue(input.name.trim(), lat, lng);
+      if (twin) return { created: false, venue: twin };
+    }
+    const venue = await this.createVenueFrom(null, { name: input.name, address: input.address, category: input.category, lat: input.lat, lng: input.lng, googlePlaceId: input.placeId }, 'painel do Hunter, a partir do Google');
+    return { created: true, venue };
+  }
+
+  private async searchGoogleVenues(text: unknown, center: { lat: number; lng: number } | undefined): Promise<{ available: boolean; items: GoogleVenueHit[] }> {
+    if (typeof text !== 'string' || text.trim().length < 3) throw validationError('Dados inválidos', { text: 'Escreva pelo menos 3 letras para buscar' });
     const source = this.deps.placeSource;
     if (!source.search || source.premiumSearch !== true) return { available: false, items: [] };
-    const found = await source.search(input.text.trim().replace(/\s+/g, ' ').slice(0, 120), undefined, 20, { premium: true }).catch(() => ({ available: false, places: [] }));
+    const found = await source.search(text.trim().replace(/\s+/g, ' ').slice(0, 120), center, 20, { premium: true }).catch(() => ({ available: false, places: [] }));
     // Se o Google falhar, a fonte cai no mapa gratuito: aqui só interessam lugares do Google.
     const places = found.places.filter((p) => p.source === 'GOOGLE' && GOOGLE_PLACE_ID_RE.test(p.externalId));
     // Resultado só do mapa gratuito (ou nenhum) quer dizer que o Google não respondeu ou bateu no teto do dia.
@@ -1071,7 +1105,8 @@ export class AdminService {
   }
 
   /** Confere e grava um local novo da gestão; `origin` vai para a auditoria (cadastro manual, busca no Google…). */
-  private async createVenueFrom(actor: Actor, input: AdminVenueCreateInput, origin: string): Promise<{ id: string; name: string }> {
+  /** `actor` nulo: criado pelo sistema (painel do Hunter); a auditoria registra como SYSTEM. */
+  private async createVenueFrom(actor: Actor | null, input: AdminVenueCreateInput, origin: string): Promise<{ id: string; name: string }> {
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
     const reason = noteText(input.note, false);
     let googleKey: string | undefined;
@@ -1086,7 +1121,7 @@ export class AdminService {
     if (googleKey) c.record.externalKey = googleKey;
     await this.saveNewVenue(c);
     const where = (googleKey ? 'a partir do Google; ' : '') + (c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)');
-    await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(${origin}; ${where})`.slice(0, 400), {
+    await this.log(actor?.userId ?? null, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(${origin}; ${where})`.slice(0, 400), {
       targetLabel: c.record.name,
       changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...c.record }),
     });

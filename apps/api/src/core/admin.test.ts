@@ -718,6 +718,24 @@ test('Hunter: busca locais no Google, marca os que já estão no AskouT e grava 
   assert.deepEqual(await w.core.admin.googleSearchVenues(A, { text: 'pinheiros' }), { available: false, items: [] });
 });
 
+test('painel do Hunter: busca no Google e cria o local sem duplicar (auditoria como sistema)', async () => {
+  const { w, A } = await setup();
+  w.placeSource.premiumSearch = true;
+  w.placeSource.premiumOnly = [{ externalId: 'ChIJbrahma', source: 'GOOGLE', name: 'Bar Brahma', category: 'bar', lat: -23.5412, lng: -46.6417, address: 'Av. São João, 677 - Centro, São Paulo' }];
+  const r = await w.core.admin.hunterGoogleSearch({ text: 'brahma', lat: '-23.55', lng: '-46.63' });
+  assert.deepEqual(r.items.map((i) => [i.placeId, i.status]), [['ChIJbrahma', 'NEW']]);
+  const hit = r.items[0]!;
+  const first = await w.core.admin.hunterGoogleCreate(hit);
+  assert.equal(first.created, true);
+  const again = await w.core.admin.hunterGoogleCreate(hit);
+  assert.deepEqual(again, { created: false, venue: first.venue }, 'mesmo lugar do Google: devolve o existente');
+  const twin = await w.core.admin.hunterGoogleCreate({ ...hit, placeId: 'ChIJoutro' });
+  assert.deepEqual([twin.created, twin.venue.id], [false, first.venue.id], 'mesmo nome a menos de 250 m: não duplica');
+  const log = (await w.core.admin.audit(A, {})).items.find((l) => l.action === 'VENUE_CREATED');
+  assert.ok(log && log.note?.includes('painel do Hunter'));
+  await rejectsWith(w.core.admin.hunterGoogleCreate({ placeId: 'nao/valido' }), 'VALIDATION');
+});
+
 test('gestão: endereço que a busca gratuita não acha com o Google sem cota hoje diz o motivo', async () => {
   const { w, A } = await setup();
   w.placeSource.premiumSearch = false;

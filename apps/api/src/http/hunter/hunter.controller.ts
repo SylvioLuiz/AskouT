@@ -54,8 +54,11 @@ function refuse(refusal: HunterRefusal): never {
 export class HunterServiceController {
   private readonly bridge: HunterBridge;
 
-  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge) {
+  private readonly core: Core;
+
+  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge, @Inject(CORE) core: Core) {
     this.bridge = bridge;
+    this.core = core;
   }
 
   private auth(header: unknown): void {
@@ -77,6 +80,24 @@ export class HunterServiceController {
   async venues(@Headers('authorization') authorization: string | undefined, @Query() q: { externalKey?: unknown; q?: unknown; lat?: unknown; lng?: unknown }) {
     this.auth(authorization);
     return this.bridge.lookupVenues(q);
+  }
+
+  /** Busca de lugares no Google para o painel do Hunter (`q`, e `lat`/`lng` da região para ordenar). */
+  @Public()
+  @Get('google/search')
+  async googleSearch(@Headers('authorization') authorization: string | undefined, @Query() q: { q?: unknown; lat?: unknown; lng?: unknown }) {
+    this.auth(authorization);
+    return this.core.admin.hunterGoogleSearch({ text: q.q, lat: q.lat, lng: q.lng });
+  }
+
+  /** Cria o local a partir de um lugar do Google (ou devolve o que já existe, sem duplicar). */
+  @Public()
+  @Post('google/venues')
+  @HttpCode(200)
+  async googleCreate(@Headers('authorization') authorization: string | undefined, @Body() body: unknown) {
+    this.auth(authorization);
+    const b = asBody(body);
+    return this.core.admin.hunterGoogleCreate({ placeId: b.placeId, name: b.name, address: b.address, category: b.category, lat: b.lat, lng: b.lng });
   }
 
   @Public()
