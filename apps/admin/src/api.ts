@@ -4,7 +4,7 @@ import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
 import type { Sort } from './sort.ts';
 import type {
-  AuditFilter, AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, VenueImportResult, GeocodeHit, GoogleSuggestion, GooglePlaceFill, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
+  AuditFilter, AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, VenueImportResult, GeocodeHit, GoogleSuggestion, GooglePlaceFill, GoogleVenueHit, GoogleVenueSaveResult, HunterLogState, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -132,6 +132,9 @@ export const api = {
   removeHunterEvent: (ref: string) => request<{ removed: number }>('DELETE', `/admin/hunter/events/${encodeURIComponent(ref)}`),
   syncHunter: () => request<{ at?: string; seen?: number; published?: number; review?: number; rejected?: number; error?: string }>('POST', '/admin/hunter/sync'),
   removeAllHunterEvents: () => request<{ removed: number }>('DELETE', '/admin/hunter/events'),
+  hunterLog: () => request<HunterLogState>('GET', '/admin/hunter/log'),
+  hunterGoogleSearch: (text: string) => request<{ available: boolean; items: GoogleVenueHit[] }>('POST', '/admin/hunter/google/search', { text }),
+  hunterGoogleSave: (places: GoogleVenueHit[]) => request<GoogleVenueSaveResult>('POST', '/admin/hunter/google/save', { places: places.map(({ placeId, name, address, category, lat, lng }) => ({ placeId, name, address, category, lat, lng })) }),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
   setBoostDays: (days: number[], note: string) => request<PaymentsState>('PUT', '/admin/payments/packages', { days, note }),

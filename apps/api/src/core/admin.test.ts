@@ -694,6 +694,30 @@ test('cadastrar local a partir do Google: sugestões, detalhe só com campos gr�
   assert.deepEqual(await off.core.admin.googleSuggest({ userId: ou['adm']!, role: 'ADMIN' }, { text: 'bar', sessionToken: 'sess-1234' }), { available: false, items: [] });
 });
 
+test('Hunter: busca locais no Google, marca os que já estão no AskouT e grava só os novos', async () => {
+  const { w, A } = await setup();
+  const g = (id: string, name: string, lat: number, lng: number, category: string | null = 'bar') => ({ externalId: id, source: 'GOOGLE' as const, name, category, lat, lng, address: `${name}, Pinheiros - São Paulo` });
+  w.placeSource.premiumSearch = true;
+  w.placeSource.premiumOnly = [g('ChIJnovo1', 'Bar Novo Pinheiros', -23.561, -46.69), g('ChIJnovo2', 'Balada Nova Pinheiros', -23.562, -46.691, 'night_club'), g('ChIJvelho', 'Bar Antigo Pinheiros', -23.563, -46.692)];
+  await rejectsWith(w.core.admin.googleSearchVenues(A, { text: 'pi' }), 'VALIDATION');
+  const old = await w.core.admin.createVenue(A, { name: 'Bar Antigo Pinheiros', lat: -23.5631, lng: -46.6921 });
+  const r = await w.core.admin.googleSearchVenues(A, { text: 'pinheiros' });
+  assert.equal(r.available, true);
+  assert.deepEqual(r.items.map((i) => [i.placeId, i.status, i.category]), [['ChIJnovo1', 'NEW', 'bar'], ['ChIJnovo2', 'NEW', 'balada'], ['ChIJvelho', 'DUPLICATE', 'bar']]);
+  assert.equal(r.items[2]!.existing?.id, old.id);
+
+  const saved = await w.core.admin.googleSaveVenues(A, { places: [...r.items, r.items[0]] });
+  assert.deepEqual(saved.results.map((x) => x.status), ['CREATED', 'CREATED', 'SKIPPED', 'SKIPPED'], 'pula o que já existe e o repetido no próprio lote');
+  assert.deepEqual([saved.created, saved.skipped], [2, 2]);
+  const d = await w.core.admin.venueDetail(A, saved.results[1]!.venueId!);
+  assert.deepEqual([d.name, d.category, d.source, d.extra?.externalKey], ['Balada Nova Pinheiros', 'balada', 'GOOGLE', 'google:ChIJnovo2']);
+  const again = await w.core.admin.googleSearchVenues(A, { text: 'pinheiros' });
+  assert.deepEqual(again.items.map((i) => i.status), ['LINKED', 'LINKED', 'DUPLICATE']);
+
+  w.placeSource.premiumSearch = false;
+  assert.deepEqual(await w.core.admin.googleSearchVenues(A, { text: 'pinheiros' }), { available: false, items: [] });
+});
+
 test('gestão: endereço que a busca gratuita não acha com o Google sem cota hoje diz o motivo', async () => {
   const { w, A } = await setup();
   w.placeSource.premiumSearch = false;

@@ -109,6 +109,19 @@ const GOOGLE_TYPE_LABEL: [string, string][] = [
 export const categoryFromGoogleTypes = (types: string[]): string | null => GOOGLE_TYPE_LABEL.find(([t]) => types.includes(t))?.[1] ?? null;
 const GOOGLE_PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 
+/** Um lugar da busca no Google do Hunter: novo, já vinculado a um local do AskouT ou com o mesmo nome ali perto. */
+export interface GoogleVenueHit {
+  placeId: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  lat: number;
+  lng: number;
+  mapsUri: string | null;
+  status: 'NEW' | 'LINKED' | 'DUPLICATE';
+  existing: { id: string; name: string } | null;
+}
+
 /** Uma linha da planilha de importação de locais (como veio; tudo é conferido). */
 export interface AdminVenueImportRow {
   name?: unknown;
@@ -929,6 +942,71 @@ export class AdminService {
     return { placeId: input.placeId, address: place.address, lat: place.lat, lng: place.lng, category: categoryFromGoogleTypes(place.types), linked: linked ? { id: linked.id, name: linked.name } : null, duplicate: duplicate ?? null };
   }
 
+  /**
+   * Busca de locais no Google para o Hunter gravar no AskouT: uma busca por texto ("bares em Pinheiros") devolve até 20
+   * lugares, cada um marcado como novo, já vinculado a um local do AskouT ou com o mesmo nome a menos de 250 m. Usa a
+   * busca por texto do Google (a mesma cota diária do app); `available: false` sem chave ou com o teto do dia atingido.
+   */
+  async googleSearchVenues(actor: Actor, input: { text?: unknown }): Promise<{ available: boolean; items: GoogleVenueHit[] }> {
+    this.assertAdmin(actor);
+    if (typeof input.text !== 'string' || input.text.trim().length < 3) throw validationError('Dados inválidos', { text: 'Escreva pelo menos 3 letras para buscar' });
+    const source = this.deps.placeSource;
+    if (!source.search || source.premiumSearch !== true) return { available: false, items: [] };
+    const found = await source.search(input.text.trim().replace(/\s+/g, ' ').slice(0, 120), undefined, 20, { premium: true }).catch(() => ({ available: false, places: [] }));
+    // Se o Google falhar, a fonte cai no mapa gratuito: aqui só interessam lugares do Google.
+    const places = found.places.filter((p) => p.source === 'GOOGLE' && GOOGLE_PLACE_ID_RE.test(p.externalId));
+    // Resultado só do mapa gratuito (ou nenhum) quer dizer que o Google não respondeu ou bateu no teto do dia.
+    if (places.length === 0) return { available: found.available && found.places.length === 0, items: [] };
+    const items: GoogleVenueHit[] = [];
+    for (const p of places) {
+      const linked = await this.deps.places.findVenueByExternalKey(`google:${p.externalId}`);
+      const duplicate = linked ? undefined : await this.findDuplicateVenue(p.name, p.lat, p.lng);
+      const existing = linked ? { id: linked.id, name: linked.name } : (duplicate ?? null);
+      items.push({
+        placeId: p.externalId,
+        name: p.name.slice(0, 80),
+        address: p.address ?? null,
+        category: categoryFromGoogleTypes(p.category ? [p.category] : []),
+        lat: p.lat,
+        lng: p.lng,
+        mapsUri: p.mapsUri ?? null,
+        status: linked ? 'LINKED' : duplicate ? 'DUPLICATE' : 'NEW',
+        existing,
+      });
+    }
+    return { available: true, items };
+  }
+
+  /**
+   * Grava como locais do AskouT os lugares do Google escolhidos no Hunter (até 20 por vez). Cada um passa pelas mesmas
+   * regras do cadastro manual: pula o que já está vinculado ao Google ou tem o mesmo nome a menos de 250 m (inclusive
+   * entre os próprios escolhidos). Cada local criado fica na auditoria.
+   */
+  async googleSaveVenues(actor: Actor, input: { places?: unknown; note?: unknown }): Promise<{ results: { placeId: string; name: string; status: 'CREATED' | 'SKIPPED'; venueId?: string; reason?: string }[]; created: number; skipped: number }> {
+    this.assertAdmin(actor);
+    const list = input.places;
+    if (!Array.isArray(list) || list.length === 0) throw validationError('Dados inválidos', { places: 'Escolha pelo menos um lugar' });
+    if (list.length > 20) throw validationError('Dados inválidos', { places: 'Grave até 20 lugares por vez' });
+    const note = noteText(input.note, false);
+    const results: { placeId: string; name: string; status: 'CREATED' | 'SKIPPED'; venueId?: string; reason?: string }[] = [];
+    for (const raw of list) {
+      const p = (typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+      const placeId = typeof p['placeId'] === 'string' ? p['placeId'] : '';
+      const name = typeof p['name'] === 'string' ? p['name'].trim() : '';
+      try {
+        if (!GOOGLE_PLACE_ID_RE.test(placeId)) throw validationError('Dados inválidos', { placeId: 'Lugar do Google inválido' });
+        const created = await this.createVenueFrom(actor, { name: p['name'], address: p['address'], category: p['category'], lat: p['lat'], lng: p['lng'], googlePlaceId: placeId, note }, 'busca no Google pelo Hunter');
+        results.push({ placeId, name: created.name, status: 'CREATED', venueId: created.id });
+      } catch (error) {
+        if (!(error instanceof DomainError)) throw error;
+        const detail = Object.values(error.details ?? {})[0];
+        results.push({ placeId, name, status: 'SKIPPED', reason: typeof detail === 'string' ? detail : error.message });
+      }
+    }
+    const created = results.filter((r) => r.status === 'CREATED').length;
+    return { results, created, skipped: results.length - created };
+  }
+
   /** Local do AskouT com o mesmo nome a menos de 250 m (o mesmo rolê cadastrado de novo). */
   private async findDuplicateVenue(name: string, lat: number, lng: number): Promise<{ id: string; name: string } | undefined> {
     const key = venueNameKey(name);
@@ -988,6 +1066,12 @@ export class AdminService {
    */
   async createVenue(actor: Actor, input: AdminVenueCreateInput): Promise<AdminVenueDetail> {
     this.assertAdmin(actor);
+    const created = await this.createVenueFrom(actor, input, 'cadastro manual');
+    return this.venueDetail(actor, created.id);
+  }
+
+  /** Confere e grava um local novo da gestão; `origin` vai para a auditoria (cadastro manual, busca no Google…). */
+  private async createVenueFrom(actor: Actor, input: AdminVenueCreateInput, origin: string): Promise<{ id: string; name: string }> {
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
     const reason = noteText(input.note, false);
     let googleKey: string | undefined;
@@ -1002,11 +1086,11 @@ export class AdminService {
     if (googleKey) c.record.externalKey = googleKey;
     await this.saveNewVenue(c);
     const where = (googleKey ? 'a partir do Google; ' : '') + (c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)');
-    await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(cadastro manual; ${where})`.slice(0, 400), {
+    await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(${origin}; ${where})`.slice(0, 400), {
       targetLabel: c.record.name,
       changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...c.record }),
     });
-    return this.venueDetail(actor, c.record.id);
+    return { id: c.record.id, name: c.record.name };
   }
 
   /**

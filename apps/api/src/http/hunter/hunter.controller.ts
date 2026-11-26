@@ -10,7 +10,10 @@ import { CurrentActor, Public } from '../decorators.ts';
 import { asBody, bearerToken, parseIntParam } from '../support/parse.ts';
 import { PRISMA } from '../tokens.ts';
 import { PrismaHunterStore } from './prisma-hunter-store.ts';
-import { HunterSync } from './hunter-feed.ts';
+import { HunterSync, fetchHunterRuns } from './hunter-feed.ts';
+import { HunterLog } from './hunter-log.ts';
+import type { Core } from '../../core/index.ts';
+import { CORE } from '../tokens.ts';
 
 import { HUNTER_BRIDGE } from './hunter-token.ts';
 export { HUNTER_BRIDGE };
@@ -130,10 +133,57 @@ export class HunterAdminController {
   private readonly bridge: HunterBridge;
 
   private readonly sync: HunterSync;
+  private readonly runLog: HunterLog;
+  private readonly core: Core;
 
-  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge, @Inject(HunterSync) sync: HunterSync) {
+  constructor(@Inject(HUNTER_BRIDGE) bridge: HunterBridge, @Inject(HunterSync) sync: HunterSync, @Inject(HunterLog) runLog: HunterLog, @Inject(CORE) core: Core) {
     this.bridge = bridge;
     this.sync = sync;
+    this.runLog = runLog;
+    this.core = core;
+  }
+
+  /**
+   * Registro das buscas: as da gestão (busca no Hunter e busca de locais no Google) e as rodadas do próprio Hunter
+   * (coleta nas fontes e busca com IA), lidas do Hunter. Se o Hunter não responder, vem o motivo em `hunterError`.
+   */
+  @Get('log')
+  async log(@CurrentActor() actor: Actor) {
+    assertAdmin(actor);
+    const entries = await this.runLog.list();
+    const url = process.env['HUNTER_URL'];
+    const token = process.env['HUNTER_EXPORT_TOKEN'] ?? '';
+    if (!url || token.length < 32) return { entries, hunter: null, hunterError: 'O servidor não sabe onde está o Hunter (HUNTER_URL e HUNTER_EXPORT_TOKEN)' };
+    try {
+      return { entries, hunter: await fetchHunterRuns(url, token), hunterError: null };
+    } catch (e) {
+      return { entries, hunter: null, hunterError: e instanceof Error ? e.message : 'O Hunter não respondeu' };
+    }
+  }
+
+  /** Busca locais no Google (`{text}`; busca por texto, até 20), marcando os que já estão no AskouT. Fica no registro. */
+  @Post('google/search')
+  @HttpCode(200)
+  async googleSearch(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const text = asBody(body).text;
+    const r = await this.core.admin.googleSearchVenues(actor, { text });
+    const fresh = r.items.filter((i) => i.status === 'NEW').length;
+    await this.runLog.append({
+      at: new Date().toISOString(), kind: 'GOOGLE_SEARCH', trigger: 'MANUAL',
+      summary: `Busca “${String(text).trim().slice(0, 80)}”: ${r.items.length} lugar(es), ${fresh} novo(s)`,
+      ...(r.available ? {} : { error: 'Busca do Google indisponível (sem chave ou limite do dia atingido)' }),
+    });
+    return r;
+  }
+
+  /** Grava como locais os lugares do Google escolhidos (`{places, note?}`; até 20, pula duplicados). Fica no registro. */
+  @Post('google/save')
+  @HttpCode(200)
+  async googleSave(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    const r = await this.core.admin.googleSaveVenues(actor, { places: b.places, note: b.note });
+    await this.runLog.append({ at: new Date().toISOString(), kind: 'GOOGLE_SAVE', trigger: 'MANUAL', summary: `${r.created} local(is) gravado(s) do Google, ${r.skipped} pulado(s) (já existiam)` });
+    return r;
   }
 
   @Get()
@@ -147,7 +197,7 @@ export class HunterAdminController {
   @HttpCode(200)
   async syncNow(@CurrentActor() actor: Actor) {
     assertAdmin(actor);
-    const result = await this.sync.run();
+    const result = await this.sync.run({ trigger: 'MANUAL' });
     await this.bridge.auditSync(actor.userId, result);
     return result;
   }

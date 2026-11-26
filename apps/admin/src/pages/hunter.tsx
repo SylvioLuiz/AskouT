@@ -7,6 +7,7 @@ import { ActionDialog, Badge, Loadable, PageHead, SortTh } from '../ui.tsx';
 import { sortRows, useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 import { RecordLink } from '../record.tsx';
+import { GoogleVenueSearch, HunterRunLog } from './hunter-google.tsx';
 
 /**
  * Aba do Hunter (sistema separado que descobre e publica eventos). Aqui a gestão liga e desliga a ponte e vê, e pode remover,
@@ -18,6 +19,8 @@ export function HunterPage() {
   const [action, setAction] = useState<ActionSpec>();
   const [syncMsg, setSyncMsg] = useState<string>();
   const [syncing, setSyncing] = useState(false);
+  const [logTick, setLogTick] = useState(0);
+  const refreshLog = () => setLogTick((t) => t + 1);
 
   async function syncNow() {
     setSyncing(true);
@@ -30,6 +33,7 @@ export function HunterPage() {
       setSyncMsg(e instanceof Error ? e.message : 'Não foi possível buscar agora.');
     } finally {
       setSyncing(false);
+      refreshLog();
     }
   }
 
@@ -91,7 +95,7 @@ export function HunterPage() {
 
   return (
     <>
-      <PageHead title="Hunter" hint="Liga e desliga o Hunter e mostra tudo o que ele cadastrou no app." />
+      <PageHead title="Hunter" hint="Liga e desliga o Hunter, busca locais no Google, mostra o registro de cada busca e tudo o que ele cadastrou no app." />
       <Loadable state={state} empty="Sem dados." isEmpty={() => false}>
         {(s) => (
           <>
@@ -124,6 +128,9 @@ export function HunterPage() {
               </div>
               {syncMsg ? <p role="status" className="muted small">{syncMsg}</p> : null}
               {!s.feedConfigured ? <p className="notice notice--warn" role="alert">O servidor ainda não sabe onde está o Hunter (HUNTER_URL e HUNTER_EXPORT_TOKEN, 32 caracteres ou mais).</p> : null}
+            </div>
+            <div style={{ maxWidth: 900 }}>
+              <GoogleVenueSearch onChange={refreshLog} />
             </div>
             {!s.serviceConfigured ? <p className="notice notice--warn" role="alert">O servidor ainda não tem a credencial do Hunter (HUNTER_SERVICE_TOKEN, 32 caracteres ou mais). Sem ela o Hunter não liga.</p> : null}
 
@@ -162,6 +169,7 @@ export function HunterPage() {
                 <p><button type="button" className="btn btn--danger" onClick={() => removeAll(s.total)}>Remover tudo o que o Hunter cadastrou</button></p>
               </>
             )}
+            <HunterRunLog tick={logTick} />
             <p className="muted small">Cada mudança fica na Auditoria, com quem fez e o motivo.</p>
           </>
         )}
