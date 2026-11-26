@@ -394,48 +394,52 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
   const empty = kind === 'NOTICE' ? body.trim() === '' : body.trim() === '' && photos.length === 0;
   return (
     <Sheet title={t('Nova publicação')} onClose={onClose}>
-      <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
-        <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
-          {t('Fotos do local')}
-        </button>
-        <button type="button" className={`segmented__tab${kind === 'NOTICE' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'NOTICE'} onClick={() => setKind('NOTICE')}>
-          {t('Aviso')}
-        </button>
+      <div className="feedsheet">
+        <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
+          <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
+            {t('Fotos do local')}
+          </button>
+          <button type="button" className={`segmented__tab${kind === 'NOTICE' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'NOTICE'} onClick={() => setKind('NOTICE')}>
+            {t('Aviso')}
+          </button>
+        </div>
+        {kind === 'NOTICE' ? <p className="muted">{settings.isModerator ? t('Avisos aparecem destacados e quem vai (ou ligou o sininho) recebe uma notificação.') : t('Avisos aparecem destacados no feed.')}</p> : null}
+        {settings.needsApproval ? <Notice tone="info">{t('Quem organiza aprova antes de aparecer no feed.')}</Notice> : null}
+        <Field
+          label={kind === 'NOTICE' ? t('Aviso') : t('O que está rolando?')}
+          value={body}
+          onChange={setBody}
+          multiline
+          maxLength={FEED_BODY_MAX + 20}
+          hint={`${length}/${FEED_BODY_MAX} · ${t('Use @ para marcar alguém')}`}
+          autoFocus
+        />
+        <MentionList people={people} onPick={(username) => setBody((current) => applyMention(current, username))} />
+        {photos.length > 0 ? (
+          <ul className="vpost__thumbs" aria-label={t('Fotos da publicação')}>
+            {photos.map((src, i) => (
+              <li key={i}>
+                <img src={src} alt={t('Foto {i}', { i: i + 1 })} />
+                <button type="button" className="vpost__remove" aria-label={t('Tirar foto {i}', { i: i + 1 })} onClick={() => setPhotos((current) => current.filter((_, k) => k !== i))}>
+                  <XIcon />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {photos.length < FEED_IMAGES_MAX ? (
+          <Button variant="secondary" full loading={reading} onClick={() => fileRef.current?.click()}>
+            <PhotoIcon /> {photos.length === 0 ? t('Adicionar fotos') : t('Adicionar mais fotos')}
+          </Button>
+        ) : null}
+        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
+        {message ? <Notice tone="error">{message}</Notice> : null}
+        <div className="feedsheet__submit">
+          <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => publish()}>
+            {settings.needsApproval ? t('Enviar para aprovação') : t('Publicar')}
+          </Button>
+        </div>
       </div>
-      {kind === 'NOTICE' ? <p className="muted">{settings.isModerator ? t('Avisos aparecem destacados e quem vai (ou ligou o sininho) recebe uma notificação.') : t('Avisos aparecem destacados no feed.')}</p> : null}
-      {settings.needsApproval ? <Notice tone="info">{t('Quem organiza aprova antes de aparecer no feed.')}</Notice> : null}
-      <Field
-        label={kind === 'NOTICE' ? t('Aviso') : t('O que está rolando?')}
-        value={body}
-        onChange={setBody}
-        multiline
-        maxLength={FEED_BODY_MAX + 20}
-        hint={`${length}/${FEED_BODY_MAX} · ${t('Use @ para marcar alguém')}`}
-        autoFocus
-      />
-      <MentionList people={people} onPick={(username) => setBody((current) => applyMention(current, username))} />
-      {photos.length > 0 ? (
-        <ul className="vpost__thumbs" aria-label={t('Fotos da publicação')}>
-          {photos.map((src, i) => (
-            <li key={i}>
-              <img src={src} alt={t('Foto {i}', { i: i + 1 })} />
-              <button type="button" className="vpost__remove" aria-label={t('Tirar foto {i}', { i: i + 1 })} onClick={() => setPhotos((current) => current.filter((_, k) => k !== i))}>
-                <XIcon />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {photos.length < FEED_IMAGES_MAX ? (
-        <Button variant="secondary" full loading={reading} onClick={() => fileRef.current?.click()}>
-          <PhotoIcon /> {photos.length === 0 ? t('Adicionar fotos') : t('Adicionar mais fotos')}
-        </Button>
-      ) : null}
-      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
-      {message ? <Notice tone="error">{message}</Notice> : null}
-      <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => publish()}>
-        {settings.needsApproval ? t('Enviar para aprovação') : t('Publicar')}
-      </Button>
     </Sheet>
   );
 }
