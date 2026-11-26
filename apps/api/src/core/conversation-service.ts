@@ -1,3 +1,4 @@
+import { extractMentions } from './mentions.ts';
 import { canOpenByInvite, recordCardInvites } from './event-invites.ts';
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
@@ -983,7 +984,9 @@ export class ConversationService {
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
     const preview = kind === 'TEXT' && !gif && !profileUserId ? messagePreview(body) : undefined;
-    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : file ? 'enviou um arquivo' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : profileUserId ? 'compartilhou um perfil' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
+    // Grupo: quem foi marcado com @ recebe um aviso próprio ("mencionou você"), mesmo com a conversa silenciada, e fica fora do aviso comum.
+    const mentioned = conversation.type === 'GROUP' && preview !== undefined ? await this.notifyMentions(actorId, actorName, conversation, memberIds, message, body) : new Set<string>();
+    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds.filter((id) => !mentioned.has(id)), gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : file ? 'enviou um arquivo' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : profileUserId ? 'compartilhou um perfil' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
@@ -1207,6 +1210,28 @@ export class ConversationService {
     const venue = conversation.venueId ? await this.deps.places.findVenue(conversation.venueId) : undefined;
     if (!venue) return actorName;
     return this.venueCustomerOf(conversation) === actorId ? `${actorName} · ${venue.name}` : venue.name;
+  }
+
+  /**
+   * Mensagem de texto no grupo com @usuario: avisa cada membro marcado (menos quem escreveu e quem tem bloqueio com quem
+   * escreveu). Só vale quem está no grupo; @ de quem não é membro fica como texto. Devolve quem foi avisado.
+   */
+  private async notifyMentions(actorId: string, actorName: string, conversation: ConversationRecord, memberIds: string[], message: MessageRecord, text: string): Promise<Set<string>> {
+    const notified = new Set<string>();
+    const names = extractMentions(text);
+    if (names.length === 0) return notified;
+    const others = memberIds.filter((id) => id !== actorId);
+    const profiles = await this.deps.users.findProfilesByIds(others);
+    const byName = new Map(profiles.map((p) => [p.username.toLowerCase(), p.userId]));
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(actorId));
+    const group = conversation.name ?? 'Grupo';
+    for (const name of names) {
+      const userId = byName.get(name);
+      if (!userId || hidden.has(userId) || notified.has(userId)) continue;
+      notified.add(userId);
+      await this.deps.notifier.notify({ userId, type: 'MESSAGE', title: `${actorName} mencionou você em ${group}`, body: messagePreview(text) ?? text, url: `/conversas/${conversation.id}`, dedupeKey: `chat-mention:${message.id}:${userId}`, actorId });
+    }
+    return notified;
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
