@@ -394,7 +394,7 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
   const empty = kind === 'NOTICE' ? body.trim() === '' : body.trim() === '' && photos.length === 0;
   return (
     <Sheet title={t('Nova publicação')} onClose={onClose}>
-      <div className="feedcompose">
+      <div className="feedsheet">
         <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
           <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
             {t('Fotos do local')}
@@ -434,7 +434,7 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
         ) : null}
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
         {message ? <Notice tone="error">{message}</Notice> : null}
-        <div className="feedcompose__submit">
+        <div className="feedsheet__submit">
           <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => publish()}>
             {settings.needsApproval ? t('Enviar para aprovação') : t('Publicar')}
           </Button>
@@ -954,7 +954,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
       ) : null}
       {bellError ? <Notice tone="error">{bellError}</Notice> : null}
       {settings?.canPost ? (
-        <div className="feedcompose">
+        <div className="feedsheet">
           {me ? <Avatar profile={me} size={40} /> : null}
           <button type="button" className="feedcompose__field" onClick={() => setSheet('compose')}>
             {settings.isModerator ? t('Escreva um aviso ou poste fotos do local…') : t('Poste fotos do rolê ou deixe um recado…')}

@@ -4456,9 +4456,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .hours__closed { color: var(--muted); }
 .linkbtn { border: 0; background: transparent; color: var(--brand-text); font: inherit; font-size: 13px; padding: 8px 4px; cursor: pointer; }
 /* Nova publicação no feed (evento/local): cada bloco com respiro, e o Publicar separado do "Adicionar fotos". */
-.feedcompose { display: flex; flex-direction: column; gap: 12px; }
-.feedcompose > p, .feedcompose .mentionlist { margin: 0; }
-.feedcompose__submit { margin-top: 8px; }
+.feedsheet { display: flex; flex-direction: column; gap: 12px; }
+.feedsheet > p, .feedsheet .mentionlist { margin: 0; }
+.feedsheet__submit { margin-top: 8px; }
 .vpost__thumbs { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; overflow-x: auto; }
 .vpost__thumbs li { position: relative; flex: 0 0 auto; }
 .vpost__thumbs img { display: block; width: 92px; height: 92px; object-fit: cover; border-radius: 10px; }
