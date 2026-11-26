@@ -47,6 +47,7 @@ import { CalendarImportJob } from './calendar-import-job.ts';
 import { CalendarSyncJob } from './calendar-sync-job.ts';
 import { CalendarsController } from './controllers/calendars.controller.ts';
 import { HunterSync } from './hunter/hunter-feed.ts';
+import { HunterLog } from './hunter/hunter-log.ts';
 import { HunterAdminController, HunterServiceController, hunterBridgeProvider } from './hunter/hunter.controller.ts';
 import { PollDeadlines } from './poll-deadlines.ts';
 import { PrismaShutdown, prismaProvider } from './prisma.provider.ts';
@@ -70,6 +71,7 @@ import { CONFIG } from './tokens.ts';
     CalendarImportJob,
     CalendarSyncJob,
     HunterSync,
+    HunterLog,
     {
       provide: MODERATION_ALERT,
       inject: [CONFIG],

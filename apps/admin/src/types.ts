@@ -576,6 +576,37 @@ export interface HunterOverview {
   lastSync: { at: string; seen: number; published: number; review: number; rejected: number; stoppedDisabled: boolean; error?: string } | null;
 }
 
+/** Lugar da busca de locais no Google (aba Hunter). */
+export interface GoogleVenueHit {
+  placeId: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  lat: number;
+  lng: number;
+  mapsUri: string | null;
+  /** Novo, já vinculado a um local do AskouT ou com o mesmo nome a menos de 250 m. */
+  status: 'NEW' | 'LINKED' | 'DUPLICATE';
+  existing: { id: string; name: string } | null;
+}
+
+export interface GoogleVenueSaveResult {
+  results: { placeId: string; name: string; status: 'CREATED' | 'SKIPPED'; venueId?: string; reason?: string }[];
+  created: number;
+  skipped: number;
+}
+
+/** Registro das buscas da aba Hunter: as da gestão e as rodadas do próprio Hunter. */
+export interface HunterLogState {
+  entries: { at: string; kind: 'SYNC' | 'GOOGLE_SEARCH' | 'GOOGLE_SAVE'; trigger: 'AUTO' | 'MANUAL'; summary: string; error?: string }[];
+  hunter: {
+    runs: { startedAt: string; finishedAt: string; trigger: 'agendada' | 'manual'; engine: string; found: number; skippedNiche: number; skippedArea: number; byDecision: Record<string, number>; error?: string; note?: string }[];
+    lastRun: string | null;
+    schedule: { enabled: boolean; hours: number[] } | null;
+  } | null;
+  hunterError: string | null;
+}
+
 // ---------- Retenção ----------
 
 export interface RetentionSource {
