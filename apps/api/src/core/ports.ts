@@ -1,3 +1,4 @@
+import type { PostponedState } from './event-changes.ts';
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
 import type { EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail, UserReportRecord, AuditFilter, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, EventInviteRecord, GroupInviteRecord, EventAdminRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
@@ -630,8 +631,8 @@ export interface PostRepository {
   /** Admins do evento (sem o dono), mais antigos primeiro. */
   listEventAdmins(postId: string): Promise<EventAdminRecord[]>;
   isEventAdmin(postId: string, userId: string): Promise<boolean>;
-  /** Marca (`at`) ou tira (`null`) o adiado do evento, sem contar como edição. Devolve false se o post não existe. */
-  setEventPostponed(postId: string, at: Date | null): Promise<boolean>;
+  /** Grava o adiado do evento (`at` nulo tira), sem contar como edição. Devolve false se o post não existe. */
+  setEventPostponed(postId: string, state: PostponedState): Promise<boolean>;
   /** Torna `userId` admin do evento. Devolve false se já era. */
   addEventAdmin(postId: string, userId: string, addedById: string, at: Date): Promise<boolean>;
   /** Tira `userId` dos admins do evento. Devolve false se não era. */
@@ -720,8 +721,8 @@ export interface PlaceRepository {
   listVenueEvents(venueId: string): Promise<PlaceEventRecord[]>;
   /** Troca os campos editáveis; false se o evento não é do local. */
   updateEvent(venueId: string, event: PlaceEventRecord): Promise<boolean>;
-  /** Marca (`at`) ou tira (`null`) o adiado do evento do local. Devolve false se o evento não é do local. */
-  setEventPostponed(venueId: string, eventId: string, at: Date | null): Promise<boolean>;
+  /** Grava o adiado do evento do local (`at` nulo tira). Devolve false se o evento não é do local. */
+  setEventPostponed(venueId: string, eventId: string, state: PostponedState): Promise<boolean>;
   deleteEvent(venueId: string, eventId: string): Promise<boolean>;
   /** Capa enviada pelo dono do local (bytes no banco). */
   setEventCover(eventId: string, mime: string, data: Uint8Array): Promise<void>;
@@ -1335,6 +1336,12 @@ export interface FeedRepository {
   /** Quantas denúncias (abertas ou decididas) existem. */
   countReports(open: boolean): Promise<number>;
   countAllPosts(status: FeedPostStatus): Promise<number>;
+  // ---------- Sininho do evento ----------
+  /** Liga ou desliga o sininho do feed de um evento (só PLACE_EVENT e USER_EVENT). false se o evento não existe. */
+  setBell(target: FeedTarget, userId: string, on: boolean, at: Date): Promise<boolean>;
+  hasBell(target: FeedTarget, userId: string): Promise<boolean>;
+  /** Quem ligou o sininho do evento, dos mais antigos para os mais novos, até `limit`. */
+  listBellUsers(target: FeedTarget, limit: number): Promise<string[]>;
 }
 
 /** Registro de atividades: o que a própria pessoa fez (curtidas, comentários, posts, presença, quem passou a seguir). */

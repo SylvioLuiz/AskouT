@@ -4,6 +4,7 @@ import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from './
 import { EventExtrasFields } from './event-extras.tsx';
 import { EventInviteSheet } from './event-invite-picker.tsx';
 import { LinkPlaceSheet } from './link-place-sheet.tsx';
+import { PostponeQuestion } from './event-dates.tsx';
 import { Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -32,6 +33,8 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const [ends, setEnds] = useState(event.endsAt ? isoToLocalInput(event.endsAt) : '');
   // Evento ainda sem data (a votação decide): continua assim até a pessoa escolher uma data.
   const [byPoll, setByPoll] = useState(event.startsAt === null);
+  // Mudou a data de um evento que já tinha data: pergunta se é adiamento (sem resposta, não salva).
+  const [postponed, setPostponed] = useState<boolean | undefined>();
   const [kind, setKind] = useState<EventKind>(event.kind ?? 'OTHER');
   const [isPrivate, setPrivate] = useState(event.private === true);
   // Admin do evento edita, mas quem vê (público ou só convidados) continua escolha de quem criou.
@@ -74,6 +77,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const dateByPoll = byPoll && !starts;
   const missing = [title.trim() ? null : t('nome'), starts || dateByPoll ? null : t('data')].filter((m): m is string => m !== null);
   const when = dateByPoll ? t('Por votação') : whenLabel(starts, ends, new Date());
+  const dateMoved = event.startsAt !== null && !dateByPoll && starts !== '' && starts !== isoToLocalInput(event.startsAt);
   const kindLabel = KINDS.find((k) => k.id === kind)?.label ?? t('Outros');
   const cover = post.images.find((i) => i.path);
   const answered = extrasFromDraft(extras, extraOptions.data ?? []).length;
@@ -85,6 +89,10 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
     const problem = eventProblem({ title, kind, startsAt: starts, endsAt: ends, dateByPoll }, place, unchanged ? new Date(0) : new Date());
     if (problem) {
       setMessage(problem);
+      return;
+    }
+    if (dateMoved && postponed === undefined) {
+      setMessage(t('A data mudou: diga se é um adiamento antes de salvar.'));
       return;
     }
     setBusy(true);
@@ -101,6 +109,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           startsAt: dateByPoll ? null : localToIso(starts),
           endsAt: !dateByPoll && ends ? localToIso(ends) : null,
           ...(canChangeAudience ? { private: isPrivate } : {}),
+          ...(dateMoved && postponed !== undefined ? { postponed } : {}),
           // Sem a lista carregada, não manda `extras` e as respostas ficam como estavam.
           ...(extraOptions.data ? { extras: extrasFromDraft(extras, extraOptions.data) } : {}),
         },
@@ -126,7 +135,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           </button>
         </header>
         {message ? <Notice tone="error">{message}</Notice> : null}
-        {event.postponed ? <Notice>{t('Este evento está adiado. Ao salvar uma nova data, ele deixa de estar adiado e quem vai recebe um aviso.')}</Notice> : null}
+        {event.postponed && !dateMoved ? <Notice>{event.postponedFrom ? t('Este evento está adiado.') : t('Este evento está adiado, sem nova data. Escolha a nova data em Quando.')}</Notice> : null}
 
         <input
           ref={coverInput}
@@ -181,6 +190,11 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
 
         <ul className="evrows">
           <EventRow icon={<CalendarIcon />} label={t('Quando')} value={when} placeholder={t('Escolher')} onClick={() => setSheet('when')} disabled={busy} />
+          {dateMoved ? (
+            <li className="evrows__extra">
+              <PostponeQuestion value={postponed} onChange={setPostponed} />
+            </li>
+          ) : null}
           <EventRow
             icon={<LocationIcon />}
             label={t('Onde')}

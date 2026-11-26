@@ -44,8 +44,8 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
 
   async listGoingStartingBetween(from: Date, to: Date, limit: number): Promise<{ ref: EventRef; userId: string; createdAt: Date; startsAt: Date }[]> {
     const rows = await this.prisma.eventAttendance.findMany({
-      // Evento adiado não manda lembrete: a data guardada é a antiga.
-      where: { OR: [{ placeEvent: { postponedAt: null, startsAt: { gt: from, lte: to } } }, { post: { archivedAt: null, eventPostponedAt: null, eventStartsAt: { gt: from, lte: to } } }] },
+      // Adiado sem nova data não manda lembrete (a data guardada é a antiga); adiado com nova data manda, pela nova.
+      where: { OR: [{ placeEvent: { startsAt: { gt: from, lte: to }, OR: [{ postponedAt: null }, { postponedFrom: { not: null } }] } }, { post: { archivedAt: null, eventStartsAt: { gt: from, lte: to }, OR: [{ eventPostponedAt: null }, { eventPostponedFrom: { not: null } }] } }] },
       select: { userId: true, createdAt: true, placeEventId: true, postId: true, placeEvent: { select: { startsAt: true } }, post: { select: { eventStartsAt: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,

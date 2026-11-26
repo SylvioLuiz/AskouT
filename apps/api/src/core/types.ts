@@ -477,8 +477,10 @@ export interface PlaceEventRecord {
   tags: string[];
   /** Link https para comprar ingresso (site do próprio local ou de uma bilheteria). Ausente/nulo: sem link. */
   ticketUrl?: string | null;
-  /** Adiado sem nova data: quando foi marcado. Nulo/ausente: não está adiado. */
+  /** Adiado: quando foi marcado. Nulo/ausente: não está adiado. */
   postponedAt?: Date | null;
+  /** Adiado com nova data: o início de antes. Nulo com `postponedAt`: nova data a definir (o início guardado é o antigo). */
+  postponedFrom?: Date | null;
   isSample: boolean;
 }
 
@@ -534,7 +536,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN' | 'EVENT_UPDATE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'FEED_NEW_POST' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN' | 'EVENT_UPDATE';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -598,8 +600,10 @@ export interface PostRecord {
   eventPrivate?: boolean;
   /** Respostas às configurações de evento da gestão ("Pode fumar?": sim). Só vale quando o post é um evento. */
   eventExtras?: EventExtraAnswer[];
-  /** Evento adiado sem nova data: quando foi marcado. Nulo/ausente: não está adiado. */
+  /** Evento adiado: quando foi marcado. Nulo/ausente: não está adiado. */
   eventPostponedAt?: Date | null;
+  /** Adiado com nova data: o início de antes. Nulo com `eventPostponedAt`: nova data a definir (o início guardado é o antigo). */
+  eventPostponedFrom?: Date | null;
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
   archivedAt: Date | null;
   editedAt: Date | null;
@@ -835,6 +839,7 @@ export interface PostPatch {
   eventPrivate?: boolean;
   /** Sem o campo, o adiado não muda. */
   eventPostponedAt?: Date | null;
+  eventPostponedFrom?: Date | null;
   editedAt: Date;
 }
 

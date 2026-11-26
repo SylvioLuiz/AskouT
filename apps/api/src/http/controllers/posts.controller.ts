@@ -156,10 +156,10 @@ export class PostsController {
     return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, event: b.event, inviteUserIds: b.inviteUserIds }));
   }
 
-  /** Marca ou tira o "Adiado" do evento (dono ou admin): `{postponed: boolean}`. A nova data vem pela edição (que tira o adiado). */
+  /** Marca ou tira o "Adiado" do evento (dono ou admin): `{postponed: boolean, dateSet?: boolean}` (dateSet: a data atual já é a nova). A nova data vem pela edição (que tira o adiado). */
   @Put('posts/:id/postponed')
   async setPostponed(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
-    return this.present(await this.core.posts.setPostponed(actor.userId, id, asBody(body).postponed));
+    return this.present(await this.core.posts.setPostponed(actor.userId, id, asBody(body).postponed, asBody(body).dateSet));
   }
 
   /** Convida mais amigos para o próprio evento: `{userIds: string[]}`, sem marcar o evento como editado. Devolve só quem foi convidado agora. */

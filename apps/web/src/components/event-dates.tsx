@@ -1,12 +1,21 @@
+import { followStart } from '../lib/event-when.ts';
 import { t } from '../lib/i18n/index.ts';
 import { Button, Field } from './ui.tsx';
 
-/** Início e fim lado a lado. O fim é opcional e dá para apagar. */
+/** Início e fim lado a lado. O fim é opcional e dá para apagar; mudar o início leva o fim junto (mesma duração), e o fim continua editável. */
 export function EventDates({ starts, ends, onStarts, onEnds }: { starts: string; ends: string; onStarts: (v: string) => void; onEnds: (v: string) => void }) {
   return (
     <div className="eventdates">
       <div className="eventdates__grid">
-        <Field label={t('Começa')} type="datetime-local" value={starts} onChange={onStarts} />
+        <Field
+          label={t('Começa')}
+          type="datetime-local"
+          value={starts}
+          onChange={(v) => {
+            onStarts(v);
+            if (ends) onEnds(followStart(starts, v, ends));
+          }}
+        />
         <Field label={t('Termina (opcional)')} type="datetime-local" value={ends} onChange={onEnds} />
       </div>
       <div className="eventdates__foot">
@@ -17,6 +26,51 @@ export function EventDates({ starts, ends, onStarts, onEnds }: { starts: string;
           </Button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Na edição, quando a data muda: pergunta se é um adiamento. Sim: o evento aparece como adiado, com a nova data e a de antes
+ * riscada. Não: só muda a data. Nos dois casos quem vai recebe um aviso.
+ */
+export function PostponeQuestion({ value, onChange }: { value: boolean | undefined; onChange: (postponed: boolean) => void }) {
+  return (
+    <div className="evpostpone" role="group" aria-labelledby="evpostpone-q">
+      <strong id="evpostpone-q">{t('A data mudou. É um adiamento?')}</strong>
+      <div className="evpostpone__options">
+        <button type="button" className={`evchip${value === true ? ' evchip--on' : ''}`} aria-pressed={value === true} onClick={() => onChange(true)}>
+          {t('Sim, marcar como adiado')}
+        </button>
+        <button type="button" className={`evchip${value === false ? ' evchip--on' : ''}`} aria-pressed={value === false} onClick={() => onChange(false)}>
+          {t('Não, só mudar a data')}
+        </button>
+      </div>
+      <span className="muted">{t('Adiado aparece para quem vai com a nova data e a de antes riscada. Nos dois casos, quem vai recebe um aviso.')}</span>
+    </div>
+  );
+}
+
+/**
+ * Adiar sem passar pela edição: a data atual já é a nova (mostra "Adiado para" ela), escolher a nova data (abre a edição)
+ * ou ainda sem nova data (fica "a definir"). Quem vai recebe um aviso.
+ */
+export function PostponeChoice({ dateLabel, busy, onChoose, onPickDate, onCancel }: { dateLabel: string; busy: boolean; onChoose: (dateSet: boolean) => void; onPickDate: () => void; onCancel: () => void }) {
+  return (
+    <div className="evpostpone" role="group" aria-labelledby="evpostpone-c">
+      <strong id="evpostpone-c">{t('Adiar o evento? Quem vai recebe um aviso.')}</strong>
+      <Button full variant="secondary" loading={busy} onClick={() => onChoose(true)}>
+        {t('A nova data já é a atual ({date})', { date: dateLabel })}
+      </Button>
+      <Button full variant="secondary" disabled={busy} onClick={onPickDate}>
+        {t('Escolher a nova data')}
+      </Button>
+      <Button full variant="secondary" disabled={busy} onClick={() => onChoose(false)}>
+        {t('Ainda sem nova data')}
+      </Button>
+      <Button full variant="quiet" disabled={busy} onClick={onCancel}>
+        {t('Cancelar')}
+      </Button>
     </div>
   );
 }

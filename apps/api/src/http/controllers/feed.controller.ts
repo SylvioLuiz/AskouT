@@ -50,6 +50,12 @@ export class FeedController {
     return this.core.feed.setPolicy(actor.userId, 'venue', id, asBody(body).policy);
   }
 
+  /** `{on: boolean}`. Sininho do evento: aviso a cada publicação nova de outra pessoa. Devolve as configurações do feed. */
+  @Put('events/:id/feed/bell')
+  eventBell(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.feed.setBell(actor.userId, 'event', id, asBody(body).on);
+  }
+
   /** Só quem organiza: as publicações esperando aprovação. */
   @Get('events/:id/feed/pending')
   eventPending(@CurrentActor() actor: Actor, @Param('id') id: string) {

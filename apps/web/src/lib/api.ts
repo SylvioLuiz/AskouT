@@ -396,7 +396,7 @@ export function createApi(deps: ApiDeps) {
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
     /** O dono torna admin do evento quem vai ou aceitou o convite. */
     /** Marca ou tira o "Adiado" do evento (dono ou admin). A nova data vem pela edição, que tira o adiado. */
-    setEventPostponed: (postId: string, postponed: boolean) => request<PostView>('PUT', `/posts/${id(postId)}/postponed`, { body: { postponed } }),
+    setEventPostponed: (postId: string, postponed: boolean, dateSet?: boolean) => request<PostView>('PUT', `/posts/${id(postId)}/postponed`, { body: { postponed, ...(dateSet === undefined ? {} : { dateSet }) } }),
     addEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('POST', `/posts/${id(postId)}/admins`, { body: { userId } }),
     /** O dono tira um admin; o próprio admin também pode sair. */
     removeEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('DELETE', `/posts/${id(postId)}/admins/${id(userId)}`),
@@ -699,6 +699,7 @@ export function createApi(deps: ApiDeps) {
       request<FeedPage>('GET', `/${where}/${id(targetId)}/feed${toQuery({ cursor: query.cursor ?? undefined, limit: query.limit })}`),
     createFeedPost: (where: FeedWhere, targetId: string, input: { kind: 'POST' | 'NOTICE'; body?: string; images?: string[] }) => request<FeedPost>('POST', `/${where}/${id(targetId)}/feed`, { body: input }),
     setFeedPolicy: (where: FeedWhere, targetId: string, policy: FeedPolicy) => request<FeedSettings>('PUT', `/${where}/${id(targetId)}/feed/policy`, { body: { policy } }),
+    setFeedBell: (eventId: string, on: boolean) => request<FeedSettings>('PUT', `/events/${id(eventId)}/feed/bell`, { body: { on } }),
     feedPending: (where: FeedWhere, targetId: string) => request<{ items: FeedPost[] }>('GET', `/${where}/${id(targetId)}/feed/pending`),
     feedPost: (postId: string) => request<FeedPost>('GET', `/feed/posts/${id(postId)}`),
     deleteFeedPost: (postId: string) => request<{ deleted: true }>('DELETE', `/feed/posts/${id(postId)}`),
@@ -813,7 +814,7 @@ export function createApi(deps: ApiDeps) {
     cloakroomLookup: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/lookup`, { body: { code } }),
     cloakroomReceive: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/receive`, { body: { code } }),
     cloakroomReturn: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/return`, { body: { code } }),
-    setVenueEventPostponed: (venueId: string, eventId: string, postponed: boolean) => request<VenueEvent>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/postponed`, { body: { postponed } }),
+    setVenueEventPostponed: (venueId: string, eventId: string, postponed: boolean, dateSet?: boolean) => request<VenueEvent>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/postponed`, { body: { postponed, ...(dateSet === undefined ? {} : { dateSet }) } }),
     deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas

@@ -94,3 +94,77 @@ test('evento do local: quem administra adia e muda a data, e quem vai é avisado
   assert.equal((await w.core.eventPages.get(ana, event.id)).postponed, false);
   assert.equal((await updates(w, ana)).length, 2);
 });
+
+test('mudar a data dizendo que é adiamento: fica adiado com a nova data e a de antes guardada', async () => {
+  const { w, ana, caio, post, start } = await userEvent();
+  const next = new Date(start.getTime() + 7 * 24 * H);
+  const edited = await w.core.posts.update(ana, post.id, { event: { title: 'Churrasco', startsAt: next.toISOString(), postponed: true } });
+  assert.equal(edited.event?.postponed, true);
+  assert.equal(edited.event?.postponedFrom, start.toISOString());
+  assert.equal(edited.event?.startsAt, next.toISOString());
+  const page = await w.core.eventPages.get(caio, post.id);
+  assert.equal(page.postponed, true);
+  assert.equal(page.postponedFrom, start.toISOString());
+  const notes = await updates(w, caio);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0]!.title, /foi adiado/);
+  assert.match(notes[0]!.body, /Nova data/);
+  // Adiado com nova data continua mandando lembrete, pela nova data.
+  const near = await w.eventRoom.listGoingStartingBetween(new Date(next.getTime() - H), next, 50);
+  assert.ok(near.some((g) => g.ref.id === post.id));
+  // Adiar de novo guarda a data original, não a intermediária.
+  w.clock.tick(1000);
+  const later = new Date(next.getTime() + 7 * 24 * H);
+  const again = await w.core.posts.update(ana, post.id, { event: { title: 'Churrasco', startsAt: later.toISOString(), postponed: true } });
+  assert.equal(again.event?.postponedFrom, start.toISOString());
+  // Editar outra coisa não mexe no adiado.
+  w.clock.tick(1000);
+  const caption = await w.core.posts.update(ana, post.id, { caption: 'Mudou tudo' });
+  assert.equal(caption.event?.postponed, true);
+  assert.equal((await updates(w, caio)).length, 2);
+});
+
+test('adiado pelo menu e depois com a nova data dita como adiamento guarda a data original', async () => {
+  const { w, ana, post, start } = await userEvent();
+  const tbd = await w.core.posts.setPostponed(ana, post.id, true);
+  assert.equal(tbd.event?.postponedFrom, null, 'sem nova data ainda');
+  const next = new Date(start.getTime() + 3 * 24 * H);
+  const edited = await w.core.posts.update(ana, post.id, { event: { title: 'Churrasco', startsAt: next.toISOString(), postponed: true } });
+  assert.equal(edited.event?.postponedFrom, start.toISOString());
+});
+
+test('evento do local: nova data como adiamento', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('pres', 'ana', 'adm');
+  const [pres, ana, adm] = [u['pres']!, u['ana']!, u['adm']!];
+  w.users.users.set(adm, { ...w.users.users.get(adm)!, role: 'ADMIN' });
+  const claim = await w.core.venues.requestOrganization(pres, { name: 'Bateria Furiosa', type: 'Bateria', campus: 'UFMG', description: 'x', lat: -19.87, lng: -43.96, document: JPEG() });
+  await w.core.venues.reviewClaim(adm, claim.id, 'APPROVED');
+  const start = new Date(w.clock.now().getTime() + 24 * H);
+  const event = await w.core.venues.createEvent(pres, claim.venue.id, { title: 'Ensaio', startsAt: start.toISOString() });
+  await w.core.eventPages.go(ana, event.id);
+  const next = new Date(start.getTime() + 2 * 24 * H);
+  const updated = await w.core.venues.updateEvent(pres, claim.venue.id, event.id, { title: 'Ensaio', startsAt: next.toISOString(), postponed: true });
+  assert.equal(updated.postponed, true);
+  assert.equal(updated.postponedFrom, start.toISOString());
+  assert.match((await updates(w, ana))[0]!.title, /foi adiado/);
+});
+
+test('adiar pelo menu dizendo que a data atual já é a nova mostra "Adiado para" a data', async () => {
+  const { w, ana, caio, post, start } = await userEvent();
+  const view = await w.core.posts.setPostponed(ana, post.id, true, true);
+  assert.equal(view.event?.postponed, true);
+  assert.equal(view.event?.postponedFrom, start.toISOString(), 'tem data: não fica "a definir"');
+  const notes = await updates(w, caio);
+  assert.match(notes[0]!.body, /Nova data/);
+  // Quem já tinha adiado sem data e depois diz que a data atual é a nova também passa a mostrar a data.
+  const other = await userEvent();
+  await other.w.core.posts.setPostponed(other.ana, other.post.id, true);
+  other.w.clock.tick(1000);
+  const fixed = await other.w.core.posts.setPostponed(other.ana, other.post.id, true, true);
+  assert.equal(fixed.event?.postponedFrom, other.start.toISOString());
+  assert.equal((await updates(other.w, other.caio)).length, 2);
+  // Lembretes seguem pela data.
+  const near = await other.w.eventRoom.listGoingStartingBetween(new Date(other.start.getTime() - H), other.start, 50);
+  assert.ok(near.some((g) => g.ref.id === other.post.id));
+});

@@ -259,6 +259,7 @@ model User {
   eventReminderChoices EventReminderChoice[]
   venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
+  feedBells         FeedBell[]        @relation("FeedBellUser")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
   feedCommentReactions FeedCommentReaction[] @relation("FeedCommentReactionUser")
@@ -1033,6 +1034,8 @@ model PlaceEvent {
   feedPolicy  FeedPolicy @default(OWNER_ONLY)
   /// Adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
   postponedAt DateTime?
+  /// Adiado com nova data: a data de antes (o início antigo). Nulo com `postponedAt`: nova data ainda a definir.
+  postponedFrom DateTime?
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1045,6 +1048,7 @@ model PlaceEvent {
   stories   EventStory[]
   cover    PlaceEventCover?
   feedPosts FeedPost[]
+  feedBells FeedBell[]
   cloakroom CloakroomSetting?
   cloakroomTickets CloakroomTicket[]
   guestList GuestList?
@@ -1075,6 +1079,8 @@ model Post {
   eventExtras      Json    @default("[]")
   /// Evento adiado sem nova data: quando foi marcado. A data antiga fica guardada; marcar uma nova data tira o adiado.
   eventPostponedAt DateTime?
+  /// Adiado com nova data: a data de antes (o início antigo). Nulo com `eventPostponedAt`: nova data ainda a definir.
+  eventPostponedFrom DateTime?
   archivedAt    DateTime?
   editedAt      DateTime?
   createdAt    DateTime @default(now())
@@ -1101,6 +1107,7 @@ model Post {
   attendees EventAttendance[]
   stories   EventStory[]
   feedPosts  FeedPost[]
+  feedBells  FeedBell[]
   sharedInMessages Message[] @relation("MessagePostEvent")
   repostedBy PostedUserEvent[]
   datePolls  DatePoll[] @relation("PollEventPost")
@@ -1854,6 +1861,24 @@ model FeedPost {
   @@index([userEventId, status, createdAt])
   @@index([venueId, status, createdAt])
   @@index([authorId])
+}
+
+/// Sininho do feed de um evento: quem ligou recebe um aviso a cada publicação nova de outra pessoa ali.
+model FeedBell {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  placeEventId String?  @db.Uuid
+  userEventId  String?  @db.Uuid
+  createdAt    DateTime @default(now())
+
+  user       User        @relation("FeedBellUser", fields: [userId], references: [id], onDelete: Cascade)
+  placeEvent PlaceEvent? @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
+  userEvent  Post?       @relation(fields: [userEventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, placeEventId])
+  @@unique([userId, userEventId])
+  @@index([placeEventId, createdAt])
+  @@index([userEventId, createdAt])
 }
 
 /// Foto da publicação do feed (já reduzida pelo app, até 100 KB).

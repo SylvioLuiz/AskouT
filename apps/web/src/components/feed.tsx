@@ -5,7 +5,7 @@ import { CommentGifView, CommentTools, ReplyBanner, ReplyButton } from './commen
 import { removeComment, replyPrefill, threadComments } from '../lib/comment-threads.ts';
 import { Carousel } from './post.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
-import { ArrowUpIcon, CommentIcon, HeartIcon, MoreIcon, PhotoIcon, PlusIcon, TrashIcon, XIcon } from './icons.tsx';
+import { ArrowUpIcon, BellIcon, BellOffIcon, CommentIcon, HeartIcon, MoreIcon, PhotoIcon, PlusIcon, TrashIcon, XIcon } from './icons.tsx';
 import { EmojiSheet } from './emoji-sheet.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
@@ -846,12 +846,14 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
   const [sheet, setSheet] = useState<'compose' | 'policy' | 'pending' | undefined>(openPending ? 'pending' : undefined);
   const [commentsFor, setCommentsFor] = useState<FeedPost | undefined>();
   const [notice, setNotice] = useState<string | undefined>();
+  const [bellBusy, setBellBusy] = useState(false);
+  const [bellError, setBellError] = useState<string | undefined>();
   const sentinel = useRef<HTMLDivElement>(null);
   const settingsRef = useRef(onSettings);
   settingsRef.current = onSettings;
 
   function applySettings(next: FeedSettings) {
-    const s = { policy: next.policy, hasModerator: next.hasModerator, isModerator: next.isModerator, canPost: next.canPost, needsApproval: next.needsApproval, pendingCount: next.pendingCount };
+    const s = { policy: next.policy, hasModerator: next.hasModerator, isModerator: next.isModerator, canPost: next.canPost, needsApproval: next.needsApproval, pendingCount: next.pendingCount, bell: next.bell ?? null };
     setSettings(s);
     settingsRef.current?.(s);
   }
@@ -902,6 +904,23 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, loading, error]);
 
+  /** Sininho do evento: liga ou desliga o aviso a cada publicação nova de outra pessoa. */
+  async function toggleBell() {
+    if (!settings || settings.bell === null || bellBusy) return;
+    setBellBusy(true);
+    setBellError(undefined);
+    try {
+      const next = await api.setFeedBell(targetId, !settings.bell);
+      applySettings(next);
+      haptic('tap');
+      setNotice(next.bell ? t('Pronto! Você recebe um aviso a cada publicação nova aqui.') : t('Avisos de publicações novas desligados.'));
+    } catch (failure) {
+      setBellError(toApiError(failure).message);
+    } finally {
+      setBellBusy(false);
+    }
+  }
+
   const patch = (post: FeedPost) => {
     setItems((current) => current.map((p) => (p.id === post.id ? post : p)));
     setCommentsFor((current) => (current?.id === post.id ? post : current));
@@ -914,6 +933,22 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
   return (
     <section className="feed" aria-label={t('Publicações')}>
       {intro}
+      {settings && settings.bell !== null ? (
+        <div className="feedbell">
+          <button
+            type="button"
+            className={`feedmod__chip feedbell__chip${settings.bell ? ' feedbell__chip--on' : ''}`}
+            aria-pressed={settings.bell}
+            disabled={bellBusy}
+            aria-busy={bellBusy || undefined}
+            onClick={() => void toggleBell()}
+          >
+            {settings.bell ? <BellIcon /> : <BellOffIcon />}
+            {settings.bell ? t('Avisos de publicações ligados') : t('Avisar publicações novas')}
+          </button>
+        </div>
+      ) : null}
+      {bellError ? <Notice tone="error">{bellError}</Notice> : null}
       {settings?.canPost ? (
         <div className="feedcompose">
           {me ? <Avatar profile={me} size={40} /> : null}

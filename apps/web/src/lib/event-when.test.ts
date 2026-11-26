@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { addHoursLocal, joinLocal, splitLocal, upcomingDays, whenLabel } from './event-when.ts';
+import { addHoursLocal, followStart, joinLocal, splitLocal, upcomingDays, whenLabel } from './event-when.ts';
 
 describe('quando do evento', () => {
   it('separa e junta dia e hora', () => {
@@ -33,5 +33,16 @@ describe('quando do evento', () => {
     assert.equal(whenLabel('2026-11-20T21:00', '2026-11-20T23:30', now), 'amanhã · 21:00–23:30');
     assert.equal(whenLabel('2026-11-19T22:00', '2026-11-20T03:00', now), 'hoje · 22:00 até 03:00');
     assert.match(whenLabel('2026-11-22T22:00', '', now), /22.*nov.*· 22:00/);
+  });
+});
+
+describe('followStart', () => {
+  it('o término anda junto com o início, mantendo a duração', () => {
+    assert.equal(followStart('2026-12-05T20:00', '2026-12-12T21:30', '2026-12-05T23:00'), '2026-12-13T00:30');
+    assert.equal(followStart('2026-12-05T20:00', '2026-12-05T18:00', '2026-12-06T02:00'), '2026-12-06T00:00');
+  });
+  it('sem término ou com valor inválido, não mexe', () => {
+    assert.equal(followStart('2026-12-05T20:00', '2026-12-06T20:00', ''), '');
+    assert.equal(followStart('', '2026-12-06T20:00', '2026-12-05T23:00'), '2026-12-05T23:00');
   });
 });

@@ -71,3 +71,17 @@ export function whenLabel(starts: string, ends: string, now: Date): string {
   if (!e.date) return `${day} · ${s.time}`;
   return e.date === s.date ? `${day} · ${s.time}–${e.time}` : `${day} · ${s.time} ${t('até')} ${e.time}`;
 }
+
+/**
+ * O término acompanha o início: mudou o início, o término anda o mesmo tanto (a duração fica igual).
+ * Sem término, ou com um dos valores inválido, devolve o término como estava. O término continua editável à parte.
+ */
+export function followStart(previousStart: string, nextStart: string, end: string): string {
+  if (!end || !previousStart || !nextStart) return end;
+  const before = new Date(previousStart).getTime();
+  const after = new Date(nextStart).getTime();
+  const { date, time } = splitLocal(end);
+  if (!date || Number.isNaN(before) || Number.isNaN(after)) return end;
+  const d = new Date(new Date(`${date}T${time}`).getTime() + (after - before));
+  return `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
