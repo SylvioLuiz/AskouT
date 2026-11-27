@@ -37,7 +37,7 @@ export type PostGone = 'deleted' | 'hidden' | 'archived';
 // ---------- Menu ⋯ ----------
 
 /** Opções do post: de outra pessoa (denunciar, não tenho interesse) ou suas (editar, ajustar, arquivar, excluir). */
-export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArchiveToggle, onNotInterested, onDelete, onRemoveTag, busy }: {
+export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArchiveToggle, onNotInterested, onDelete, onRemoveTag, onRestoreTag, busy }: {
   post: PostView;
   onClose: () => void;
   onEdit: () => void;
@@ -48,6 +48,8 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
   onDelete: () => void;
   /** Só quando você está marcado (marcação aceita) no post de outra pessoa. */
   onRemoveTag?: (() => void) | undefined;
+  /** Só quando você removeu a sua marcação no post de outra pessoa: aceitar de novo. */
+  onRestoreTag?: (() => void) | undefined;
   busy: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -83,6 +85,7 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
       ) : (
         <ul className="sharelist">
           {onRemoveTag ? item(t('Remover minha marcação'), t('O post sai do seu perfil e você deixa de aparecer marcado.'), onRemoveTag) : null}
+          {onRestoreTag ? item(t('Aceitar marcação de novo'), t('O post volta para o seu perfil e você volta a aparecer marcado.'), onRestoreTag) : null}
           {item('Denunciar', t('Conteúdo que não deveria estar aqui.'), onReport, { danger: true })}
           {item(t('Não tenho interesse'), t('Deixa de mostrar este post no seu feed.'), onNotInterested)}
         </ul>

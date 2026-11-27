@@ -357,6 +357,20 @@ export function EventScreen({ eventId }: { eventId: string }) {
     }
   }
 
+  async function acceptTagAgain() {
+    if (!e) return;
+    setGoBusy(true);
+    setProblem(undefined);
+    try {
+      const result = await api.respondTag(e.id, 'accept');
+      setFresh({ ...e, myTag: result.status });
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setGoBusy(false);
+    }
+  }
+
   async function switchProfile() {
     if (!e) return;
     setGoBusy(true);
@@ -651,6 +665,14 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     {e.goingOnProfile ? t('Aparece na aba Eventos do seu perfil.') : t('Fica na aba Participou do seu perfil, que só você vê.')}{' '}
                     <button type="button" className="linkbtn" onClick={() => void switchProfile()} disabled={goBusy}>
                       {e.goingOnProfile ? t('Tirar do perfil') : t('Mostrar no perfil')}
+                    </button>
+                  </p>
+                ) : null}
+                {e.myTag === 'DECLINED' ? (
+                  <p className="evgo__hint">
+                    {t('Você removeu sua marcação deste evento.')}{' '}
+                    <button type="button" className="linkbtn" onClick={() => void acceptTagAgain()} disabled={goBusy}>
+                      {t('Aceitar marcação de novo')}
                     </button>
                   </p>
                 ) : null}

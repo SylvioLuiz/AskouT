@@ -1082,6 +1082,8 @@ export interface EventPage {
   canStory: boolean;
   /** Só quando confirmou: escolheu mostrar o evento na aba Eventos do perfil (senão fica na aba Participou, só sua). */
   goingOnProfile?: boolean;
+  /** Sua marcação no evento (nulo: não foi marcada). Recusada: você tirou a marcação e pode aceitar de novo. */
+  myTag?: 'PENDING' | 'ACCEPTED' | 'DECLINED' | null;
   /** Evento sem data com votação aberta (para quem criou ou participa). Nulo: sem votação. */
   datePollId?: string | null;
   /** Grupo (conversa) do evento em que você está. Nulo: não está em nenhum. */
