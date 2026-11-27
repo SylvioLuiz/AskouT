@@ -35,6 +35,18 @@ test('marcar no evento já é convidar: aparece como convidado e abre o evento p
   await rejectsWith(w.core.eventPages.get(caio, post.id), 'NOT_FOUND');
 });
 
+test('evento privado com marcação aceita aparece no perfil de quem foi marcada e no de quem marcou', async () => {
+  const { w, ana, bia, caio, make } = await setup();
+  const post = await make(true, [bia]);
+  await w.core.posts.respondTag(bia, post.id, 'accept');
+  const eventIds = async (viewer: string, username: string) => (await w.core.posts.listByUsername(viewer, username, { kind: 'event' })).items.map((p) => p.id);
+  assert.deepEqual(await eventIds(bia, 'bia'), [post.id], 'bia vê no próprio perfil');
+  assert.deepEqual(await eventIds(bia, 'ana'), [post.id], 'bia vê no perfil de ana');
+  assert.deepEqual(await eventIds(ana, 'bia'), [post.id], 'a dona vê no perfil de bia');
+  assert.deepEqual(await eventIds(caio, 'bia'), [], 'amigo sem convite não vê o privado');
+  assert.deepEqual(await eventIds(caio, 'ana'), []);
+});
+
 test('evento privado: convidar cria a marcação; dá para convidar mais gente depois', async () => {
   const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
   const post = await make(true);

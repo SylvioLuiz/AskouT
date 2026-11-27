@@ -219,6 +219,8 @@ test('evento criado a partir da votação: confirmados já vão, nome sincroniza
   assert.equal(await w.eventRoom.isGoing(ref, bia), true);
   assert.equal(await w.eventRoom.isGoing(ref, caio), true);
   assert.equal(await w.eventRoom.isGoing(ref, dani), false);
+  const eventIds = async (username: string) => (await w.core.posts.listByUsername(bia, username, { kind: 'event' })).items.map((p) => p.id);
+  assert.deepEqual(await eventIds('ana'), [post.id], 'o evento continua na aba Eventos de quem organizou');
   const [item] = (await w.core.scheduling.listForConversation(ana, group.id)).items;
   assert.equal(item!.title, 'Churras na laje');
   assert.equal(item!.event?.id, post.id);

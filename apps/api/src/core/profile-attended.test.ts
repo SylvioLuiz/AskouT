@@ -83,19 +83,20 @@ test('confirmar de novo só troca a escolha; eventos criados pela pessoa não en
 });
 
 test('quem criou o evento pode tirá-lo da aba Eventos e deixar só no Participou (e trazer de volta)', async () => {
-  const { w, ana, bia, aberto } = await setup();
+  const { w, ana, bia, caio, aberto } = await setup();
+  // caio é amigo de ana sem convite para o evento privado: só vê a Corrida.
   const eventTitles = async (viewer: string) => (await w.core.posts.listByUsername(viewer, 'ana', { kind: 'event' })).items.map((p) => p.event?.title).sort();
-  assert.deepEqual(await eventTitles(bia), ['Corrida']);
+  assert.deepEqual(await eventTitles(caio), ['Corrida']);
   const before = (await w.core.eventPages.get(bia, aberto.id)).confirmedCount;
 
   await w.core.eventPages.setGoingOnProfile(ana, aberto.id, false);
-  assert.deepEqual(await eventTitles(bia), [], 'some da aba Eventos para quem visita');
+  assert.deepEqual(await eventTitles(caio), [], 'some da aba Eventos para quem visita');
   assert.equal((await w.core.posts.listByUsername(ana, 'ana', { kind: 'event' })).total, 1, 'só o evento privado (que só ela vê) continua');
   assert.deepEqual(titles(await w.core.eventPages.listAttended(ana, 'ana')), ['Corrida'], 'fica no Participou');
   assert.equal((await w.core.eventPages.get(bia, aberto.id)).confirmedCount, before, 'o dono não conta duas vezes');
 
   await w.core.eventPages.setGoingOnProfile(ana, aberto.id, true);
-  assert.deepEqual(await eventTitles(bia), ['Corrida']);
+  assert.deepEqual(await eventTitles(caio), ['Corrida']);
   assert.deepEqual(titles(await w.core.eventPages.listAttended(ana, 'ana')), []);
 });
 

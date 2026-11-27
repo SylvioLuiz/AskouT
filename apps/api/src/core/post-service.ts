@@ -323,9 +323,10 @@ export class PostService {
     if (meetup) {
       await meetups.update(meetup.id, { title, eventPostId: postId });
       const going = new Set([actorId, ...meetup.participants.filter((p) => p.status === 'CONFIRMED').map((p) => p.userId)]);
-      for (const userId of going) await eventRoom.addGoing({ source: 'USER', id: postId }, userId, clock.now());
+      // Quem organiza conta como confirmado com o evento na aba Eventos; presença do dono fora do perfil significa que ele tirou o evento de lá.
+      for (const userId of going) await eventRoom.addGoing({ source: 'USER', id: postId }, userId, clock.now(), userId === actorId);
     } else {
-      await eventRoom.addGoing({ source: 'USER', id: postId }, actorId, clock.now());
+      await eventRoom.addGoing({ source: 'USER', id: postId }, actorId, clock.now(), true);
     }
   }
 
@@ -1047,8 +1048,8 @@ export class PostService {
         continue;
       }
       const author = row.post.authorId;
-      // Evento privado não aparece em listas (feed, perfil) de ninguém além do dono.
-      if (row.post.eventPrivate && author !== viewerId) continue;
+      // Evento privado só aparece em listas (feed, perfil) para quem tem acesso a ele: o dono e quem foi convidado ou marcado.
+      if (row.post.eventPrivate && author !== viewerId && !(await canOpenByInvite(this.deps, viewerId, row.post.id))) continue;
       if (!memo.has(author)) memo.set(author, await this.canSee(viewerId, author));
       if (memo.get(author)) out.push(row);
     }
