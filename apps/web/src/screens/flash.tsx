@@ -1255,8 +1255,11 @@ function useReopenLiveArrival(matches: readonly FlashMatch[] | undefined): void 
   }, [key]);
 }
 
-function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void): { available: boolean; denied: boolean } {
-  const active = match?.meArrival === true;
+function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void, sharing = false): { available: boolean; denied: boolean } {
+  // Mostrando a chegada, ou só compartilhando a posição neste encontro: no app do celular a posição continua indo com a
+  // tela bloqueada (como no Uber). Antes, só com a chegada ligada; compartilhando sem ela, o iPhone parava ao bloquear.
+  const arrival = match?.meArrival === true;
+  const active = arrival || (sharing && match !== undefined);
   const inviteId = match?.inviteId;
   const name = match?.other.username ?? '';
   const [denied, setDenied] = useState(false);
@@ -1279,17 +1282,19 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
     let startM: number | undefined;
     let targetKey: string | undefined;
     const url = `${apiBaseUrl}/flash/matches/${encodeURIComponent(inviteId)}/location`;
-    const title = t('Mostrando sua chegada para {name}', { name });
+    const title = arrival ? t('Mostrando sua chegada para {name}', { name }) : t('Compartilhando sua localização com {name}', { name });
     bridge
       .start({
         title,
         message: t('O AskouT manda sua posição até o encontro acabar ou você parar.'),
         onFix: (fix) => {
           const now = Date.now();
+          // Só compartilhando (sem a chegada): com o app aberto quem envia é a tela; aqui, só em segundo plano.
+          if (!arrival && typeof document !== 'undefined' && document.visibilityState === 'visible') return;
           if (!shouldSendFix(last, fix, now)) return;
           last = { at: now, lat: fix.lat, lng: fix.lng };
           const target = targetRef.current;
-          if (target && bridge.progress && !cancelled) {
+          if (arrival && target && bridge.progress && !cancelled) {
             // Trocou ou tirou o lugar: a barra recomeça do zero, como no aviso do amigo.
             const key = `${target.lat},${target.lng}`;
             if (key !== targetKey) startM = undefined;
@@ -1329,7 +1334,7 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
       cancelled = true;
       void stop?.();
     };
-  }, [active, inviteId, name]);
+  }, [active, arrival, inviteId, name]);
   return { available: backgroundLocationBridge() !== undefined, denied };
 }
 
@@ -1563,7 +1568,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
   const share = useShareLocation([inviteId], match.reload, match.data !== undefined);
-  const background = useBackgroundArrival(match.data, match.reload);
+  const background = useBackgroundArrival(match.data, match.reload, share.state.phase === 'sharing');
   const [mapFailed, setMapFailed] = useState(false);
   const [pickedKey, setPickedKey] = useState<string | undefined>();
   const [mode, setMode] = useState<'foot' | 'driving'>('foot');

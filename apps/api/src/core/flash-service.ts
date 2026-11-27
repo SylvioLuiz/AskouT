@@ -2,7 +2,7 @@ import { openFlashAlbum } from './album-service.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps, RouteResult } from './ports.ts';
 import { distanceMeters, midpoint } from './geo.ts';
-import { ArrivalTracker, estimateArrival, formatArrivalDistance } from './arrival.ts';
+import { ArrivalTracker, estimateArrival, formatArrivalDistance, type ArrivalEstimate } from './arrival.ts';
 import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import { decay, directCloseness } from './recommendation-service.ts';
@@ -116,6 +116,8 @@ function withArrival(invite: FlashInviteRecord, userId: string, share: boolean):
 }
 
 const arrivalTag = (inviteId: string, userId: string): string => `arrival:${inviteId}:${userId}`;
+/** Aviso da própria chegada de quem mostra (só iPhone: o Android já tem o aviso fixo do serviço de localização). */
+const ownArrivalTag = (inviteId: string, userId: string): string => `arrival-own:${inviteId}:${userId}`;
 
 /** Encaixa numa grade de ~3 km quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
 function fuzzIfApprox(position: FlashPositionRecord, approx: boolean): FlashPositionRecord {
@@ -699,6 +701,38 @@ export class FlashService {
       live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: (!step.first || retarget) && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
       who: { name: who, ...(profile?.avatarUrl ? { image: profile.avatarUrl } : {}) },
     });
+    await this.pushOwnArrival(invite, sharerId, otherId, estimate, now, retarget).catch(() => undefined);
+  }
+
+  /**
+   * No iPhone, quem mostra a chegada também vê quanto falta na tela bloqueada (Live Activity ou aviso), como o aviso
+   * fixo com a barra que o Android já mostra. As posições chegam pelo envio em segundo plano do app.
+   */
+  private async pushOwnArrival(invite: FlashInviteRecord, sharerId: string, otherId: string, estimate: ArrivalEstimate, now: Date, retarget: boolean): Promise<void> {
+    const notifier = this.deps.notifier;
+    if (!notifier.live) return;
+    const tag = ownArrivalTag(invite.id, sharerId);
+    const step = this.arrivals.next(tag, estimate, now.getTime());
+    if (!step) return;
+    const dest = invite.destination;
+    const otherName = (await this.deps.users.findProfilesByIds([otherId]))[0]?.username ?? 'seu amigo';
+    const place = dest ? dest.name : otherName;
+    await notifier.live({
+      userId: sharerId,
+      type: 'FLASH_INVITE',
+      title: estimate.arrived ? 'Você chegou' : `Indo para ${place}`,
+      body: estimate.arrived
+        ? dest
+          ? `Você chegou em ${dest.name}`
+          : `Você está bem perto de ${otherName}`
+        : `Chega em ~${estimate.minutes} min · ${formatArrivalDistance(estimate.distanceM)} até ${place}`,
+      url: `/now/encontro/${invite.id}`,
+      tag,
+      // Só a chegada toca: a pessoa sabe que saiu, não precisa de som no começo.
+      live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: !estimate.arrived || retarget, untilMs: invite.expiresAt.getTime() },
+      who: { name: place },
+      iphoneOnly: true,
+    });
   }
 
   /**
@@ -739,8 +773,21 @@ export class FlashService {
   /** Troca o aviso fixo de quem acompanhava por um aviso final (o Android tira o fixo; o iPhone troca o texto). */
   private async stopArrival(invite: FlashInviteRecord, sharerId: string, body: string): Promise<void> {
     this.arrivals.forget(arrivalTag(invite.id, sharerId));
+    this.arrivals.forget(ownArrivalTag(invite.id, sharerId));
     const notifier = this.deps.notifier;
     if (!notifier.live) return;
+    await notifier
+      .live({
+        userId: sharerId,
+        type: 'FLASH_INVITE',
+        title: 'Sua chegada',
+        body,
+        url: `/now/encontro/${invite.id}`,
+        tag: ownArrivalTag(invite.id, sharerId),
+        live: { state: 'stopped', progress: 0, quiet: true, untilMs: invite.expiresAt.getTime() },
+        iphoneOnly: true,
+      })
+      .catch(() => undefined);
     const otherId = invite.fromUserId === sharerId ? invite.toUserId : invite.fromUserId;
     const who = (await this.deps.users.findProfilesByIds([sharerId]))[0]?.username ?? 'Seu amigo';
     await notifier.live({

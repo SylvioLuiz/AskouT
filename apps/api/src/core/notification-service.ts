@@ -175,7 +175,7 @@ export class StoredNotifier implements Notifier {
    * Aviso que se atualiza (chegada do amigo no NOW): só push, nada no sino (seriam dezenas de avisos iguais).
    * Respeita o "silenciar todas". Vai só para o app do celular: o navegador não tem notificação fixa nem barra.
    */
-  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void> {
+  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean; iphoneOnly?: boolean }): Promise<void> {
     const { notifications, pushSubscriptions, push } = this.deps;
     const job = (async () => {
       if (!push.nativeEnabled) return;
@@ -184,8 +184,15 @@ export class StoredNotifier implements Notifier {
       // iPhone com Live Activity: a chegada vai para a tela bloqueada (com a barra), e não como aviso comum.
       const route = await this.liveActivity(input, all);
       // Live Activity fechada: no iPhone só vão os avisos que tocam (a chegada) e o de "parou"; as trocas silenciosas não.
-      const skipIphone = route === 'activity' || (route === 'dismissed' && input.live.quiet && input.live.state === 'moving');
-      const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(skipIphone && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
+      // Pedida e ainda não confirmada pelo iPhone: o "chegou" e o "parou" vão também como aviso comum. Antes o iPhone
+      // ficava até 10 min sem nada (nem o "chegou") quando a atividade não chegava a abrir (Atividades ao Vivo
+      // desligadas, extensão ausente, iOS recusou o push-to-start).
+      const skipIphone =
+        route === 'activity' || (route === 'dismissed' && input.live.quiet && input.live.state === 'moving') || (route === 'starting' && input.live.state === 'moving');
+      // `iphoneOnly`: o aviso da sua própria chegada. O Android já mostra o dele (aviso fixo do serviço de localização).
+      // A sua própria chegada acabou: só fecha a Live Activity, sem mandar aviso para você mesmo.
+      if (input.iphoneOnly && input.live.state === 'stopped') return;
+      const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(skipIphone && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)) && !(input.iphoneOnly && !s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
       const image = input.who?.image;
       const sound = await chosenSound(notifications, input.userId, 'arrival');
       await Promise.all(
@@ -204,13 +211,14 @@ export class StoredNotifier implements Notifier {
 
   /**
    * Manda a chegada para a Live Activity do iPhone: atualiza a que está aberta (token registrado pelo app) ou abre
-   * uma pelo token "push-to-start". `activity`: o iPhone foi atendido assim (aí não vai o aviso comum); `dismissed`:
-   * a pessoa fechou a atividade; `none`: segue o aviso comum.
+   * uma pelo token "push-to-start". `activity`: o iPhone foi atendido assim (aí não vai o aviso comum); `starting`: a
+   * atividade foi pedida antes e o iPhone ainda não registrou o token dela (pode nunca abrir: "chegou" e "parou" seguem
+   * também como aviso comum); `dismissed`: a pessoa fechou a atividade; `none`: segue o aviso comum.
    */
   private async liveActivity(
     input: { userId: string; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string }; reopen?: boolean },
     all: PushSubscriptionRecord[],
-  ): Promise<'activity' | 'dismissed' | 'none'> {
+  ): Promise<'activity' | 'starting' | 'dismissed' | 'none'> {
     const { push, pushSubscriptions, clock } = this.deps;
     const tokens = this.deps.liveActivityTokens;
     if (!push.liveActivity || !tokens) return 'none';
@@ -264,7 +272,7 @@ export class StoredNotifier implements Notifier {
       return 'none';
     }
     const startedAt = this.activityStarts.get(key);
-    if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return 'activity';
+    if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return 'starting';
     const attributes = { name: input.who?.name ?? '', tag: input.tag, url: input.url, registration: tokens.issue(input.userId, input.tag) };
     const results = await Promise.all(starters.map((sub) => send(sub, 'start', { attributes })));
     if (!results.includes('SENT')) return 'none';

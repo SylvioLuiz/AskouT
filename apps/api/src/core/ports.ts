@@ -1230,7 +1230,7 @@ export interface Notifier {
   /** Tira do sino os avisos com essa chave (o convite foi cancelado). Opcional nos dublês de teste. */
   withdraw?(userId: string, dedupeKey: string): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
-  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void>;
+  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean; iphoneOnly?: boolean }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */
