@@ -1412,6 +1412,8 @@ export interface AlbumRepository {
   deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean>;
   /** Marca que o aviso do dia seguinte já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
   markSummarized(albumId: string, userId: string, at: Date): Promise<boolean>;
+  /** Muda o início do álbum (o evento mudou de data ou foi adiado). */
+  setStartedAt(albumId: string, at: Date): Promise<void>;
 }
 
 /** Stories públicos de locais verificados, denúncias, silenciar local e preferência de quem vê. */

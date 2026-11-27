@@ -174,10 +174,13 @@ export class AlbumService {
     const from = new Date(now.getTime() - RECENT_HOURS * HOUR);
     const events: { ref: EventRef; title: string; startsAt: Date; where: string | null; ownerId: string | null }[] = [];
     for (const { event, venue } of await places.searchEvents({ from, to: now, limit: BATCH })) {
+      // Adiado sem nova data: a data guardada é a antiga, o álbum espera a nova.
+      if (event.postponedAt && !event.postponedFrom) continue;
       if (event.startsAt > from && event.startsAt <= now) events.push({ ref: { source: 'PLACE', id: event.id }, title: event.title, startsAt: event.startsAt, where: venue.name, ownerId: null });
     }
     for (const { post } of await posts.listEventsStartingBetween(from, now, BATCH)) {
       if (post.eventTitle === null || post.eventStartsAt === null || post.eventStartsAt <= from) continue;
+      if (post.eventPostponedAt && !post.eventPostponedFrom) continue;
       events.push({ ref: { source: 'USER', id: post.id }, title: post.eventTitle, startsAt: post.eventStartsAt, where: post.placeName, ownerId: post.authorId });
     }
     let touched = 0;
@@ -186,6 +189,8 @@ export class AlbumService {
       if (e.ownerId) people.add(e.ownerId);
       if (people.size === 0) continue;
       const album = await albums.ensure({ id: ids.next(), kind: 'EVENT', refId: eventRefId(e.ref), title: e.title, placeName: e.where, startedAt: e.startsAt, createdAt: now });
+      // Álbum aberto na data antiga de um evento que mudou de data (ou foi adiado): passa a valer a nova.
+      if (album.startedAt.getTime() !== e.startsAt.getTime()) await albums.setStartedAt(album.id, e.startsAt);
       await albums.addMembers(album.id, [...people], now);
       touched += 1;
     }
@@ -205,6 +210,15 @@ export class AlbumService {
     const due = (await albums.listStartedBetween(new Date(now.getTime() - RECENT_HOURS * HOUR), now, BATCH)).filter((a) => localParts(a.startedAt).day < local.day);
     let sent = 0;
     for (const album of due) {
+      // Evento que mudou de data ou foi adiado depois que o álbum abriu: o aviso sai no dia seguinte à nova data, não à antiga.
+      if (album.kind === 'EVENT') {
+        const start = await this.eventStart(album.refId);
+        if (start === null) continue;
+        if (start && start.getTime() !== album.startedAt.getTime()) {
+          await albums.setStartedAt(album.id, start);
+          if (start > now || localParts(start).day >= local.day) continue;
+        }
+      }
       const members = await albums.listMembers(album.id);
       const where = album.placeName ?? album.title ?? (album.kind === 'FLASH' ? 'um encontro do NOW' : 'um evento');
       for (const userId of members) {
@@ -224,6 +238,22 @@ export class AlbumService {
       }
     }
     return sent;
+  }
+
+  /**
+   * Início atual do evento do álbum. `null`: adiado sem nova data (espera). `undefined`: não achou o evento (vale o do álbum).
+   */
+  private async eventStart(refId: string): Promise<Date | null | undefined> {
+    const [source, id] = refId.split(':');
+    if (!id) return undefined;
+    if (source === 'PLACE') {
+      const event = (await this.deps.places.findEvent(id))?.event;
+      if (!event) return undefined;
+      return event.postponedAt && !event.postponedFrom ? null : event.startsAt;
+    }
+    const post = (await this.deps.posts.findById(id))?.post;
+    if (!post || !post.eventStartsAt) return undefined;
+    return post.eventPostponedAt && !post.eventPostponedFrom ? null : post.eventStartsAt;
   }
 
   private async memberAlbum(viewerId: string, albumId: string): Promise<AlbumRecord> {
