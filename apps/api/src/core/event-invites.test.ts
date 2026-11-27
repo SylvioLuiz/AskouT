@@ -47,6 +47,21 @@ test('evento privado com marcação aceita aparece no perfil de quem foi marcada
   assert.deepEqual(await eventIds(caio, 'ana'), []);
 });
 
+test('quem removeu a própria marcação vê isso no evento e pode aceitar de novo', async () => {
+  const { w, ana, bia, caio, make } = await setup();
+  const post = await make(false, [bia]);
+  assert.equal((await w.core.eventPages.get(bia, post.id)).myTag, 'PENDING');
+  await w.core.posts.respondTag(bia, post.id, 'accept');
+  await w.core.posts.respondTag(bia, post.id, 'decline');
+  assert.equal((await w.core.eventPages.get(bia, post.id)).myTag, 'DECLINED');
+  assert.deepEqual((await w.core.posts.listByUsername(bia, 'bia', { kind: 'event' })).items, []);
+  await w.core.posts.respondTag(bia, post.id, 'accept');
+  assert.equal((await w.core.eventPages.get(bia, post.id)).myTag, 'ACCEPTED');
+  assert.deepEqual((await w.core.posts.listByUsername(bia, 'bia', { kind: 'event' })).items.map((p) => p.id), [post.id], 'o evento volta para o perfil');
+  assert.equal((await w.core.eventPages.get(caio, post.id)).myTag, null, 'quem não foi marcado não tem marcação');
+  assert.equal((await w.core.eventPages.get(ana, post.id)).myTag, null, 'a dona não tem marcação');
+});
+
 test('evento privado: convidar cria a marcação; dá para convidar mais gente depois', async () => {
   const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
   const post = await make(true);

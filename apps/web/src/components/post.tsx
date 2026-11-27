@@ -453,6 +453,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track, openCo
           onNotInterested={() => void run(() => api.notInterested(post.id), 'hidden')}
           onDelete={() => void run(() => api.deletePost(post.id), 'deleted')}
           onRemoveTag={myTag === 'ACCEPTED' && !post.mine ? () => void answerTag('decline').then(() => setSheet(undefined)) : undefined}
+          onRestoreTag={myTag === 'DECLINED' && !post.mine ? () => void answerTag('accept').then(() => setSheet(undefined)) : undefined}
         />
       ) : null}
       {sheet === 'edit' ? (
