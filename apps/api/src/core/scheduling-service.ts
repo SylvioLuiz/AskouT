@@ -881,7 +881,8 @@ export class SchedulingService {
       editedAt: clock.now(),
     });
     const ref = { source: 'USER' as const, id: post.id };
-    for (const userId of new Set([post.authorId, ...going])) await eventRoom.addGoing(ref, userId, clock.now());
+    // O dono entra com o evento na aba Eventos (presença do dono fora do perfil quer dizer que ele tirou o evento de lá).
+    for (const userId of new Set([post.authorId, ...going])) await eventRoom.addGoing(ref, userId, clock.now(), userId === post.authorId);
     // Quem confirmou a data aceitou o evento: entra no grupo dele (quem já estava continua).
     for (const userId of new Set(going)) if (userId !== post.authorId) await joinEventGroups(this.deps, post.id, userId);
   }
