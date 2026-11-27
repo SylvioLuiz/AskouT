@@ -168,3 +168,31 @@ test('adiar pelo menu dizendo que a data atual já é a nova mostra "Adiado para
   const near = await other.w.eventRoom.listGoingStartingBetween(new Date(other.start.getTime() - H), other.start, 50);
   assert.ok(near.some((g) => g.ref.id === other.post.id));
 });
+
+test('álbum de evento adiado: o aviso de fotos sai no dia seguinte à nova data, não à antiga', async () => {
+  const { w, ana, caio, post, start } = await userEvent();
+  w.clock.tick(start.getTime() - w.clock.now().getTime() + H);
+  assert.equal(await w.core.albums.syncEvents(), 1, 'abriu o álbum na data antiga');
+  const next = new Date(start.getTime() + 3 * 24 * H);
+  await w.core.posts.update(ana, post.id, { event: { title: 'Churrasco', startsAt: next.toISOString(), postponed: true } });
+  const summaries = async () => (await w.notifications.listForUser(caio, 50)).filter((n) => n.type === 'ALBUM_SUMMARY').length;
+  // Dia seguinte à data antiga, 11 h em São Paulo: nada.
+  w.clock.tick(24 * H);
+  assert.equal(await w.core.albums.sendSummaries(), 0);
+  assert.equal(await summaries(), 0);
+  // Dia seguinte à nova data: o álbum volta a valer e o aviso sai.
+  w.clock.tick(next.getTime() - w.clock.now().getTime() + 24 * H + 2 * H);
+  await w.core.albums.syncEvents();
+  assert.ok((await w.core.albums.sendSummaries()) > 0);
+  assert.equal(await summaries(), 1);
+});
+
+test('álbum de evento adiado sem nova data espera', async () => {
+  const { w, ana, caio, post, start } = await userEvent();
+  await w.core.posts.setPostponed(ana, post.id, true);
+  w.clock.tick(start.getTime() - w.clock.now().getTime() + H);
+  assert.equal(await w.core.albums.syncEvents(), 0);
+  w.clock.tick(24 * H);
+  await w.core.albums.sendSummaries();
+  assert.equal((await w.notifications.listForUser(caio, 50)).filter((n) => n.type === 'ALBUM_SUMMARY').length, 0);
+});

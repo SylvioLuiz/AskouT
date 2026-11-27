@@ -89,4 +89,9 @@ export class PrismaAlbumRepository implements AlbumRepository {
     // Só uma instância consegue virar a linha de "nunca avisado" para "avisado".
     return (await this.prisma.albumMember.updateMany({ where: { albumId, userId, summarizedAt: null }, data: { summarizedAt: at } })).count > 0;
   }
+
+  async setStartedAt(albumId: string, at: Date): Promise<void> {
+    if (!isUuid(albumId)) return;
+    await this.prisma.album.updateMany({ where: { id: albumId }, data: { startedAt: at } });
+  }
 }
