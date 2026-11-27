@@ -75,7 +75,9 @@ function personPin(className: string, text: string, photo: string | null | undef
 
 export default function MatchMap({ me, mePhoto, others, places = [], selectedKey, onPick, destination, routes, onFail }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  const live = useRef<{ map: MapEngine; me?: EngineMarker; others: Map<string, EngineMarker>; places: Map<string, EngineMarker>; dest?: EngineMarker; fitKey: string } | undefined>(undefined);
+  const live = useRef<{ map: MapEngine; me?: EngineMarker; others: Map<string, EngineMarker>; places: Map<string, EngineMarker>; dest?: EngineMarker; peopleKey: string; destKey: string } | undefined>(undefined);
+  const destRef = useRef(destination);
+  destRef.current = destination;
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
   const failRef = useRef(onFail);
@@ -92,7 +94,7 @@ export default function MatchMap({ me, mePhoto, others, places = [], selectedKey
           map.destroy();
           return;
         }
-        live.current = { map, others: new Map(), places: new Map(), fitKey: '' };
+        live.current = { map, others: new Map(), places: new Map(), peopleKey: '', destKey: '' };
         setReady(true);
       } catch {
         if (!cancelled) failRef.current();
@@ -136,10 +138,13 @@ export default function MatchMap({ me, mePhoto, others, places = [], selectedKey
     }
 
     // Reenquadra só quando aparece ou some um pin, para não tirar o mapa do lugar enquanto a pessoa o move.
-    const fitKey = `${me ? 'm' : ''}|${[...wanted].sort().join(',')}`;
-    if (fitKey !== state.fitKey && fitKey !== '|') {
-      state.fitKey = fitKey;
-      const points: MapPin[] = [...(me ? [me] : []), ...others];
+    // A chave das pessoas é separada da do destino: antes as duas dividiam o mesmo texto, então cada nova posição
+    // parecia "pin novo" e o mapa enquadrava só as pessoas e depois o destino, num vai e volta de zoom sem fim.
+    const peopleKey = `${me ? 'm' : ''}|${[...wanted].sort().join(',')}`;
+    if (peopleKey !== state.peopleKey && peopleKey !== '|') {
+      state.peopleKey = peopleKey;
+      const dest = destRef.current;
+      const points: MapPin[] = [...(dest ? [dest] : []), ...(me ? [me] : []), ...others];
       const first = points[0] as MapPin;
       if (points.length === 1) map.moveTo(first, { zoom: 16 });
       else map.fit(points, 64, 17);
@@ -216,8 +221,8 @@ export default function MatchMap({ me, mePhoto, others, places = [], selectedKey
     const state = live.current;
     if (!ready || !state || !destination) return;
     const key = `${destination.lat},${destination.lng}`;
-    if (state.fitKey.endsWith(`>${key}`)) return;
-    state.fitKey = `${state.fitKey.split('>')[0] ?? ''}>${key}`;
+    if (state.destKey === key) return;
+    state.destKey = key;
     const points: MapPin[] = [destination, ...(me ? [me] : []), ...others];
     state.map.fit(points, 64, 17, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

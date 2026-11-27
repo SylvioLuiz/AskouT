@@ -295,3 +295,57 @@ test('chegada com lugar combinado: quem espera se mover não muda a chegada do o
   await w.core.flushNotifications();
   assert.equal(liveSent(w).length, before);
 });
+
+test('Live Activity pedida que nunca abriu no iPhone: o "chegou" vai também como aviso comum', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  w.push.liveActivities = true;
+  await w.core.notifications.subscribe(bia, { endpoint: `apnsls:${'cd'.repeat(32)}`, keys: {} });
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(1500));
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+  assert.equal(w.push.activities.length, 1, 'pediu a atividade');
+  const apnsToBia = () => liveSent(w).filter((s) => s.subscription.endpoint.startsWith('apns:') && s.subscription.userId === bia);
+
+  // O iPhone nunca registra a atividade. As trocas silenciosas não viram aviso comum...
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(ana, inviteId, north(700));
+  await w.core.flushNotifications();
+  assert.equal(apnsToBia().length, 0);
+
+  // ...mas a chegada sim.
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(ana, inviteId, north(30));
+  await w.core.flushNotifications();
+  const alerts = apnsToBia();
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]!.message.title, 'ana chegou');
+});
+
+test('quem mostra a chegada vê a própria no iPhone (o Android já tem o aviso fixo)', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  await w.pushSubscriptions.upsert({ userId: ana, endpoint: 'apns:' + '12'.repeat(32), p256dh: '', auth: '', createdAt: w.clock.now() });
+  await w.pushSubscriptions.upsert({ userId: ana, endpoint: 'fcm:android-da-ana', p256dh: '', auth: '', createdAt: w.clock.now() });
+  await w.core.flash.chooseDestination(ana, inviteId, { name: 'Café', ...HERE });
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(1500));
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+  const toAna = () => liveSent(w).filter((s) => s.subscription.userId === ana);
+  assert.deepEqual(toAna().map((s) => s.subscription.endpoint.slice(0, 5)), ['apns:'], 'só no iPhone');
+  assert.match(toAna()[0]!.message.body, /até Café$/);
+  assert.equal(toAna()[0]!.message.live?.quiet, true, 'a saída não toca');
+
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(ana, inviteId, north(30));
+  await w.core.flushNotifications();
+  const arrived = toAna().at(-1)!;
+  assert.equal(arrived.message.body, 'Você chegou em Café');
+  assert.equal(arrived.message.live?.quiet, false);
+
+  // Parar não manda aviso para a própria pessoa.
+  const before = toAna().length;
+  await w.core.flash.setArrival(ana, inviteId, false);
+  await w.core.flushNotifications();
+  assert.equal(toAna().length, before);
+});

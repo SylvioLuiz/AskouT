@@ -3403,6 +3403,7 @@ export const EN: Readonly<Record<string, string>> = {
   "{name} liberou você a acompanhar a chegada pelas notificações do celular.": "{name} is letting you follow their arrival in your phone's notifications.",
   "Sua chegada": "Your arrival",
   "Mostrando sua chegada para {name}": "Showing your arrival to {name}",
+  "Compartilhando sua localização com {name}": "Sharing your location with {name}",
   "{name} vê nas notificações quanto falta para você chegar. Deixe o AskouT aberto no caminho para o tempo ir se atualizando.": "{name} sees in their notifications how long until you arrive. Keep AskouT open on the way so the time keeps updating.",
   "Parar de mostrar minha chegada": "Stop showing my arrival",
   "Mostrar minha chegada para {name}": "Show my arrival to {name}",

@@ -318,9 +318,14 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
       if (points.length === 0) return;
       const bounds = new core.LatLngBounds();
       for (const p of points) bounds.extend(p);
+      // O teto de zoom vale já no fitBounds: corrigir depois (no "idle") fazia o mapa ir até o zoom máximo e voltar,
+      // um pulo visível quando as pessoas estão perto uma da outra.
+      const previous = map.get('maxZoom') as number | null | undefined;
+      map.setOptions({ maxZoom });
       map.fitBounds(bounds, padding);
       core.event.addListenerOnce(map, 'idle', () => {
         if ((map.getZoom() ?? 0) > maxZoom) map.setZoom(maxZoom);
+        map.setOptions({ maxZoom: previous ?? null });
       });
     },
     zoomBy(delta) {

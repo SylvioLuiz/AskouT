@@ -4122,6 +4122,11 @@ export class InMemoryAlbumRepository implements AlbumRepository {
     this.summarized.add(key);
     return true;
   }
+
+  async setStartedAt(albumId: string, at: Date): Promise<void> {
+    const album = this.albums.get(albumId);
+    if (album) album.startedAt = at;
+  }
 }
 
 export class InMemoryVenueStoryRepository implements VenueStoryRepository {

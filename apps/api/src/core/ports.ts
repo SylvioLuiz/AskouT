@@ -1230,7 +1230,7 @@ export interface Notifier {
   /** Tira do sino os avisos com essa chave (o convite foi cancelado). Opcional nos dublês de teste. */
   withdraw?(userId: string, dedupeKey: string): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
-  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void>;
+  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean; iphoneOnly?: boolean }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */
@@ -1412,6 +1412,8 @@ export interface AlbumRepository {
   deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean>;
   /** Marca que o aviso do dia seguinte já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
   markSummarized(albumId: string, userId: string, at: Date): Promise<boolean>;
+  /** Muda o início do álbum (o evento mudou de data ou foi adiado). */
+  setStartedAt(albumId: string, at: Date): Promise<void>;
 }
 
 /** Stories públicos de locais verificados, denúncias, silenciar local e preferência de quem vê. */
